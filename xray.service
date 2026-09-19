@@ -1,0 +1,12 @@
+[Unit]
+Description=Xray core (Aurora, :8899 mixed, :8897 api)
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/xray run -c /opt/aurora/xray.json
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

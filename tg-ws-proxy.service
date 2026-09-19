@@ -1,0 +1,12 @@
+[Unit]
+Description=Telegram WS proxy (Aurora, :1443)
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/opt/aurora/run_tgws.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

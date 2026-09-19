@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Aurora — прокси</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <div class="hrow">
+    <div class="logo"><span class="ic">🐱</span><div>Aurora<small>VPN PROXY</small></div></div>
+    <nav id="nav">
+      <button data-t="status" class="on"><span class="ic">🏠</span>Статус</button>
+      <button data-t="keys"><span class="ic">🔑</span>Ключи</button>
+      <button data-t="devices"><span class="ic">📱</span>Устройства</button>
+      <button data-t="connect"><span class="ic">🌐</span>Подключение</button>
+      <button data-t="rusegment"><span class="ic">🇷🇺</span>Ру-сегмент</button>
+      <button data-t="tgws"><span class="ic">✈️</span>TG-WS</button>
+    </nav>
+    <button id="theme-btn" class="theme-btn" title="Сменить тему">🌙</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="hero" id="hero">
+    <div class="cat">🐱</div>
+    <div>
+      <div class="hero-head">
+        <h1 id="hero-title">Котик просыпается…</h1>
+        <span class="badge on" id="hero-badge">VPN</span>
+      </div>
+      <div class="sub" id="hero-sub">Aurora v?.?.? · загрузка</div>
+    </div>
+    <div class="actions">
+      <button class="btn primary" id="btn-vpn">🌀 VPN</button>
+      <button class="btn" id="btn-rotate">🎲 Поменять ключ</button>
+    </div>
+  </div>
+
+  <div class="metrics">
+    <div class="stat"><div class="k">🐾 Режим</div><div class="v" id="mode">-</div></div>
+    <div class="stat"><div class="k">🔑 Активный ключ</div><div class="v mono" id="vless">-</div></div>
+    <div class="stat"><div class="k">🌍 Выходной IP</div><div class="v mono" id="egress">-</div></div>
+    <div class="stat"><div class="k">📶 Соединения</div><div class="v" id="conns">0</div></div>
+    <div class="stat"><div class="k">📦 Трафик ↓ / ↑</div><div class="v mono" id="traffic">0 / 0</div></div>
+  </div>
+
+  <section class="tab show" id="t-status">
+    <div class="card">
+      <h2><span class="ic">🛠️</span>Управление</h2>
+      <div class="actions">
+        <button class="btn" id="btn-refresh">🔄 Обновить из GitHub</button>
+        <button class="btn" id="btn-check">🧪 Проверить ключи</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2><span class="ic">🩺</span>Журнал восстановления</h2>
+      <div class="logbox" id="rclog">пока пусто…</div>
+    </div>
+    <div class="card">
+      <h2><span class="ic">🗒️</span>Лог</h2>
+      <div class="logbox" id="log">загрузка…</div>
+    </div>
+  </section>
+
+  <section class="tab" id="t-keys">
+    <div class="card">
+      <h2><span class="ic">🔑</span>Ключи</h2>
+      <div class="cmd-row" style="margin-bottom:14px">
+        <input type="text" id="keyuri" placeholder="vless://… вставьте свою ссылку (Reality)">
+        <button class="btn" onclick="keyAdd()">➕ Свой ключ</button>
+      </div>
+      <div class="actions" style="margin-bottom:14px">
+        <span class="badge" id="keyinfo">ключей: 0</span>
+        <button class="btn" id="btn-clean" title="Удалить мёртвые github-ключи (без IP / пинг > 500мс / в блеклисте)" onclick="keyClean()">🧹 Очистить мёртвые</button>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Тег</th><th>Источник</th><th>Статус</th><th>Пинг</th><th>Exit IP</th><th>Sites</th><th>Действия</th></tr></thead>
+          <tbody id="keyrows"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="tab" id="t-devices">
+    <div class="card">
+      <h2><span class="ic">📱</span>Устройства</h2>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Устройство</th><th>IP</th><th>Conn</th><th>↓ скачано</th><th>↑ отдано</th></tr></thead>
+          <tbody id="devrows"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="tab" id="t-connect">
+    <div class="card">
+      <h2><span class="ic">🌐</span>Подключение извне <span class="badge off" id="cx-flag">выключено</span></h2>
+      <p class="hint">Готовая vless-ссылка на ваш домашний прокси. Вставьте её в v2rayN / v2rayNG / NekoBox на телефоне или ПК — и ваш трафик пойдёт через этот сервер откуда угодно.</p>
+      <div class="qr-box" id="cx-qr"></div>
+      <div class="cmd-row" style="margin-bottom:6px">
+        <input type="text" id="cx-link" readonly>
+        <button class="btn" id="cx-copy" onclick="cxCopy()">📋 Копировать</button>
+      </div>
+      <div class="metrics" style="margin:0 0 4px">
+        <div class="stat"><div class="k">🔗 Адрес</div><div class="v mono" id="cx-host">-</div></div>
+        <div class="stat"><div class="k">🔌 Порт</div><div class="v mono" id="cx-port">-</div></div>
+        <div class="stat"><div class="k">🆔 UUID</div><div class="v mono" id="cx-uuid">-</div></div>
+        <div class="stat"><div class="k">🛡️ SNI</div><div class="v mono" id="cx-sni">-</div></div>
+      </div>
+      <div class="hint" style="margin-top:10px">⚠️ Не забудьте пробросить порт <b>8443</b> на роутере (WAN → IP_ВАШЕГО_СЕРВЕРА:8443), иначе извне сервер недоступен.</div>
+    </div>
+  </section>
+
+  <section class="tab" id="t-rusegment">
+    <div class="card">
+      <h2><span class="ic">🇷🇺</span>Ру-сегмент <span class="badge off" id="ru-flag">не проверено</span></h2>
+      <p class="hint">Доступность российских ресурсов напрямую с сервера (без VPN). Проверяется HTTP-ответ каждого домена — если сегмент работает, RU-сайты открываются без прокси.</p>
+      <div class="metrics" style="margin:0 0 4px">
+        <div class="stat"><div class="k">✅ Доступно</div><div class="v" id="ru-ok">–</div></div>
+        <div class="stat"><div class="k">💀 Проблемы</div><div class="v" id="ru-bad">–</div></div>
+        <div class="stat"><div class="k">⚡ Медиана пинга</div><div class="v mono" id="ru-med">–</div></div>
+        <div class="stat"><div class="k">🕐 Проверено</div><div class="v mono" id="ru-ts">ещё не проверено</div></div>
+      </div>
+      <div class="actions" style="margin-bottom:14px">
+        <button class="btn" id="ru-run" onclick="ruCheck()">🧪 Проверить сейчас</button>
+        <button class="btn small" id="ru-failonly" onclick="ruToggleFail()">💀 Только проблемы</button>
+        <span class="badge mono" style="margin-left:auto">доступность · без VPN</span>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Домен</th><th>IP</th><th>HTTP</th><th>Время</th><th>Статус</th></tr></thead>
+          <tbody id="rurows">
+            <tr><td colspan="5" class="empty"><span class="ic">🌍</span>Данные появятся после проверки</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="tab" id="t-tgws">
+    <div class="card">
+      <h2><span class="ic">✈️</span>Telegram WS-прокси</h2>
+      <div class="metrics" style="margin:0 0 4px">
+        <div class="stat"><div class="k">⚙️ Процесс</div><div class="v" id="tg-on">-</div></div>
+        <div class="stat"><div class="k">🔌 Порт</div><div class="v mono" id="tg-port">-</div></div>
+        <div class="stat"><div class="k">🤫 Секрет</div><div class="v mono" id="tg-sec" style="font-size:14px">-</div></div>
+      </div>
+      <div class="actions">
+        <button class="btn" onclick="api('tgws/restart',{},refresh)">🔄 Рестарт TG-WS</button>
+      </div>
+      <div class="qr-box" id="tg-qr"></div>
+    </div>
+  </section>
+</main>
+
+<!-- ДОК-БАР: процесс загрузки и проверки ключей -->
+<aside class="dock" id="dock" onclick="dockToggle()">
+  <span class="dock-mascot" id="dock-mascot">🐱</span>
+  <div class="dock-faze" id="dock-faze">Все котики на месте</div>
+  <div class="dock-track"><div class="dock-fill" id="dock-fill"><i class="dock-tail"></i></div></div>
+  <span class="dock-pct mono" id="dock-pct"></span>
+  <div class="dock-stats" id="dock-stats"></div>
+  <div class="dock-detail" id="dock-detail"></div>
+</aside>
+
+<footer>Сделано с любовью и котиками 🐱💕<span class="ic"></span></footer>
+<div id="toast"></div>
+<script src="/app.js"></script>
+</body>
+</html>

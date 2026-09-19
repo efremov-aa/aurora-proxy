@@ -1,0 +1,30 @@
+# Aurora VPN-прокси: docker-compose
+# Запуск:   docker compose up -d --build
+# Порт xray-mixed :8899 — внутрилокальный прокси; пробросьте наружу при необходимости.
+services:
+  aurora:
+    build: .
+    container_name: aurora
+    restart: unless-stopped
+    environment:
+      XRAY_MANAGE: proc
+      AURORA_HOST: ${AURORA_HOST:-0.0.0.0}
+      AURORA_WHITE_IP: ${AURORA_WHITE_IP:-}
+      # Внешний VLESS-Reality (опционально)
+      AURORA_VLESS_ENABLED: ${AURORA_VLESS_ENABLED:-false}
+      AURORA_VLESS_PORT: ${AURORA_VLESS_PORT:-8443}
+      AURORA_VLESS_HOST: ${AURORA_VLESS_HOST:-}
+      AURORA_VLESS_UUID: ${AURORA_VLESS_UUID:-}
+      AURORA_VLESS_PRIVATE_KEY: ${AURORA_VLESS_PRIVATE_KEY:-}
+      AURORA_VLESS_PUBLIC_KEY: ${AURORA_VLESS_PUBLIC_KEY:-}
+      AURORA_VLESS_SHORT_ID: ${AURORA_VLESS_SHORT_ID:-}
+      AURORA_VLESS_SNI: ${AURORA_VLESS_SNI:-www.microsoft.com}
+      AURORA_VLESS_FLOW: ${AURORA_VLESS_FLOW:-xtls-rprx-vision}
+    ports:
+      - "8890:8890"   # Web-панель
+      - "8897:8897"   # xray API (докемо-интрес)
+      - "1443:1443"   # Telegram WS-прокси
+      # - "8899:8899"  # mixed-прокси (опционально, если нужен наружу)
+      # - "8443:8443"  # внешний VLESS-Reality
+    volumes:
+      - ./data:/app/data

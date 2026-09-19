@@ -1,0 +1,13 @@
+[Unit]
+Description=Aurora VPN Proxy (панель :8890, xray :8899)
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/aurora
+ExecStart=/usr/bin/python3 /opt/aurora/run.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
