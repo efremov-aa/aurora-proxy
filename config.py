@@ -6,8 +6,8 @@ import os
 import threading
 import time
 
-VERSION = "1.1.0"
-VERSION_NAME = "Свежие ключи"
+VERSION = "1.2.0"
+VERSION_NAME = "Windows-fix"
 APP_NAME = "Aurora"
 
 # --- пути (относительно корня проекта) ---

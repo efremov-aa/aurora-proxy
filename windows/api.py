@@ -77,6 +77,9 @@ def build_state():
     st["egress_ip"] = core.egress_ip()
     st["comm"] = st.pop("comm", {"state": "idle", "msg": ""})
     st["vless_ext"] = _vless_ext()
+    st["white_ip"] = config.get_white_ip() if hasattr(config, "get_white_ip") else ""
+    st["bypass_domains"] = config.get_bypass_domains() if hasattr(config, "get_bypass_domains") else []
+    st["tgws_link"] = tgws.tgws_link()
     # ключи в пуле
     keys = pool.get_keys()
     vless_now = st["vless_now"]
@@ -134,6 +137,10 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/app.js":
             self._send(200, "application/javascript; charset=utf-8", ui.APP.encode("utf-8"))
             return
+        if path == "/qr.js":
+            qjs = ui.QJS if hasattr(ui, "QJS") else ""
+            self._send(200, "application/javascript; charset=utf-8", qjs.encode("utf-8"))
+            return
         if path == "/api/state":
             self._send(*_json(build_state()))
             return
@@ -184,6 +191,7 @@ class Handler(BaseHTTPRequestHandler):
             "/api/agent/cmd": self._agent_cmd,
             "/api/tgws/restart": self._tgws_restart,
             "/api/rusegment/check": self._rusegment_check,
+            "/api/whitelist": self._whitelist,
         }.get(path)
         if handler:
             handler(data)
@@ -284,6 +292,28 @@ class Handler(BaseHTTPRequestHandler):
     def _rusegment_check(self, data):
         started = rusegment.check_all()
         self._send(*_json({"ok": True, "started": started}))
+
+    def _whitelist(self, data):
+        # Белый список: белый IP провайдера + кастомные домены (идут напрямую).
+        try:
+            if hasattr(config, "set_white_ip") and "white_ip" in data:
+                config.set_white_ip(str(data.get("white_ip") or "").strip())
+            if hasattr(config, "set_bypass_domains") and "bypass_domains" in data:
+                raw = data.get("bypass_domains") or []
+                if isinstance(raw, str):
+                    raw = [d for d in raw.replace("\r", "\n").split("\n") if d.strip()]
+                config.set_bypass_domains(raw)
+            if config.get("vpn_mode", True):
+                threading.Thread(target=core.sync, daemon=True).start()
+            resp = {
+                "ok": True,
+                "white_ip": config.get_white_ip() if hasattr(config, "get_white_ip") else "",
+                "bypass_domains": config.get_bypass_domains() if hasattr(config, "get_bypass_domains") else [],
+                "msg": "белый список сохранён",
+            }
+        except Exception as e:
+            resp = {"ok": False, "error": str(e)}
+        self._send(*_json(resp))
 
 
 def serve(port=None):

@@ -6,8 +6,8 @@ import os
 import threading
 import time
 
-VERSION = "1.1.0"
-VERSION_NAME = "Свежие ключи"
+VERSION = "1.2.0"
+VERSION_NAME = "Windows-fix"
 APP_NAME = "Aurora"
 
 # --- пути (относительно корня проекта) ---
@@ -18,11 +18,11 @@ LOG_FILE = os.path.join(BASE_DIR, "aurora.log")
 
 os.makedirs(DATA_DIR, exist_ok=True)
 
-# --- порты (привязаны к клиентским устройствам, НЕ менять без запроса) ---
-UI_PORT = 8890            # панель Aurora
-XRAY_PORT = 8899          # mixed-вход xray (http+socks)
-XRAY_API_PORT = 8897      # докодемо-API xray (статистика)
-TGWS_PORT = 1443          # Telegram WS-прокси
+# --- порты (конфигурируются через env AURORA_*_PORT; дефолты совместимы с сервером) ---
+UI_PORT = int(os.environ.get("AURORA_UI_PORT", "8890"))            # панель Aurora
+XRAY_PORT = int(os.environ.get("AURORA_XRAY_PORT", "8899"))        # mixed-вход xray (http+socks)
+XRAY_API_PORT = int(os.environ.get("AURORA_XRAY_API_PORT", "8897"))  # докодемо-API xray (статистика)
+TGWS_PORT = int(os.environ.get("AURORA_TGWS_PORT", "1443"))        # Telegram WS-прокси
 
 # --- сеть (значения из env, дефолты безопасны) ---
 # На Windows локальный адрес авто-определяется (для внешних ссылок/QR).
@@ -124,10 +124,11 @@ ROTATE_COOLDOWN_S = 180.0 # демпф ротации
 VPN_KEYS_N = 4            # сколько ключей попадает в xray.json при VPN ON
 
 # --- внешнее подключение (VLESS-Reality inbound :8443) ---
-# Отключено по умолчанию. Заполните свои ВСЕ поля через env AURORA_VLESS_* (см. README/.env.example),
-# иначе register_public_inbound() вернёт False и внешний inbound не создастся.
+# На Windows/публичной сборке ключи генерируются автоматически при первом старте
+# (см. ensure_vless()): uuid + пара x25519 через `xray x25519`, сохраняются в data/vless_public.json.
+# Вручную можно переопределить через env AURORA_VLESS_* (см. README/.env.example).
 VLESS_PUBLIC = {
-    "enabled": os.environ.get("AURORA_VLESS_ENABLED", "").lower() == "true",
+    "enabled": os.environ.get("AURORA_VLESS_ENABLED", "true").lower() != "false",
     "port": int(os.environ.get("AURORA_VLESS_PORT", "8443")),
     "host": os.environ.get("AURORA_VLESS_HOST", "127.0.0.1"),
     "uuid": os.environ.get("AURORA_VLESS_UUID", ""),
@@ -137,6 +138,113 @@ VLESS_PUBLIC = {
     "sni": os.environ.get("AURORA_VLESS_SNI", "www.microsoft.com"),
     "flow": os.environ.get("AURORA_VLESS_FLOW", "xtls-rprx-vision"),
 }
+
+_VLESS_FILE = os.path.join(DATA_DIR, "vless_public.json")
+
+
+def _gen_vless_material():
+    """uuid + пара x25519 через `xray x25519`. Возвращает (uuid, priv, pub) или None."""
+    import subprocess
+    import uuid as _uuid
+    xbin = os.path.join(BASE_DIR, "bin", "xray.exe")
+    if not os.path.exists(xbin):
+        xbin = os.path.join(BASE_DIR, "xray")
+    if not os.path.exists(xbin):
+        return None
+    try:
+        out = subprocess.run([xbin, "x25519"], capture_output=True, text=True, timeout=10).stdout
+    except Exception:
+        return None
+    priv = pub = ""
+    for ln in out.splitlines():
+        if ln.startswith("PrivateKey:"):
+            priv = ln.split(":", 1)[1].strip()
+        elif ln.startswith("PublicKey:"):
+            pub = ln.split(":", 1)[1].strip()
+    if not priv or not pub:
+        return None
+    return str(_uuid.uuid4()), priv, pub
+
+
+def ensure_vless():
+    """Авто-включение внешнего VLESS: env -> сохранённый -> автогенерация. Возвращает VLESS_PUBLIC."""
+    global VLESS_PUBLIC
+    if VLESS_PUBLIC.get("enabled") and VLESS_PUBLIC.get("uuid") and VLESS_PUBLIC.get("private_key"):
+        return VLESS_PUBLIC
+    saved = {}
+    try:
+        with open(_VLESS_FILE, "r", encoding="utf-8") as f:
+            saved = json.load(f)
+    except (OSError, ValueError):
+        saved = {}
+    if saved.get("uuid") and saved.get("private_key") and saved.get("public_key"):
+        VLESS_PUBLIC = {
+            "enabled": True,
+            "port": int(saved.get("port", VLESS_PUBLIC.get("port", 8443))),
+            "host": saved.get("host", VLESS_PUBLIC.get("host", "127.0.0.1")),
+            "uuid": saved["uuid"],
+            "private_key": saved["private_key"],
+            "public_key": saved["public_key"],
+            "short_id": saved.get("short_id", ""),
+            "sni": saved.get("sni", VLESS_PUBLIC.get("sni", "www.microsoft.com")),
+            "flow": saved.get("flow", VLESS_PUBLIC.get("flow", "xtls-rprx-vision")),
+        }
+        return VLESS_PUBLIC
+    made = _gen_vless_material()
+    if not made:
+        log("vless: xray недоступен, внешний VLESS не сгенерирован")
+        return VLESS_PUBLIC
+    _uuid, priv, pub = made
+    VLESS_PUBLIC = {
+        "enabled": True,
+        "port": VLESS_PUBLIC.get("port", 8443),
+        "host": VLESS_PUBLIC.get("host", "127.0.0.1"),
+        "uuid": _uuid,
+        "private_key": priv,
+        "public_key": pub,
+        "short_id": "",
+        "sni": VLESS_PUBLIC.get("sni", "www.microsoft.com"),
+        "flow": VLESS_PUBLIC.get("flow", "xtls-rprx-vision"),
+    }
+    try:
+        with open(_VLESS_FILE + ".tmp", "w", encoding="utf-8") as f:
+            json.dump(VLESS_PUBLIC, f, indent=2)
+        os.replace(_VLESS_FILE + ".tmp", _VLESS_FILE)
+    except OSError:
+        pass
+    log("vless: внешний VLESS сгенерирован (%s:%d)" % (VLESS_PUBLIC["host"], VLESS_PUBLIC["port"]))
+    return VLESS_PUBLIC
+
+
+def open_firewall(ports=None):
+    """Windows: netsh правила для наших портов (best-effort, ошибки игнорируются).
+
+    ports: явный список портов; по умолчанию UI/XRAY/XRAY_API/TGWS/VLESS(8443).
+    """
+    if os.name != "nt":
+        return
+    import subprocess
+    _ports = list(ports) if ports else [
+        UI_PORT, XRAY_PORT, XRAY_API_PORT, TGWS_PORT,
+        int(VLESS_PUBLIC.get("port", 8443)),
+    ]
+    seen = {}
+    ordered = []
+    for p in _ports:
+        if p in seen:
+            continue
+        seen[p] = 1
+        ordered.append(p)
+    for p in ordered:
+        try:
+            subprocess.run(
+                ["netsh", "advfirewall", "firewall", "add", "rule",
+                 "name=Aurora_%d" % p, "dir=in", "action=allow",
+                 "protocol=TCP", "localport=%d" % p],
+                capture_output=True, timeout=10)
+        except Exception:
+            pass
+    log("firewall: правила добавлены для портов %s" % ",".join(str(p) for p in ordered))
 
 # --- агент ПК (recovery, команды) ---
 AGENT_TOKEN = ""
@@ -151,6 +259,8 @@ _SETTINGS_DEFAULTS = {
     "vpn_mode": True,        # True = VPN активен (final = лучший ключ), False = прямой
     "auto_recovery": True,   # авто-восстановление канала через агента
     "continue_text": "",     # текст при отправке continue
+    "white_ip": "",          # белый IP провайдера (переопределяет env AURORA_WHITE_IP)
+    "bypass_domains": [],    # кастомный белый список доменов, идущих на direct (в дополнение к RU-байпасу)
 }
 
 _settings = dict(_SETTINGS_DEFAULTS)
@@ -264,13 +374,15 @@ def _ts():
 # --- настройки ---
 def load_settings():
     """Читает data/settings.json (выживают только известные ключи)."""
-    global _settings
+    global _settings, WHITE_IP
     try:
         with open(_SETTINGS_FILE, "r", encoding="utf-8") as f:
             raw = json.load(f)
         merged = dict(_SETTINGS_DEFAULTS)
         merged.update({k: raw[k] for k in raw if k in _SETTINGS_DEFAULTS})
         _settings = merged
+        if _settings.get("white_ip"):
+            WHITE_IP = _settings["white_ip"].strip()
     except (OSError, ValueError):
         _settings = dict(_SETTINGS_DEFAULTS)
 
@@ -310,3 +422,38 @@ def get_state():
 def state_fields():
     """Плоская копия STATE для JSON-ответа."""
     return get_state()
+
+
+# --- белый список (белый IP + кастомные домены на direct) ---
+def get_white_ip():
+    """Белый IP провайдера: settings override -> env -> ''."""
+    v = (_settings.get("white_ip") or "").strip()
+    return v or (os.environ.get("AURORA_WHITE_IP", "") or "").strip()
+
+
+def set_white_ip(ip):
+    """Сохраняет белый IP в настройки (и обновляет WHITE_IP). Возвращает новый IP."""
+    global WHITE_IP
+    WHITE_IP = (ip or "").strip()
+    _settings["white_ip"] = WHITE_IP
+    save_settings()
+    return WHITE_IP
+
+
+def get_bypass_domains():
+    """Кастомный белый список доменов (direct-байпас)."""
+    return list(_settings.get("bypass_domains") or [])
+
+
+def set_bypass_domains(domains):
+    """Сохраняет список кастомных доменов (direct-байпас). Возвращает сохранённый список."""
+    clean = []
+    seen = {}
+    for d in domains or []:
+        d = str(d).strip().lower()
+        if d and d not in seen and not d.startswith(("http://", "https://", "www.")):
+            seen[d] = 1
+            clean.append(d)
+    _settings["bypass_domains"] = clean
+    save_settings()
+    return clean

@@ -126,6 +126,7 @@ function render() {
   renderTGWS();
   renderConnect();
   renderRu();
+  renderWhitelist();
   renderDock();
 }
 
@@ -221,6 +222,21 @@ function renderDevices() {
   }).join('');
 }
 
+function qrImg(text, size) {
+  try {
+    const fn = (typeof window.qrcode === 'function') ? window.qrcode : (window.qrcode || null);
+    if (typeof fn === 'function') {
+      const q = fn(0, 'M');
+      q.addData(text || '');
+      q.make();
+      const img = q.createImgTag(4, 0);
+      return img.replace('<img src="', '<img width="' + size + '" height="' + size + '" src="');
+    }
+  } catch (e) { /* фолбэк ниже */ }
+  return '<img src="https://api.qrserver.com/v1/create-qr-code/?size=' + size + 'x' + size +
+    '&data=' + encodeURIComponent(text || '') + '" alt="QR">';
+}
+
 function renderTGWS() {
   const t = (S && S.tgws) || {};
   $('tg-on').textContent = t.running ? 'running 🐈' : 'стоп';
@@ -229,9 +245,7 @@ function renderTGWS() {
   $('tg-sec').textContent = t.secret_ok ? 'секрет ok' : 'секрет?';
   const qr = $('tg-qr');
   if (t.link) {
-    qr.innerHTML = '<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' +
-      encodeURIComponent(t.link) +
-      '" alt="QR"><div class="qr-link mono">' + esc(t.link) + '</div>';
+    qr.innerHTML = qrImg(t.link, 220) + '<div class="qr-link mono">' + esc(t.link) + '</div>';
   } else {
     qr.innerHTML = '<span class="empty">секрета нет</span>';
   }
@@ -253,9 +267,7 @@ function renderConnect() {
   const qr = $('cx-qr');
   if (on) {
     input.value = x.link;
-    qr.innerHTML = '<img src="https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=' +
-      encodeURIComponent(x.link) +
-      '" alt="QR"><div class="qr-link mono">' + esc(x.link) + '</div>';
+    qr.innerHTML = qrImg(x.link, 260) + '<div class="qr-link mono">' + esc(x.link) + '</div>';
   } else {
     input.value = '';
     qr.innerHTML = '<span class="empty">состояние выключено</span>';
@@ -371,6 +383,43 @@ function renderRu() {
       '<td>' + chip + '</td>' +
       '</tr>';
   }).join('');
+}
+
+/* ——— белый список ——— */
+function renderWhitelist() {
+  const ip = $('wl-ip');
+  const dom = $('wl-dom');
+  const info = $('wl-info');
+  if (ip) ip.value = (S && S.white_ip) || '';
+  if (dom) {
+    const bd = (S && S.bypass_domains) || [];
+    dom.value = Array.isArray(bd) ? bd.join('\n') : String(bd || '');
+  }
+  if (info) {
+    const n = Array.isArray(S && S.bypass_domains) ? S.bypass_domains.length : 0;
+    info.textContent = 'IP: ' + ((S && S.white_ip) || '—') + ' · доменов напрямую: ' + n;
+  }
+}
+
+function wlSave() {
+  const ip = $('wl-ip');
+  if (!ip) return;
+  const v = (ip.value || '').trim();
+  if (!v) return toast('Укажите белый IP', false);
+  api('whitelist', { white_ip: v }, (j) => {
+    if (j && j.ok) { toast('Мяу! IP сохранён 🐾', true); refresh(); }
+    else toast((j && j.error) || 'ошибка', false);
+  });
+}
+
+function wlSaveDom() {
+  const dom = $('wl-dom');
+  if (!dom) return;
+  const raw = (dom.value || '').split('\n').map((s) => s.trim()).filter(Boolean);
+  api('whitelist', { bypass_domains: raw }, (j) => {
+    if (j && j.ok) { toast('Мяу! Домены сохранены 🐾', true); refresh(); }
+    else toast((j && j.error) || 'ошибка', false);
+  });
 }
 
 function refresh() {

@@ -20,6 +20,7 @@
       <button data-t="connect"><span class="ic">🌐</span>Подключение</button>
       <button data-t="rusegment"><span class="ic">🇷🇺</span>Ру-сегмент</button>
       <button data-t="tgws"><span class="ic">✈️</span>TG-WS</button>
+      <button data-t="whitelist"><span class="ic">⬜</span>Белый список</button>
     </nav>
     <button id="theme-btn" class="theme-btn" title="Сменить тему">🌙</button>
   </div>
@@ -158,6 +159,24 @@
       <div class="qr-box" id="tg-qr"></div>
     </div>
   </section>
+
+  <section class="tab" id="t-whitelist">
+    <div class="card">
+      <h2><span class="ic">⬜</span>Белый список</h2>
+      <p class="hint">Домены белого списка идут <b>напрямую (direct)</b>, минуя VPN. Белый IP — это IP вашего провайдера (не считается «выходом туннеля» при проверке egress).</p>
+      <div class="cmd-row" style="margin-bottom:14px">
+        <input type="text" id="wl-ip" placeholder="Белый IP провайдера, например 1.2.3.4">
+        <button class="btn" onclick="wlSave()">💾 Сохранить IP</button>
+      </div>
+      <div class="cmd-row" style="margin-bottom:6px">
+        <textarea id="wl-dom" rows="6" placeholder="Домены напрямую (по одному на строку):&#10;yandex.ru&#10;vk.com&#10;github.com"></textarea>
+        <button class="btn" onclick="wlSaveDom()">💾 Сохранить домены</button>
+      </div>
+      <div class="actions">
+        <span class="badge mono" id="wl-info">загрузка…</span>
+      </div>
+    </div>
+  </section>
 </main>
 
 <!-- ДОК-БАР: процесс загрузки и проверки ключей -->
@@ -172,6 +191,7 @@
 
 <footer>Сделано с любовью и котиками 🐱💕<span class="ic"></span></footer>
 <div id="toast"></div>
+<script src="/qr.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>

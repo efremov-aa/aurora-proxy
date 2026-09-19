@@ -59,6 +59,21 @@ def restart():
         secret = _get_secret()
         if not secret:
             return False
+        # убить старый процесс, если держит порт (иначе новый не поднимется)
+        try:
+            out = subprocess.run(["netstat", "-ano"], capture_output=True, text=True,
+                                 timeout=10).stdout
+            pids = []
+            for ln in out.splitlines():
+                if ":%d" % config.TGWS_PORT in ln and "LISTENING" in ln:
+                    parts = ln.split()
+                    if parts and parts[-1].isdigit() and parts[-1] not in pids:
+                        pids.append(parts[-1])
+            for pid in pids:
+                subprocess.run(["taskkill", "/F", "/PID", pid],
+                               capture_output=True, timeout=10)
+        except Exception:
+            pass
         try:
             subprocess.Popen(
                 [sys.executable, "-m", "proxy.tg_ws_proxy",
@@ -82,11 +97,23 @@ def restart():
 
 
 def tgws_link():
-    """Ссылка tg://proxy?... для QR. host: публичный IP или VM_HOST."""
+    """Ссылка tg://proxy?... для QR.
+
+    host: явный env AURORA_TGWS_HOST, иначе внутренний IP ПК (config.VM_HOST).
+    Публичный IP — только явный фолбэк, если локальный не найден.
+    """
     secret = _get_secret()
     if not secret:
         return ""
-    host = config.get_public_ip() or config.VM_HOST if hasattr(config, "get_public_ip") else config.VM_HOST
+    host = (os.environ.get("AURORA_TGWS_HOST", "") or "").strip()
+    if not host:
+        vm = config.VM_HOST if hasattr(config, "VM_HOST") else ""
+        if vm and not str(vm).startswith("127."):
+            host = str(vm)
+        elif hasattr(config, "get_public_ip"):
+            host = config.get_public_ip() or ""
+    if not host:
+        host = "127.0.0.1"
     return "tg://proxy?server=%s&port=%d&secret=%s" % (host, config.TGWS_PORT, secret)
 
 

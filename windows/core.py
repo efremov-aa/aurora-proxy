@@ -72,9 +72,16 @@ def build_xray_config(final_tag):
                  "network": "tcp,udp", "outboundTag": tag}
     rules = [http_rule]
     ru_bypass = config.ru_domains()
-    if ru_bypass:
+    custom_bypass = config.get_bypass_domains() if hasattr(config, "get_bypass_domains") else []
+    bypass_all = list(ru_bypass)
+    seen = {}
+    for d in custom_bypass:
+        if d and d not in seen:
+            seen[d] = 1
+            bypass_all.append(d)
+    if bypass_all:
         rules.insert(0, {"type": "field",
-                         "domain": ["domain:" + d for d in ru_bypass],
+                         "domain": ["domain:" + d for d in bypass_all],
                          "outboundTag": "direct"})
 
     cfg = {

@@ -2,6 +2,7 @@
 
 import signal
 import threading
+import time
 
 import config
 import core
@@ -17,10 +18,24 @@ def _boot():
     config.load_settings()
     pool.load()
     pool.cleanup()  # убрать мёртвые github-ключи при старте
+
+    # внешний VLESS: автогенерация ключей (+inbound :8443) до сборки xray-конфига
+    if hasattr(config, "ensure_vless"):
+        config.ensure_vless()
+    # Windows: разрешить наши порты в брандмауэре (best-effort)
+    if hasattr(config, "open_firewall"):
+        config.open_firewall()
+
     config.log("Aurora v%s boot" % config.VERSION)
 
     # проверка/заполнение tgws-секрета и фоновый статус
     tgws.refresh_status()
+    # авто-старт tg-ws, если порт 1443 не открыт
+    if not tgws.running():
+        config.log("tgws: порт %d закрыт, авто-старт" % config.TGWS_PORT)
+        tgws.restart()
+        time.sleep(2)
+        tgws.refresh_status()
 
     # фоновое определение публичного IP (для внешних ссылок/QR)
     if hasattr(config, "refresh_public_ip_async"):
@@ -30,11 +45,15 @@ def _boot():
     threading.Thread(target=telemetry.poll, daemon=True).start()
     threading.Thread(target=_startup_sync, daemon=True).start()
     core.start_watch()
-    # обновление tgws-статуса каждые 30с
+
+    # самолечение tgws: каждые 30с проверяем порт, при падении — рестарт
     def tgws_loop():
-        import time
         while True:
             time.sleep(30)
+            if not tgws.running():
+                config.log("tgws: порт %d закрыт, авто-восстановление" % config.TGWS_PORT)
+                tgws.restart()
+                time.sleep(2)
             tgws.refresh_status()
     threading.Thread(target=tgws_loop, daemon=True).start()
     # обновление имён устройств
