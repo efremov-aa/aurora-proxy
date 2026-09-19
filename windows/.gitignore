@@ -1,0 +1,7 @@
+data/
+*.log
+__pycache__/
+*.pyc
+.env
+bin/
+service.log

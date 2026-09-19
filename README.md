@@ -9,6 +9,20 @@
 
 ---
 
+## Загрузка
+
+Архивы и список изменений — в [Release v1.1.0](https://github.com/efremov-aa/aurora-proxy/releases):
+
+- **`Aurora-v1.1.0-linux.zip`** — Linux-версия: исходники + `Dockerfile`/`docker-compose.yml`
+  (Docker, `XRAY_MANAGE=proc`) или развёртывание на сервере с systemd (`aurora.service` и юниты).
+- **`Aurora-v1.1.0-windows.zip`** — Windows-версия (папка `windows/`): авто-детект локального и
+  публичного IP, телеметрия через `netstat`, служба **NSSM «Aurora»** (`nssm/install_service.bat`),
+  бинарь xray ставится скриптом `download_xray.ps1`. Подробности — в `windows/README-windows.md`.
+
+Версия для обеих платформ: `VERSION=1.1.0`, `VERSION_NAME=Свежие ключи`.
+
+---
+
 ## Возможности
 
 - **VLESS Reality** — xray mixed на `:8899`, 4 встроенных в реальности ключа-пула, ротация по
