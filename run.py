@@ -41,8 +41,8 @@ def _boot():
     threading.Thread(target=telemetry.resolve_names, daemon=True).start()
     # стартовая проверка ру-сегмента (фон, результаты — в /api/state)
     rusegment.start()
-    # авто-обновление по GitHub (env AURORA_AUTO_UPDATE=check|apply, пусто=выкл)
-    updater.auto_update(os.environ.get("AURORA_AUTO_UPDATE", ""))
+    # обязательное авто-обновление (без обхода; сервера на ручном — вне этой сборки)
+    updater.auto_update()
 
 
 def _startup_sync():

@@ -6,9 +6,15 @@ import os
 import threading
 import time
 
-VERSION = "1.3.0"
-VERSION_NAME = "Mesh"
+VERSION = "1.3.1"
+VERSION_NAME = "Auto-Update"
 APP_NAME = "Aurora"
+
+# --- авто-обновление (GitHub Releases) ---
+# Обязательное: публичная сборка всегда обновляется с этого репо.
+# Локальное отключение/обход НЕ предусмотрен (управляется только политикой релизов).
+UPDATE_REPO = "efremov-aa/aurora-proxy"
+UPDATE_CHECK_INTERVAL = 15 * 60  # проверка признаков обновления каждые 15 минут
 
 # --- пути (относительно корня проекта) ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))

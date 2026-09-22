@@ -6,7 +6,7 @@
 ![кот](https://img.shields.io/badge/mascot-%F0%9F%90%B1-pink)
 ![python](https://img.shields.io/badge/python-3.12-blue)
 ![xray](https://img.shields.io/badge/xray-v26.9.9-blue)
-![version](https://img.shields.io/badge/version-1.3.0%20%C2%ABMesh%C2%BB-pink)
+![version](https://img.shields.io/badge/version-1.3.1%20%C2%ABAuto-Update%C2%BB-pink)
 
 > Мяу! Готово 🐾 — панель в стиле Neko: тёплые кошачьи тона, тосты «Мяу! Готово 🐾».
 
@@ -23,15 +23,15 @@
 
 ## 📥 Загрузка
 
-Архивы и список изменений — в [Release v1.3.0](https://github.com/efremov-aa/aurora-proxy/releases):
+Архивы и список изменений — в [Release v1.3.1](https://github.com/efremov-aa/aurora-proxy/releases):
 
-- **`Aurora-v1.3.0-linux.zip`** — Linux-версия: исходники + `Dockerfile`/`docker-compose.yml`
+- **`Aurora-v1.3.1-linux.zip`** — Linux-версия: исходники + `Dockerfile`/`docker-compose.yml`
   (Docker, `XRAY_MANAGE=proc`) или развёртывание на сервере с systemd (`aurora.service` и юниты).
-- **`Aurora-v1.3.0-windows.zip`** — Windows-версия (папка `windows/`): авто-детект локального и
+- **`Aurora-v1.3.1-windows.zip`** — Windows-версия (папка `windows/`): авто-детект локального и
   публичного IP, телеметрия через `netstat`, служба **NSSM «Aurora»** (`nssm/install_service.bat`),
   бинарь xray ставится скриптом `download_xray.ps1`. Подробности — в `windows/README-windows.md`.
 
-Версия для обеих платформ: `VERSION=1.3.0`, `VERSION_NAME=Mesh`.
+Версия для обеих платформ: `VERSION=1.3.1`, `VERSION_NAME=Auto-Update`.
 
 ## ✨ Возможности
 
@@ -51,8 +51,6 @@
 - **Авто-восстановление** 🔄 — лимит/регион/соединение: ротация vless при VPN ON, при VPN OFF — пропуск.
 - **Админ-токен** 🛡️ — защита панели: env `AURORA_ADMIN_TOKEN` либо `data/admin_secret.json`
   (ротация на вкладке «Безопасность»), rate-limit неудачных попыток.
-- **Авто-обновление** 🔄 — обновление с GitHub: `AURORA_UPDATE_REPO=owner/repo`,
-  `AURORA_AUTO_UPDATE=check|apply` (пусто — выключено), бэкап данных перед применением.
 
 ## 🗂 Структура
 
@@ -67,7 +65,6 @@ aurora/
 ├── ui.py             # загрузка static-файлов панели
 ├── ui/               # index.html, app.js, style.css, qr.js (локальный QR)
 ├── security.py       # admin-токен панели (env AURORA_ADMIN_TOKEN, rate-limit)
-├── updater.py        # авто-обновление с GitHub (env AURORA_UPDATE_REPO)
 ├── telemetry.py      # устройства (conns + трафик) по /proc и ss
 ├── tgws.py           # Telegram WS-прокси (секрет, статус, ссылка)
 ├── recovery.py       # авто-восстановление (limit/region/conn)
@@ -116,8 +113,6 @@ Xray в образ уже встроен (v26.9.9 + geoip/geosite). Управл
 | `AURORA_DATA_DIR` | `<base>/data` | каталог данных |
 | `AURORA_TGWS_PORT` | `443` | порт Telegram WS-прокси |
 | `AURORA_ADMIN_TOKEN` | пусто | admin-токен панели (Bearer для POST `/api/*`; пусто — выключено) |
-| `AURORA_UPDATE_REPO` | пусто | GitHub-репозиторий авто-обновления (`owner/repo`; пусто — выключено) |
-| `AURORA_AUTO_UPDATE` | пусто | `check` — проверять, `apply` — применять и перезапуститься |
 
 ## 🔌 API (выборка)
 
@@ -131,8 +126,6 @@ Xray в образ уже встроен (v26.9.9 + geoip/geosite). Управл
 - `POST /api/rusegment/check` — проверка ру-сегмента.
 - `GET /api/log`, `GET /api/recovery/log`, `GET /api/tgws/status`.
 - `GET /api/security/status` — состояние admin-токена (`enabled` + маска); `POST /api/security/rotate` — новый токен.
-- `GET /api/update/status` — состояние авто-обновления; `POST /api/update/check` — проверить версию;
-  `POST /api/update/apply` — применить и перезапуститься.
 
 ## 🧪 Тесты
 

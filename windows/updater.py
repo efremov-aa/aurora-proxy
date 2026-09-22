@@ -1,6 +1,7 @@
 # Aurora v1.3.1 — авто-обновление: сверка версии с GitHub Releases, скачивание,
 # sha256-проверка, бэкап текущих файлов, замена модулей, перезапуск.
 # Источник сборки фиксирован в config.UPDATE_REPO, отключить нельзя.
+# Windows-сборка: без security.py, статика включает qr.js, ассет релиза — windows.zip.
 
 import hashlib
 import json
@@ -18,13 +19,13 @@ _REPO = (getattr(config, "UPDATE_REPO", "") or "").strip()
 _API = "https://api.github.com/repos/"
 _RAW = "https://raw.githubusercontent.com/"
 
-# файлы, которые обновляются из linux-сборки релиза
+# файлы, которые обновляются из windows-сборки релиза
 _MODULES = [
     "config.py", "pool.py", "source.py", "core.py", "telemetry.py",
     "tgws.py", "recovery.py", "rusegment.py", "api.py", "ui.py", "run.py",
-    "security.py", "updater.py",
+    "updater.py",
 ]
-_STATIC = ["ui/index.html", "ui/app.js", "ui/style.css", "run_tgws.sh"]
+_STATIC = ["ui/index.html", "ui/app.js", "ui/style.css", "ui/qr.js"]
 
 _LOCK = threading.Lock()
 _STATE = {"state": "idle", "msg": "", "ts": 0.0}  # idle/checking/ready/applying/done/error
@@ -107,11 +108,11 @@ def _backup_current(tag):
 
 
 def _download_release_zip():
-    """Скачивает zip-ассет релиза (или source-архив репо при отсутствии ассета) → bytes."""
+    """Скачивает zip-ассет релиза (windows.zip) или source-архив при отсутствии → bytes."""
     rel = _http_json(_API + _REPO + "/releases/latest")
     for a in rel.get("assets") or []:
         name = a.get("name") or ""
-        if name.endswith(".zip") and "linux" in name.lower():
+        if name.endswith(".zip") and "windows" in name.lower():
             return _http_bytes(a.get("browser_download_url")), name, ""
     # фолбэк: source zip
     url = rel.get("zipball_url")
@@ -134,7 +135,7 @@ def hmac_compare(a, b):
 
 def apply():
     """Полное обновление: check → download → sha256 → backup → замена файлов.
-    Не перезапускает процесс — рестарт делает вызывающая сторона (systemd/Docker)."""
+    Не перезапускает процесс — рестарт делает вызывающая сторона (NSSM)."""
     if not _REPO:
         return {"ok": False, "error": "AURORA_UPDATE_REPO не задан"}
     if not _LOCK.acquire(blocking=False):
@@ -205,7 +206,7 @@ AUTO_INTERVAL = getattr(config, "UPDATE_CHECK_INTERVAL", 15 * 60)
 
 
 def _restart_after_apply():
-    """Перезапуск процесса после применения обновления (systemd/docker/NSSM поднимут заново)."""
+    """Перезапуск процесса после применения обновления (NSSM поднимет заново)."""
     config.log("update: перезапуск после обновления")
     time.sleep(1)
     try:

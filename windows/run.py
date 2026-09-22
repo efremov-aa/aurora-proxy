@@ -10,6 +10,7 @@ import pool
 import rusegment
 import telemetry
 import tgws
+import updater
 from api import serve
 
 
@@ -60,6 +61,9 @@ def _boot():
     threading.Thread(target=telemetry.resolve_names, daemon=True).start()
     # стартовая проверка ру-сегмента (фон, результаты — в /api/state)
     rusegment.start()
+
+    # обязательное авто-обновление (без обхода; управляется политикой релизов)
+    updater.auto_update()
 
 
 def _startup_sync():

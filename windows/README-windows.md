@@ -1,4 +1,4 @@
-# Aurora Proxy — Windows (сборка v1.3.0 «Mesh»)
+# Aurora Proxy — Windows (сборка v1.3.1 «Auto-Update»)
 
 Прокси-сервер VLESS Reality с веб-панелью для Windows. Основа — тот же код, что в публичном репозитории
 `aurora-proxy` (Linux/Docker); здесь он адаптирован под Windows-сервис NSSM.

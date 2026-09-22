@@ -15,6 +15,7 @@ import source
 import telemetry
 import tgws
 import ui
+import updater
 
 # origins, которым разрешены POST
 _ALLOWED_ORIGINS = {"127.0.0.1", "localhost", config.VM_HOST, "::1"}
@@ -153,6 +154,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/tgws/status":
             self._send(*_json(tgws.status()))
             return
+        if path == "/api/update/status":
+            self._send(*_json(updater.status()))
+            return
         self._send(*_json({"error": "unknown endpoint"}, 404))
 
     def do_POST(self):
@@ -192,6 +196,8 @@ class Handler(BaseHTTPRequestHandler):
             "/api/tgws/restart": self._tgws_restart,
             "/api/rusegment/check": self._rusegment_check,
             "/api/whitelist": self._whitelist,
+            "/api/update/check": self._update_check,
+            "/api/update/apply": self._update_apply,
         }.get(path)
         if handler:
             handler(data)
@@ -309,6 +315,16 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:
             resp = {"ok": False, "error": str(e)}
         self._send(*_json(resp))
+
+    def _update_check(self, data):
+        self._send(*_json(updater.check()))
+
+    def _update_apply(self, data):
+        r = updater.apply()
+        self._send(*_json(r))
+        if r.get("ok") and r.get("restart_required"):
+            # NSSM перезапустит службу после выхода процесса
+            threading.Timer(0.8, os._exit, args=(0,)).start()
 
 
 def serve(port=None):
