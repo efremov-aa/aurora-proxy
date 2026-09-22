@@ -11,15 +11,15 @@
 
 ## Загрузка
 
-Архивы и список изменений — в [Release v1.2.0](https://github.com/efremov-aa/aurora-proxy/releases):
+Архивы и список изменений — в [Release v1.3.0](https://github.com/efremov-aa/aurora-proxy/releases):
 
-- **`Aurora-v1.2.0-linux.zip`** — Linux-версия: исходники + `Dockerfile`/`docker-compose.yml`
+- **`Aurora-v1.3.0-linux.zip`** — Linux-версия: исходники + `Dockerfile`/`docker-compose.yml`
   (Docker, `XRAY_MANAGE=proc`) или развёртывание на сервере с systemd (`aurora.service` и юниты).
-- **`Aurora-v1.2.0-windows.zip`** — Windows-версия (папка `windows/`): авто-детект локального и
+- **`Aurora-v1.3.0-windows.zip`** — Windows-версия (папка `windows/`): авто-детект локального и
   публичного IP, телеметрия через `netstat`, служба **NSSM «Aurora»** (`nssm/install_service.bat`),
   бинарь xray ставится скриптом `download_xray.ps1`. Подробности — в `windows/README-windows.md`.
 
-Версия для обеих платформ: `VERSION=1.2.0`, `VERSION_NAME=Windows-fix`.
+Версия для обеих платформ: `VERSION=1.3.0`, `VERSION_NAME=Mesh`.
 
 ---
 
@@ -36,9 +36,13 @@
   грузится с GitHub с кэшем и статическим фолбэком. Google/YouTube всегда в туннеле.
 - **Веб-панель `:8890`** — статус, ключи (обновить/проверить/добавить свой/удалить), устройства с
   трафиком, Telegram WS-прокси, «Ру-сегмент» (проверка доступности РФ-ресурсов), док-бар прогресса.
-- **Telegram WS-прокси `:1443`** — секрет генерится и хранится в `data/tg_secret.txt`.
+- **Telegram WS-прокси `:443`** — секрет генерится и хранится в `data/tg_secret.txt`.
 - **Внешний VLESS-Reality `:8443`** (опционально) — готовая ссылка + QR для подключения извне.
 - **Авто-восстановление** — лимит/регион/соединение: ротация vless (VPN ON) или команда агенту ПК.
+- **Админ-токен** — защита панели: env `AURORA_ADMIN_TOKEN` либо `data/admin_secret.json`
+  (ротация на вкладке «Безопасность»), rate-limit неудачных попыток.
+- **Авто-обновление** — обновление с GitHub: `AURORA_UPDATE_REPO=owner/repo`,
+  `AURORA_AUTO_UPDATE=check|apply` (пусто — выключено), бэкап данных перед применением.
 
 ## Структура
 
@@ -51,7 +55,9 @@ aurora/
 ├── core.py           # сборка xray.json, старт/рестарт xray, ротация, watch
 ├── api.py            # HTTP API (/api/state, /api/keys/*, /api/vpn_mode, ...)
 ├── ui.py             # загрузка static-файлов панели
-├── ui/               # index.html, app.js, style.css
+├── ui/               # index.html, app.js, style.css, qr.js (локальный QR)
+├── security.py       # admin-токен панели (env AURORA_ADMIN_TOKEN, rate-limit)
+├── updater.py        # авто-обновление с GitHub (env AURORA_UPDATE_REPO)
 ├── telemetry.py      # устройства (conns + трафик) по /proc и ss
 ├── tgws.py           # Telegram WS-прокси (секрет, статус, ссылка)
 ├── recovery.py       # авто-восстановление (limit/region/conn)
@@ -72,7 +78,7 @@ cp .env.example .env    # заполните AURORA_HOST и при желани�
 docker compose up -d --build
 ```
 
-Порты: панель `:8890`, API `:8897`, TG-WS `:1443`, mixed-прокси `:8899` (опционально),
+Порты: панель `:8890`, API `:8897`, TG-WS `:443`, mixed-прокси `:8899` (опционально),
 внешний VLESS `:8443` (опционально). Данные — в томе `./data`.
 
 Xray в образ уже встроен (v26.9.9 + geoip/geosite). Управление xray — режим `XRAY_MANAGE=proc`
@@ -99,6 +105,10 @@ Xray в образ уже встроен (v26.9.9 + geoip/geosite). Управл
 | `AURORA_VLESS_SNI` | `www.microsoft.com` | SNI прикрытия Reality |
 | `XRAY_MANAGE` | `systemctl` | `systemctl` (сервер) или `proc` (Docker) |
 | `AURORA_DATA_DIR` | `<base>/data` | каталог данных |
+| `AURORA_TGWS_PORT` | `443` | порт Telegram WS-прокси |
+| `AURORA_ADMIN_TOKEN` | пусто | admin-токен панели (Bearer для POST `/api/*`; пусто — выключено) |
+| `AURORA_UPDATE_REPO` | пусто | GitHub-репозиторий авто-обновления (`owner/repo`; пусто — выключено) |
+| `AURORA_AUTO_UPDATE` | пусто | `check` — проверять, `apply` — применять и перезапуститься |
 
 ## API (выборка)
 
@@ -111,6 +121,9 @@ Xray в образ уже встроен (v26.9.9 + geoip/geosite). Управл
 - `POST /api/tgws/restart` — рестарт Telegram WS-прокси.
 - `POST /api/rusegment/check` — проверка ру-сегмента.
 - `GET /api/log`, `GET /api/recovery/log`, `GET /api/tgws/status`.
+- `GET /api/security/status` — состояние admin-токена (`enabled` + маска); `POST /api/security/rotate` — новый токен.
+- `GET /api/update/status` — состояние авто-обновления; `POST /api/update/check` — проверить версию;
+  `POST /api/update/apply` — применить и перезапуститься.
 
 ## Тесты
 

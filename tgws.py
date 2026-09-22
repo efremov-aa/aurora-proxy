@@ -77,6 +77,7 @@ def status():
     return {
         "running": running(),
         "port_open": port_open(),
+        "port": config.TGWS_PORT,
         "secret_ok": bool(_get_secret()),
         "link": tgws_link(),
     }

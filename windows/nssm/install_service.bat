@@ -43,7 +43,7 @@ if errorlevel 1 (
 
 "%NSSM%" set Aurora AppDirectory "%ROOT%"
 "%NSSM%" set Aurora DisplayName "Aurora Proxy"
-"%NSSM%" set Aurora Description "Прокси-сервер Aurora (VLESS Reality + TG WS). Панель :8890, xray :8899, api :8897, tg-ws :1443."
+"%NSSM%" set Aurora Description "Прокси-сервер Aurora (VLESS Reality + TG WS). Панель :8890, xray :8899, api :8897, tg-ws :443."
 "%NSSM%" set Aurora Start SERVICE_AUTO_START
 "%NSSM%" set Aurora AppStdout "%ROOT%\service.log"
 "%NSSM%" set Aurora AppStderr "%ROOT%\service.log"

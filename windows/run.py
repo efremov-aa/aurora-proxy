@@ -30,7 +30,7 @@ def _boot():
 
     # проверка/заполнение tgws-секрета и фоновый статус
     tgws.refresh_status()
-    # авто-старт tg-ws, если порт 1443 не открыт
+    # авто-старт tg-ws, если порт не открыт
     if not tgws.running():
         config.log("tgws: порт %d закрыт, авто-старт" % config.TGWS_PORT)
         tgws.restart()

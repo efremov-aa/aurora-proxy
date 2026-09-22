@@ -241,7 +241,7 @@ function renderTGWS() {
   const t = (S && S.tgws) || {};
   $('tg-on').textContent = t.running ? 'running 🐈' : 'стоп';
   $('tg-on').parentElement.className = 'stat';
-  $('tg-port').textContent = t.port_open ? '1443 открыт' : '1443 закрыт';
+  $('tg-port').textContent = (t.port || '443') + (t.port_open ? ' открыт' : ' закрыт');
   $('tg-sec').textContent = t.secret_ok ? 'секрет ok' : 'секрет?';
   const qr = $('tg-qr');
   if (t.link) {

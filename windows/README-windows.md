@@ -41,7 +41,7 @@
 | 8890  | Веб-панель Aurora                |
 | 8899  | xray mixed (proxy-вход)          |
 | 8897  | xray API (dokodemo 127.0.0.1)    |
-| 1443  | TG-WS proxy                       |
+| 443   | TG-WS proxy                       |
 | 8443  | Внешний VLESS-Reality (опц.)      |
 | 19876+| keytest (проверка ключей)        |
 

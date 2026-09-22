@@ -1,5 +1,6 @@
 # Aurora v1.0 — лаунчер: инициализация и запуск всех фоновых циклов.
 
+import os
 import signal
 import threading
 
@@ -7,14 +8,17 @@ import config
 import core
 import pool
 import rusegment
+import security
 import telemetry
 import tgws
+import updater
 from api import serve
 
 
 def _boot():
     """Стартовая последовательность: настройки -> ключи -> sync -> фоновые треды."""
     config.load_settings()
+    security.init()  # admin-токен + chmod data/ (до любых действий)
     pool.load()
     pool.cleanup()  # убрать мёртвые github-ключи при старте
     config.log("Aurora v%s boot" % config.VERSION)
@@ -37,6 +41,8 @@ def _boot():
     threading.Thread(target=telemetry.resolve_names, daemon=True).start()
     # стартовая проверка ру-сегмента (фон, результаты — в /api/state)
     rusegment.start()
+    # авто-обновление по GitHub (env AURORA_AUTO_UPDATE=check|apply, пусто=выкл)
+    updater.auto_update(os.environ.get("AURORA_AUTO_UPDATE", ""))
 
 
 def _startup_sync():

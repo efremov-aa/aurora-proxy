@@ -6,8 +6,8 @@ import os
 import threading
 import time
 
-VERSION = "1.2.0"
-VERSION_NAME = "Windows-fix"
+VERSION = "1.3.0"
+VERSION_NAME = "Mesh"
 APP_NAME = "Aurora"
 
 # --- пути (относительно корня проекта) ---
@@ -22,7 +22,7 @@ os.makedirs(DATA_DIR, exist_ok=True)
 UI_PORT = int(os.environ.get("AURORA_UI_PORT", "8890"))            # панель Aurora
 XRAY_PORT = int(os.environ.get("AURORA_XRAY_PORT", "8899"))        # mixed-вход xray (http+socks)
 XRAY_API_PORT = int(os.environ.get("AURORA_XRAY_API_PORT", "8897"))  # докодемо-API xray (статистика)
-TGWS_PORT = int(os.environ.get("AURORA_TGWS_PORT", "1443"))        # Telegram WS-прокси
+TGWS_PORT = int(os.environ.get("AURORA_TGWS_PORT", "443"))        # Telegram WS-прокси (443; 1443 блокировался РКН)
 
 # --- сеть (значения из env, дефолты безопасны) ---
 # На Windows локальный адрес авто-определяется (для внешних ссылок/QR).

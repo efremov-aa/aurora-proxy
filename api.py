@@ -11,10 +11,12 @@ import core
 import pool
 import recovery
 import rusegment
+import security
 import source
 import telemetry
 import tgws
 import ui
+import updater
 
 # origins, которым разрешены POST
 _ALLOWED_ORIGINS = {"127.0.0.1", "localhost", config.VM_HOST, "::1"}
@@ -145,6 +147,12 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/tgws/status":
             self._send(*_json(tgws.status()))
             return
+        if path == "/api/security/status":
+            self._send(*_json(security.status()))
+            return
+        if path == "/api/update/status":
+            self._send(*_json(updater.status()))
+            return
         self._send(*_json({"error": "unknown endpoint"}, 404))
 
     def do_POST(self):
@@ -158,6 +166,9 @@ class Handler(BaseHTTPRequestHandler):
     def _do_post(self):
         if not _origin_ok(self):
             self._send(*_json({"error": "cross-origin blocked"}, 403))
+            return
+        if not security.check(self.headers, self.client_address[0]):
+            self._send(*_json({"error": "unauthorized"}, 401))
             return
         path = self.path.split("?", 1)[0]
 
@@ -183,6 +194,9 @@ class Handler(BaseHTTPRequestHandler):
             "/api/agent/cmd": self._agent_cmd,
             "/api/tgws/restart": self._tgws_restart,
             "/api/rusegment/check": self._rusegment_check,
+            "/api/security/rotate": self._security_rotate,
+            "/api/update/check": self._update_check,
+            "/api/update/apply": self._update_apply,
         }.get(path)
         if handler:
             handler(data)
@@ -284,11 +298,25 @@ class Handler(BaseHTTPRequestHandler):
         started = rusegment.check_all()
         self._send(*_json({"ok": True, "started": started}))
 
+    def _security_rotate(self, data):
+        token = security.rotate()
+        self._send(*_json({"ok": bool(token), "token": token}))
 
-def serve(port=None):
-    port = port or config.UI_PORT
-    httpd = ThreadingHTTPServer(("0.0.0.0", port), Handler)
-    httpd.daemon_threads = True
-    httpd.allow_reuse_address = True
-    config.log("Aurora v%s started (UI :%d, xray :%d)" % (config.VERSION, port, config.XRAY_PORT))
-    httpd.serve_forever()
+    def _update_check(self, data):
+        r = updater.check()
+        self._send(*_json(r))
+
+    def _update_apply(self, data):
+        ok, msg = updater.apply()
+        if ok:
+            # применение прошло — рестарт основной процесс; HTTP-ответ уже не дойдёт
+            threading.Timer(0.8, os._exit, args=(0,)).start()
+        self._send(*_json({"ok": ok, "msg": msg}))
+
+    def serve(port=None):
+        port = port or config.UI_PORT
+        httpd = ThreadingHTTPServer(("0.0.0.0", port), Handler)
+        httpd.daemon_threads = True
+        httpd.allow_reuse_address = True
+        config.log("Aurora v%s started (UI :%d, xray :%d)" % (config.VERSION, port, config.XRAY_PORT))
+        httpd.serve_forever()

@@ -1,5 +1,5 @@
 [Unit]
-Description=Telegram WS proxy (Aurora, :1443)
+Description=Telegram WS proxy (Aurora, :443)
 After=network-online.target
 
 [Service]

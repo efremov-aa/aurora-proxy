@@ -20,6 +20,8 @@
       <button data-t="connect"><span class="ic">🌐</span>Подключение</button>
       <button data-t="rusegment"><span class="ic">🇷🇺</span>Ру-сегмент</button>
       <button data-t="tgws"><span class="ic">✈️</span>TG-WS</button>
+      <button data-t="security"><span class="ic">🛡️</span>Безопасность</button>
+      <button data-t="update"><span class="ic">🔄</span>Обновление</button>
     </nav>
     <button id="theme-btn" class="theme-btn" title="Сменить тему">🌙</button>
   </div>
@@ -156,6 +158,36 @@
         <button class="btn" onclick="api('tgws/restart',{},refresh)">🔄 Рестарт TG-WS</button>
       </div>
       <div class="qr-box" id="tg-qr"></div>
+    </div>
+  </section>
+
+  <section class="tab" id="t-security">
+    <div class="card">
+      <h2><span class="ic">🛡️</span>Безопасность</h2>
+      <p class="hint">Админ-токен защищает эндпоинты <b>/api/keys/rotate</b>, <b>/api/keys/refresh</b>, <b>/api/security/rotate</b> от подделки запросов. Если токен не задан (пусто) — защита выключена. Токен хранится в <code>data/admin_secret.json</code> и указывается через заголовок <code>X-Admin-Token</code>.</p>
+      <div class="metrics" style="margin:0 0 4px">
+        <div class="stat"><div class="k">⚙️ Защита</div><div class="v" id="sec-en">-</div></div>
+        <div class="stat"><div class="k">🔑 Токен</div><div class="v mono" id="sec-tok" style="font-size:14px">-</div></div>
+      </div>
+      <div class="actions">
+        <button class="btn" onclick="secRotate()">🔄 Ротировать токен</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="tab" id="t-update">
+    <div class="card">
+      <h2><span class="ic">🔄</span>Обновление</h2>
+      <p class="hint">Проверяет наличие новой версии <b>Aurora</b> в репозитории (env <code>AURORA_UPDATE_REPO</code> = <code>owner/repo</code>). Применить можно только обновление с совместимым <code>config.py</code> конфигом. Сервер кратко перезапустится сам.</p>
+      <div class="metrics" style="margin:0 0 4px">
+        <div class="stat"><div class="k">⚙️ Текущая</div><div class="v mono" id="up-cur">-</div></div>
+        <div class="stat"><div class="k">🚀 Доступна</div><div class="v mono" id="up-lat">-</div></div>
+        <div class="stat"><div class="k">🕐 Проверка</div><div class="v mono" id="up-ts">ещё не проверялась</div></div>
+      </div>
+      <div class="actions">
+        <button class="btn" onclick="upCheck()">🔍 Проверить обновление</button>
+        <button class="btn primary" id="btn-up-apply" onclick="upApply()">📥 Установить</button>
+      </div>
     </div>
   </section>
 </main>

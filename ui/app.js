@@ -126,6 +126,8 @@ function render() {
   renderTGWS();
   renderConnect();
   renderRu();
+  renderSecurity();
+  renderUpdate();
   renderDock();
 }
 
@@ -225,7 +227,7 @@ function renderTGWS() {
   const t = (S && S.tgws) || {};
   $('tg-on').textContent = t.running ? 'running 🐈' : 'стоп';
   $('tg-on').parentElement.className = 'stat';
-  $('tg-port').textContent = t.port_open ? '1443 открыт' : '1443 закрыт';
+  $('tg-port').textContent = t.port_open ? (t.port || 443) + ' открыт' : (t.port || 443) + ' закрыт';
   $('tg-sec').textContent = t.secret_ok ? 'секрет ok' : 'секрет?';
   const qr = $('tg-qr');
   if (t.link) {
@@ -371,6 +373,58 @@ function renderRu() {
       '<td>' + chip + '</td>' +
       '</tr>';
   }).join('');
+}
+
+/* ——— безопасность: админ-токен ——— */
+const SEC_STATE = { enabled: null, masked: '' };
+
+function renderSecurity() {
+  fetch('/api/security/status')
+    .then((r) => r.json())
+    .then((j) => {
+      SEC_STATE.enabled = !!(j && j.enabled);
+      SEC_STATE.masked = (j && j.masked) || '';
+      const en = $('sec-en');
+      en.textContent = SEC_STATE.enabled ? 'включена 🔒' : 'выключена';
+      en.className = 'v ' + (SEC_STATE.enabled ? '' : 'dim');
+      $('sec-tok').textContent = SEC_STATE.masked;
+    })
+    .catch(() => {});
+}
+
+function secRotate() {
+  api('security/rotate', {}, () => {
+    toast('Токен ротирован 🔑');
+    renderSecurity();
+  });
+}
+
+/* ——— обновление ——— */
+function renderUpdate() {
+  fetch('/api/update/status')
+    .then((r) => r.json())
+    .then((j) => {
+      if (!j) return;
+      $('up-cur').textContent = j.current || '-';
+      $('up-lat').textContent = j.latest ? (j.update ? ('доступна v' + j.latest) : ('v' + j.latest + ' (актуально)')) : (j.repo || 'не настроено');
+      $('up-ts').textContent = j.ts ? new Date(j.ts * 1000).toLocaleString() : 'ещё не проверялась';
+      const apply = $('btn-up-apply');
+      if (apply) apply.disabled = !(j.ok && j.update);
+    })
+    .catch(() => {});
+}
+
+function upCheck() {
+  api('update/check', {}, () => {
+    toast('Проверка выполнена 🔍');
+    renderUpdate();
+  });
+}
+
+function upApply() {
+  if (!confirm('Установить обновление? Сервер кратко перезапустится.')) return;
+  toast('Устанавливаю… сервер перезапустится 📥');
+  api('update/apply', {}, () => {});
 }
 
 function refresh() {
