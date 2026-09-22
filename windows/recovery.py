@@ -1,5 +1,5 @@
 # Aurora v1.0 — авто-восстановление: лимит/регион/соединение.
-# Recovery: VPN ON -> ротация vless; VPN OFF -> команда агенту ПК (restart_warp).
+# Recovery: VPN ON -> ротация vless; VPN OFF -> пропустить.
 
 import threading
 import time
@@ -48,10 +48,8 @@ def _run_recovery(kind, reason):
                 _log(kind, "rotation failed for %s: %s" % (kind, reason))
                 return {"ok": False, "msg": "no live key"}
             else:
-                # VPN OFF: команда агенту ПК restart_warp
-                agent_msg = send_agent("restart_warp")
-                _log(kind, "agent restart_warp queued (%s)" % agent_msg)
-                return {"ok": True, "msg": "agent restart_warp queued"}
+                _log(kind, "vpn off - recovery skipped")
+                return {"ok": False, "msg": "vpn off - recovery skipped"}
         finally:
             RECOVERY_IN_PROGRESS = False
 
@@ -76,23 +74,3 @@ def status():
     }
 
 
-# --- агент ПК (bridge) ---
-def send_agent(command, args=None, agent_id=None):
-    """Отправка команды агенту ПК через API агента (localhost:5057).
-    Возвращает True/False/msg."""
-    import urllib.request
-    payload = {"command": command}
-    if args:
-        payload["args"] = args
-    import json
-    try:
-        req = urllib.request.Request(
-            "http://127.0.0.1:5057/cmd",
-            data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-            method="POST")
-        with urllib.request.urlopen(req, timeout=10) as r:
-            body = json.loads(r.read().decode("utf-8", errors="replace"))
-        return body.get("ok", False)
-    except Exception as e:
-        return "offline: %s" % e

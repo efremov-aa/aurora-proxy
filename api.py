@@ -191,7 +191,7 @@ class Handler(BaseHTTPRequestHandler):
             "/api/recovery/limit": self._rc_limit,
             "/api/recovery/region": self._rc_region,
             "/api/recovery/conn": self._rc_conn,
-            "/api/agent/cmd": self._agent_cmd,
+
             "/api/tgws/restart": self._tgws_restart,
             "/api/rusegment/check": self._rusegment_check,
             "/api/security/rotate": self._security_rotate,
@@ -283,11 +283,6 @@ class Handler(BaseHTTPRequestHandler):
 
     def _rc_conn(self, data):
         self._send(*_json(recovery.run_conn(data.get("host", ""), data.get("port", 0))))
-
-    def _agent_cmd(self, data):
-        cmd = data.get("command", "")
-        r = recovery.send_agent(cmd, data.get("args"))
-        self._send(*_json({"ok": bool(r), "result": r}))
 
     def _tgws_restart(self, data):
         ok = tgws.restart()
