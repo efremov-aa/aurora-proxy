@@ -6,3 +6,6 @@ __pycache__/
 .env
 *.zip
 xray
+xray.json
+*.tmp
+.DS_Store
