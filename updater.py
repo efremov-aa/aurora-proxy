@@ -22,9 +22,9 @@ _RAW = "https://raw.githubusercontent.com/"
 _MODULES = [
     "config.py", "pool.py", "source.py", "core.py", "telemetry.py",
     "tgws.py", "recovery.py", "rusegment.py", "api.py", "ui.py", "run.py",
-    "security.py", "updater.py",
+    "security.py", "updater.py", "mesh.py", "subs.py",
 ]
-_STATIC = ["ui/index.html", "ui/app.js", "ui/style.css", "run_tgws.sh"]
+_STATIC = ["ui/index.html", "ui/app.js", "ui/style.css", "ui/qr.js", "run_tgws.sh"]
 
 _LOCK = threading.Lock()
 _STATE = {"state": "idle", "msg": "", "ts": 0.0}  # idle/checking/ready/applying/done/error

@@ -13,9 +13,12 @@ import urllib.request
 
 import config
 import pool
+import subs
 
-XRAY_CONFIG_LOCK = threading.Lock()
+XRAY_CONFIG_LOCK = threading.RLock()  # RLock: read-modify-write оборачивается этим локом целиком
 EGRESS_LOCK = threading.Lock()
+_ROTATE_LOCK = threading.Lock()
+_MODE_LOCK = threading.Lock()  # сериализация sync/set_direct (гонка vpn ON->OFF)
 _EGRESS_CACHE = {"ip": "-", "ts": 0.0}
 _LAST_ROTATE = [0.0]
 _WATCH_STOP = threading.Event()
@@ -79,6 +82,8 @@ def build_xray_config(final_tag):
     cfg = {
         "log": {"loglevel": "warning", "access": "", "error": ""},
         "api": {"tag": "api-in", "services": ["StatsService"]},
+        "policy": {"levels": {"0": {"statsUserUplink": True,
+                                    "statsUserDownlink": True}}},
         "inbounds": [
             {"tag": "http-in", "listen": "0.0.0.0", "port": config.XRAY_PORT,
              "protocol": "http"},
@@ -88,19 +93,30 @@ def build_xray_config(final_tag):
         "outbounds": outbounds,
         "routing": {"domainStrategy": "IPIfNonMatch", "rules": rules},
     }
-    # Внешний VLESS-Reality inbound для подключения к домашнему прокси ИЗВНЕ.
+    # Внешний VLESS-Reality inbound для подключения к прокси ИЗВНЕ.
     vln = config.VLESS_PUBLIC
     if vln.get("enabled") and vln.get("uuid"):
+        # мастер-uuid (владелец сервера) + все активные подписочные клиенты
+        clients = [{
+            "id": vln["uuid"],
+            "flow": vln.get("flow", "xtls-rprx-vision"),
+        }]
+        try:
+            for cuuid in subs.build_client_list():
+                clients.append({
+                    "id": cuuid,
+                    "email": cuuid,
+                    "flow": vln.get("flow", "xtls-rprx-vision"),
+                })
+        except Exception:
+            pass
         cfg["inbounds"].insert(1, {
             "tag": "vless-in",
             "listen": "0.0.0.0",
             "port": int(vln.get("port", 8443)),
             "protocol": "vless",
             "settings": {
-                "clients": [{
-                    "id": vln["uuid"],
-                    "flow": vln.get("flow", "xtls-rprx-vision"),
-                }],
+                "clients": clients,
                 "decryption": "none",
             },
             "streamSettings": {
@@ -204,7 +220,13 @@ def _restart_xray():
 
 def sync():
     """Полная синхронизация: пул -> конфиг -> старт -> проверка egress.
-    Возвращает (ok: bool, final: str)."""
+    Возвращает (ok: bool, final: str). Под _MODE_LOCK: параллельный set_direct
+    не может перезаписать результат после чтения vpn_mode."""
+    with _MODE_LOCK:
+        return _sync_impl()
+
+
+def _sync_impl():
     config.update_state(comm={"state": "syncing", "msg": "синхронизация с xray..."})
     pool.dedupe()
     vpn = config.get("vpn_mode", True)
@@ -226,14 +248,14 @@ def sync():
                             comm={"state": "idle", "msg": ""})
         return False, "direct"
 
-    # egress-проверка активного канала (2 попытки)
+    # egress-проверка активного канала (4 попытки — cold start Reality >8с)
     ip = None
     if final_tag != "direct":
-        for i in (1, 2):
+        for i in range(1, 5):
             ip = egress_probe(timeout=10)
             if ip:
                 break
-            config.log("core: sync final=%s egress probe %d/2 не дал IP" % (final_tag, i))
+            config.log("core: sync final=%s egress probe %d/4 не дал IP" % (final_tag, i))
             time.sleep(3)
         if not ip:
             config.log("core: final=%s БЕЗ egress, откат на direct" % final_tag)
@@ -248,6 +270,9 @@ def sync():
     n_keys = len(pool.get_keys())
     config.log("core: sync: outbounds=%d final=%s user_keys=%d" % (
         len(cfg["outbounds"]) - 2, final_tag, n_keys))
+    # при коллизии тег в xray.json мог быть переименован (-x) — в state пишем фактический
+    if final_tag != "direct":
+        final_tag = get_vless_now() or final_tag
     config.update_state(vless_now=final_tag, final_mode=final_tag,
                         egress_ip=ip or config.WHITE_IP,
                         comm={"state": "idle", "msg": ""})
@@ -255,24 +280,23 @@ def sync():
 
 
 def egress_probe(timeout=10):
-    """Фактический egress через живой порт xray. Возвращает IP или None."""
-    for scheme in ("https", "http"):
-        url = "%s://api.ipify.org?format=json" % scheme
-        try:
-            proxy = urllib.parse.urlparse("http://127.0.0.1:%d" % config.XRAY_PORT)
-            handler = urllib.request.ProxyHandler({
-                "http": "http://127.0.0.1:%d" % config.XRAY_PORT,
-                "https": "http://127.0.0.1:%d" % config.XRAY_PORT,
-            })
-            opener = urllib.request.build_opener(handler)
-            req = urllib.request.Request(url, headers={"User-Agent": "curl"})
-            with opener.open(req, timeout=timeout) as r:
-                body = r.read().decode("utf-8", errors="replace")
-            ip = json.loads(body).get("ip", "")
-            if ip and ip not in ("", "-", config.WHITE_IP):
-                return ip
-        except Exception:
-            continue
+    """Фактический egress через живой порт xray. Возвращает IP или None.
+    Только HTTP: HTTPS через CONNECT даёт SSL EOF (ложный провал)."""
+    url = "http://api.ipify.org?format=json"
+    try:
+        handler = urllib.request.ProxyHandler({
+            "http": "http://127.0.0.1:%d" % config.XRAY_PORT,
+            "https": "http://127.0.0.1:%d" % config.XRAY_PORT,
+        })
+        opener = urllib.request.build_opener(handler)
+        req = urllib.request.Request(url, headers={"User-Agent": "curl"})
+        with opener.open(req, timeout=timeout) as r:
+            body = r.read().decode("utf-8", errors="replace")
+        ip = json.loads(body).get("ip", "")
+        if ip and ip not in ("", "-", config.WHITE_IP):
+            return ip
+    except Exception:
+        return None
     return None
 
 
@@ -302,18 +326,25 @@ def get_vless_now():
 
 
 def set_direct():
-    """Переключение final=direct (правки routing, vless-outbounds сохраняются)."""
+    """Переключение final=direct (правки routing, vless-outbounds сохраняются).
+    Под _MODE_LOCK: сериализация с sync при смене vpn_mode."""
+    with _MODE_LOCK:
+        return _set_direct_impl()
+
+
+def _set_direct_impl():
     config.update_state(comm={"state": "syncing", "msg": "переключение в прямой режим..."})
-    cfg = _read_config()
-    if not cfg:
-        config.update_state(comm={"state": "idle", "msg": ""})
-        return False
-    for rule in cfg.get("routing", {}).get("rules", []):
-        if "http-in" in (rule.get("inboundTag") or []):
-            rule["outboundTag"] = "direct"
-    if not _write_config(cfg):
-        config.update_state(comm={"state": "idle", "msg": ""})
-        return False
+    with XRAY_CONFIG_LOCK:  # read-modify-write целиком под локом (TOCTOU)
+        cfg = _read_config()
+        if not cfg:
+            config.update_state(comm={"state": "idle", "msg": ""})
+            return False
+        for rule in cfg.get("routing", {}).get("rules", []):
+            if "http-in" in (rule.get("inboundTag") or []):
+                rule["outboundTag"] = "direct"
+        if not _write_config(cfg):
+            config.update_state(comm={"state": "idle", "msg": ""})
+            return False
     if not _restart_xray():
         config.update_state(comm={"state": "idle", "msg": ""})
         return False
@@ -323,32 +354,77 @@ def set_direct():
     return True
 
 
+def apply_sub_clients():
+    """Перезаписывает clients inbound vless-in в существующем xray.json
+    (мастер + все активные подписочные uuid) и рестартует xray.
+    ТОЛЬКО правка clients — routing/outbounds не трогаются (безопасно вживую).
+    Возвращает (ok: bool, msg: str)."""
+    if not (config.VLESS_PUBLIC.get("enabled") and config.VLESS_PUBLIC.get("uuid")):
+        return False, "внешний inbound не настроен"
+    clients = [{
+        "id": config.VLESS_PUBLIC["uuid"],
+        "flow": config.VLESS_PUBLIC.get("flow", "xtls-rprx-vision"),
+    }]
+    try:
+        for cuuid in subs.build_client_list():
+            clients.append({
+                "id": cuuid,
+                "email": cuuid,
+                "flow": config.VLESS_PUBLIC.get("flow", "xtls-rprx-vision"),
+            })
+    except Exception:
+        pass
+    with XRAY_CONFIG_LOCK:
+        cfg = _read_config()
+        if not cfg:
+            return False, "нет конфига"
+        # статистика по пользователям нужна и для живого конфига (не только при sync)
+        if "policy" not in cfg:
+            cfg["policy"] = {"levels": {"0": {"statsUserUplink": True,
+                                              "statsUserDownlink": True}}}
+        done = False
+        for inbound in cfg.get("inbounds", []):
+            if inbound.get("tag") == "vless-in":
+                inbound.setdefault("settings", {})["clients"] = clients
+                done = True
+                break
+        if not done:
+            return False, "vless-in не найден в xray.json"
+        if not _write_config(cfg):
+            return False, "write fail"
+    if not _restart_xray():
+        return False, "restart fail"
+    config.log("core: vless-in clients обновлены (%d всего)" % len(clients))
+    return True, "clients %d" % len(clients)
+
+
 def set_active_tag(tag):
     """Переключение final на тег из xray.json (vless). Возвращает (ok, msg)."""
     config.update_state(comm={"state": "syncing", "msg": "переключение ключа..."})
-    cfg = _read_config()
-    if not cfg:
-        config.update_state(comm={"state": "idle", "msg": ""})
-        return False, "нет конфига"
-    tags = [o.get("tag") for o in cfg.get("outbounds", [])]
-    if tag not in tags:
-        config.update_state(comm={"state": "idle", "msg": ""})
-        return False, "tag not in outbounds"
-    prev = get_vless_now()
-    if prev == tag:
-        config.update_state(comm={"state": "idle", "msg": ""})
-        return True, "already active"
-    for rule in cfg.get("routing", {}).get("rules", []):
-        if "http-in" in (rule.get("inboundTag") or []):
-            rule["outboundTag"] = tag
-    if not _write_config(cfg):
-        config.update_state(comm={"state": "idle", "msg": ""})
-        return False, "write fail"
+    with XRAY_CONFIG_LOCK:  # read-modify-write целиком под локом (TOCTOU)
+        cfg = _read_config()
+        if not cfg:
+            config.update_state(comm={"state": "idle", "msg": ""})
+            return False, "нет конфига"
+        tags = [o.get("tag") for o in cfg.get("outbounds", [])]
+        if tag not in tags:
+            config.update_state(comm={"state": "idle", "msg": ""})
+            return False, "tag not in outbounds"
+        prev = get_vless_now()
+        if prev == tag:
+            config.update_state(comm={"state": "idle", "msg": ""})
+            return True, "already active"
+        for rule in cfg.get("routing", {}).get("rules", []):
+            if "http-in" in (rule.get("inboundTag") or []):
+                rule["outboundTag"] = tag
+        if not _write_config(cfg):
+            config.update_state(comm={"state": "idle", "msg": ""})
+            return False, "write fail"
     if not _restart_xray():
         config.update_state(comm={"state": "idle", "msg": ""})
         return False, "restart fail"
     ip = None
-    for i in (1, 2):
+    for i in range(1, 5):  # 4 попытки, cold start Reality >8с
         ip = egress_probe(timeout=10)
         if ip:
             break
@@ -360,10 +436,13 @@ def set_active_tag(tag):
         return True, "egress %s" % ip
     # откат
     rollback = prev if prev in tags else "direct"
-    for rule in cfg.get("routing", {}).get("rules", []):
-        if "http-in" in (rule.get("inboundTag") or []):
-            rule["outboundTag"] = rollback
-    _write_config(cfg)
+    with XRAY_CONFIG_LOCK:
+        cfg = _read_config()  # перечитываем свежую версию (конфиг мог смениться)
+        if cfg:
+            for rule in cfg.get("routing", {}).get("rules", []):
+                if "http-in" in (rule.get("inboundTag") or []):
+                    rule["outboundTag"] = rollback
+            _write_config(cfg)
     _restart_xray()
     config.update_state(vless_now=rollback, final_mode=rollback,
                         comm={"state": "idle", "msg": ""})
@@ -380,9 +459,11 @@ def _rotate_guard():
 
 def rotate():
     """Ротация: пробуем до 3 кандидатов с живым egress. Возвращает новый тег или None."""
-    if _rotate_guard():
-        config.log("core: rotate cooldown, skip")
-        return None
+    with _ROTATE_LOCK:  # guard + установка кулдауна атомарны (гонка watch+API)
+        if _rotate_guard():
+            config.log("core: rotate cooldown, skip")
+            return None
+        _LAST_ROTATE[0] = time.time()  # фиксируем сразу после прохода guard
     cur = get_vless_now()
     pool.dedupe()
     keys = pool.get_keys()
@@ -398,7 +479,6 @@ def rotate():
     if not cands:  # фолбек: все живые, кроме текущего
         cands = [k for k in keys if k.get("tag") != cur and not pool.blocked(k.get("uri", ""))]
     cands = cands[:3]
-    _LAST_ROTATE[0] = time.time()
     for k in cands:
         tag = k.get("tag")
         if not tag:
@@ -444,9 +524,15 @@ def _final_watch():
                     continue
                 rotate()
                 continue
-        ip = egress_probe(timeout=8)
+        # устойчивый None: одна проба = ложный rotate (cold start/flap 5-14с)
+        ip = None
+        for _attempt in range(3):
+            ip = egress_probe(timeout=8)
+            if ip:
+                break
+            time.sleep(3)
         if not ip:
-            config.log("core: final %s БЕЗ egress, rotate" % tag)
+            config.log("core: final %s БЕЗ egress (3 пробы), rotate" % tag)
             # честный egress: канал реально не отдаёт IP — не показываем устаревший кэш
             config.update_state(egress_ip="-")
             if _rotate_guard():

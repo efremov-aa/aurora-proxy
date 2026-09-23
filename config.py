@@ -6,9 +6,11 @@ import os
 import threading
 import time
 
-VERSION = "1.3.1"
-VERSION_NAME = "Auto-Update"
+VERSION = "1.6.0"
+VERSION_NAME = "Меш и Магазин"
 APP_NAME = "Aurora"
+
+_BOOT_TS = time.time()   # время старта процесса (для /api/settings.uptime)
 
 # --- авто-обновление (GitHub Releases) ---
 # Обязательное: публичная сборка всегда обновляется с этого репо.
@@ -23,6 +25,31 @@ XRAY_CONFIG = os.path.join(BASE_DIR, "xray.json")
 LOG_FILE = os.path.join(BASE_DIR, "aurora.log")
 
 os.makedirs(DATA_DIR, exist_ok=True)
+
+# --- подписки (продаваемые VLESS-ключи клиентам) ---
+SUBS_FILE = os.path.join(DATA_DIR, "subs.json")
+SUBS_PLANS_FILE = os.path.join(DATA_DIR, "plans.json")
+AUTO_REFRESH_INTERVAL = 1800   # фоновый цикл обновления github-ключей (сек)
+
+SUBS_PLANS = {
+    "free": {"name": "Бесплатный", "price": 0, "bytes": 10 * 1024 ** 3, "days": 30,
+             "devices": 1, "keys": 1,
+             "features": ["1 устройство", "10 ГБ трафика", "Базовая локация 🇷🇺"],
+             "features_no": ["Меш-сеть", "Внешний доступ извне", "Приоритетная поддержка"]},
+    "basic": {"name": "Базовый", "price": 399, "bytes": 100 * 1024 ** 3, "days": 30,
+              "devices": 3, "keys": 2,
+              "features": ["3 устройства", "100 ГБ трафика", "Все локации + 🇩🇪 🇳🇱",
+                           "Меш-сеть", "Внешний доступ извне"],
+              "features_no": ["Приоритетная поддержка"]},
+    "prem": {"name": "Премиум", "price": 799, "bytes": 0, "days": 30,
+             "devices": 10, "keys": 5,
+             "features": ["10 устройств", "Безлимит трафика", "Все локации + эксклюзив",
+                          "Меш-сеть + приоритет", "Внешний доступ извне",
+                          "Приоритетная поддержка 24/7"],
+             "features_no": []},
+}
+SUBS_PLAN_DEFAULT = "free"
+SUBS_MASK_UUID = True  # в UI показывать маскированные uuid подключений
 
 # --- порты (привязаны к клиентским устройствам, НЕ менять без запроса) ---
 UI_PORT = 8890            # панель Aurora
@@ -67,7 +94,7 @@ RU_DOMAINS_CACHE = {"list": [], "ts": 0.0}
 
 # --- лимиты ---
 MAX_USER_KEYS = 120       # максимум ключей в пуле (60 -> 120: большая выборка из 2529 reality-ключей)
-MAX_PING_MS = 500        # выше = ключ мёртв (правило юзера: >500мс мёртвый)
+MAX_PING_MS = 700        # выше = ключ мёртв (правило юзера: >700мс мёртвый)
 EGRESS_TTL_S = 60         # кэш egress
 ROTATE_COOLDOWN_S = 180.0 # демпф ротации
 VPN_KEYS_N = 4            # сколько ключей попадает в xray.json при VPN ON
@@ -93,13 +120,27 @@ AGENT_UPDATE_URL = ""
 AGENT_UPDATE_VERSION = ""
 
 # --- настройки (сохранение в data/settings.json) ---
-_LOCK = threading.Lock()
+_LOCK = threading.RLock()   # RLock: set() берёт лок, save_settings берёт вложенно
 _SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
 
 _SETTINGS_DEFAULTS = {
     "vpn_mode": True,        # True = VPN активен (final = лучший ключ), False = прямой
     "auto_recovery": True,   # авто-восстановление канала через агента
     "continue_text": "",     # текст при отправке continue
+    "ui_token": "",          # X-Auth-токен панели (пусто = как раньше, секреты видны в LAN)
+    # --- v1.4.0: сервер / меш / безопасность ---
+    "server_name": "Home",       # имя сервера (хаб меша)
+    "auto_refresh": True,        # автообновление github-ключей фоновым циклом
+    "lan_only": False,           # панель: loopback + LAN (дефолт выключен для публичного деплоя)
+    "block_scanners": False,     # 403 на шаблонные пути сканеров/ботов
+    "rate_limit": True,          # демпфер 600 req/min на не-loopback IP
+    "mesh_id": "mesh-aurora-home",  # идентификатор меша (invite-ссылка)
+    "mesh_token": "",            # токен invite (генерируется при первом запросе)
+    "twofa": False,              # требовать X-2FA на POST /api/*
+    "ui_pin": "",                # пин 2FA (заголовок X-2FA)
+    "show_mesh": True,           # показывать вкладку «Меш-сеть» в панели
+    "show_subs": True,           # показывать вкладку «Магазин» в панели
+    "mesh_master": False,        # головной сервер: раздаёт политику видимости клиентам меша
 }
 
 _settings = dict(_SETTINGS_DEFAULTS)
@@ -236,13 +277,68 @@ def save_settings():
             log("settings: не удалось сохранить: %s" % e)
 
 
+def reset_settings():
+    """Сброс настроек к значениям по умолчанию (кнопка «Сбросить всё»)."""
+    global _settings
+    with _LOCK:
+        _settings = dict(_SETTINGS_DEFAULTS)
+    save_settings()
+    log("settings: сброшены к значениям по умолчанию")
+
+
+# --- тарифы: переопределение из data/plans.json (редактор тарифов в UI) ---
+_SUBS_PLANS_LOCK = threading.RLock()
+
+
+def save_plans():
+    """Сохраняет текущие SUBS_PLANS в data/plans.json (атомарно)."""
+    with _SUBS_PLANS_LOCK:
+        tmp = SUBS_PLANS_FILE + ".tmp"
+        try:
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(SUBS_PLANS, f, indent=2, ensure_ascii=False)
+            os.replace(tmp, SUBS_PLANS_FILE)
+        except OSError as e:
+            log("plans: не удалось сохранить: %s" % e)
+
+
+def _load_plans_override():
+    """Переопределение тарифов из data/plans.json (валидные планы перезаписывают)."""
+    try:
+        if not os.path.exists(SUBS_PLANS_FILE):
+            return
+        with open(SUBS_PLANS_FILE, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+        valid = {}
+        need = ("name", "price", "bytes", "days", "devices", "keys")
+        for k, v in raw.items():
+            if isinstance(v, dict) and all(x in v for x in need):
+                # мержим с дефолтом: features/features_no не обязательны в json,
+                # но сохраняем, если заданы (иначе описание тарифа теряется)
+                base = dict(SUBS_PLANS.get(k, {}))
+                base.update(v)
+                valid[k] = base
+        if valid:
+            SUBS_PLANS.update(valid)
+            log("plans: тарифы переопределены из data/plans.json (%d)" % len(valid))
+    except (OSError, ValueError) as e:
+        log("plans: не читается plans.json: %s" % e)
+
+
 def get(key, default=None):
     return _settings.get(key, default)
 
 
 def set(key, value):
-    _settings[key] = value
+    with _LOCK:                  # защита от RuntimeError при параллельном save_settings
+        _settings[key] = value
     save_settings()
+
+
+def update_state_sub(key, **kw):
+    """Атомарный апдейт вложенного словаря STATE (напр. tgws) под локом."""
+    with STATE_LOCK:
+        STATE.setdefault(key, {}).update(kw)
 
 
 def update_state(**kw):
@@ -259,3 +355,7 @@ def get_state():
 def state_fields():
     """Плоская копия STATE для JSON-ответа."""
     return get_state()
+
+
+# Переопределение тарифов из data/plans.json — в конце модуля (после log()).
+_load_plans_override()

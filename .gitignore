@@ -9,3 +9,7 @@ xray
 xray.json
 *.tmp
 .DS_Store
+
+windows/installer/output/
+windows/nssm/nssm.exe
+*.bak_mojibake

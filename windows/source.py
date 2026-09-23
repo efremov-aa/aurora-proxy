@@ -245,7 +245,8 @@ def keytest(key, timeout=15, port=None):
     proc = None
     try:
         proc = subprocess.Popen([xbin, "run", "-c", cfg_path],
-                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                creationflags=config.HIDE_FLAG)
     except OSError:
         pass
 

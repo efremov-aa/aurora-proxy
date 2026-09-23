@@ -1,197 +1,666 @@
 <!DOCTYPE html>
 <html lang="ru" data-theme="dark">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Aurora — прокси</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/style.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Aurora — прокси · меш · магазин</title>
+  <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-<header>
-  <div class="hrow">
-    <div class="logo"><span class="ic">🐱</span><div>Aurora<small>VPN PROXY</small></div></div>
-    <nav id="nav">
-      <button data-t="status" class="on"><span class="ic">🏠</span>Статус</button>
-      <button data-t="keys"><span class="ic">🔑</span>Ключи</button>
-      <button data-t="devices"><span class="ic">📱</span>Устройства</button>
-      <button data-t="connect"><span class="ic">🌐</span>Подключение</button>
-      <button data-t="rusegment"><span class="ic">🇷🇺</span>Ру-сегмент</button>
-      <button data-t="tgws"><span class="ic">✈️</span>TG-WS</button>
-      <button data-t="whitelist"><span class="ic">⬜</span>Белый список</button>
+<div class="app">
+
+  <!-- ============================================================
+       SIDEBAR
+       ============================================================ -->
+  <aside class="side" id="side">
+    <div class="side-brand">
+      <span class="cat">🐱</span>
+      <div>
+        <b>Aurora</b>
+        <small>gh edition</small>
+      </div>
+    </div>
+
+    <nav class="side-nav" id="nav">
+      <div class="ngroup">
+        <div class="ngroup-title" data-short="🏠">🏠 <span data-i18n="nav.group.home">Домашний прокси</span></div>
+        <button data-t="dashboard" class="on"><span class="ic">📊</span><span class="lb" data-i18n="nav.dash">Обзор</span></button>
+        <button data-t="keys"><span class="ic">🔑</span><span class="lb" data-i18n="nav.keys">Ключи</span></button>
+        <button data-t="devices"><span class="ic">📱</span><span class="lb" data-i18n="nav.devices">Устройства</span></button>
+        <button data-t="connect"><span class="ic">🌐</span><span class="lb" data-i18n="nav.connect">Внешний доступ</span></button>
+        <button data-t="rusegment"><span class="ic">🇷🇺</span><span class="lb" data-i18n="nav.rusegment">Ру-сегмент</span></button>
+        <button data-t="tgws"><span class="ic">✈️</span><span class="lb" data-i18n="nav.tgws">TG-WS</span></button>
+      </div>
+
+      <div class="ngroup" id="g-mesh">
+        <div class="ngroup-title" data-short="🕸️">🕸️ <span data-i18n="nav.mesh">Меш-сеть</span></div>
+        <button data-t="mesh-join"><span class="ic">🔗</span><span class="lb" data-i18n="nav.mesh-join">Подключение</span><span class="tag live" id="tag-mesh-join">✓</span></button>
+        <button data-t="mesh-topo"><span class="ic">🌌</span><span class="lb" data-i18n="nav.mesh-topo">Топология</span></button>
+        <button data-t="mesh-routes"><span class="ic">🧭</span><span class="lb" data-i18n="nav.mesh-routes">Маршруты</span></button>
+      </div>
+
+      <div class="ngroup" id="g-shop">
+        <div class="ngroup-title" data-short="🛒">🛒 <span data-i18n="nav.shop">Магазин</span></div>
+        <button data-t="shop-plans"><span class="ic">💎</span><span class="lb" data-i18n="nav.shop-plans">Тарифы</span><span class="tag gold" id="tag-plan">basic</span></button>
+        <button data-t="shop-features"><span class="ic">🧩</span><span class="lb" data-i18n="nav.shop-features">Функции</span><span class="tag" id="tag-feat">2</span></button>
+        <button data-t="shop-billing"><span class="ic">💳</span><span class="lb" data-i18n="nav.shop-billing">Платежи</span></button>
+      </div>
+
+      <div class="ngroup">
+        <div class="ngroup-title" data-short="🔄">🔄 <span data-i18n="nav.group.upd">Обновления</span></div>
+        <button data-t="update"><span class="ic">⬆️</span><span class="lb" data-i18n="nav.update">Обновление</span><span class="tag hot" id="tag-upd">NEW</span></button>
+        <button data-t="versions"><span class="ic">📚</span><span class="lb" data-i18n="nav.versions">Версии</span></button>
+      </div>
+
+      <div class="ngroup">
+        <div class="ngroup-title" data-short="⚙️">⚙️ <span data-i18n="nav.group.set">Настройки</span></div>
+        <button data-t="settings"><span class="ic">🧩</span><span class="lb" data-i18n="nav.settings">Сервер</span></button>
+        <button data-t="security"><span class="ic">🛡️</span><span class="lb" data-i18n="nav.security">Безопасность</span></button>
+        <button data-t="logs"><span class="ic">📜</span><span class="lb" data-i18n="nav.logs">Логи</span></button>
+      </div>
     </nav>
-    <button id="theme-btn" class="theme-btn" title="Сменить тему">🌙</button>
+
+    <div class="side-foot">
+      <span class="dot"></span>
+      <span id="side-version">v—</span>
+      <span class="upd" id="side-upd" style="display:none" onclick="navTo('update')">⬆ NEW</span>
+    </div>
+  </aside>
+
+  <!-- ============================================================
+       MAIN
+       ============================================================ -->
+  <div class="main">
+    <header class="topbar">
+      <button class="menu-btn" id="menu-btn" aria-label="Меню">☰</button>
+      <div class="tb-title"><span class="ic" id="tb-icon">📊</span><span id="tb-name">Обзор</span></div>
+      <div class="tb-pills">
+        <span class="pill off hide-sm" id="pill-vpn"><span class="dot"></span><span id="pill-vpn-t">VPN</span></span>
+        <span class="pill on hide-sm" id="pill-mesh"><span class="dot"></span>mesh</span>
+        <span class="pill gold" id="pill-plan">💎 basic</span>
+        <span class="pill mono hide-sm" id="pill-ip">—</span>
+      </div>
+      <select id="lang-sel" class="lang-sel" onchange="setLang(this.value)" title="Язык / Language">
+        <option value="ru">Русский</option>
+        <option value="en">English</option>
+        <option value="es">Español</option>
+        <option value="de">Deutsch</option>
+        <option value="fr">Français</option>
+        <option value="tr">Türkçe</option>
+        <option value="pt">Português</option>
+        <option value="zh">中文</option>
+        <option value="ar">العربية</option>
+        <option value="hi">हिन्दी</option>
+      </select>
+      <button id="theme-btn" class="icon-btn" title="Сменить тему">🌙</button>
+    </header>
+
+    <div class="content">
+
+      <!-- ==================================================
+           ДАШБОРД (обзор)
+           ================================================== -->
+      <section class="tab show" id="t-dashboard">
+        <div class="hero">
+          <div class="cat">🐱</div>
+          <div class="hbody">
+            <div class="hhead">
+              <h1 id="hero-title">Aurora</h1>
+              <span class="badge on" id="hero-badge">VPN</span>
+            </div>
+            <div class="hsub" id="hero-sub">прокси · загрузка</div>
+          </div>
+          <div class="hact">
+            <button class="btn primary" id="btn-vpn" data-i18n="btn.vpn-off">🌀 VPN</button>
+            <button class="btn" id="btn-rotate" data-i18n="btn.rotate">🎲 Сменить ключ</button>
+          </div>
+        </div>
+
+        <div class="metrics">
+          <div class="stat"><div class="k">🐾 <span data-i18n="dash.mode">Режим</span></div><div class="v" id="mode">–</div></div>
+          <div class="stat"><div class="k">🌍 <span data-i18n="dash.ip">Выходной IP</span></div><div class="v mono" id="egress" style="font-size:13px">–</div></div>
+          <div class="stat"><div class="k">📶 <span data-i18n="dash.conns">Соединения</span></div><div class="v" id="conns">0</div></div>
+          <div class="stat"><div class="k">📦 <span data-i18n="dash.traffic">Трафик ↓ / ↑</span></div><div class="v mono" id="traffic" style="font-size:13px">0 / 0</div></div>
+          <div class="stat" id="meshm"><div class="k">🕸️ <span data-i18n="dash.mesh-nodes">Меш-узлов</span></div><div class="v" id="mesh-count">0</div></div>
+          <div class="stat gold" id="planm"><div class="k">💎 <span data-i18n="dash.plan">Тариф</span></div><div class="v" id="plan-name">–</div></div>
+        </div>
+
+        <!-- === Виджет: обновление === -->
+        <div class="update-card new" id="dash-update" style="display:none">
+          <div class="update-line">
+            <span class="ic">⬆️</span>
+            <div class="uinfo">
+              <div class="uver">
+                <span class="mono" id="du-cur">—</span>
+                <span class="arrow">→</span>
+                <span class="mono new-ver" id="du-new">—</span>
+                <span class="badge gold" style="font-size:10px" data-i18n="upd.avail">доступно</span>
+              </div>
+              <div class="usub" id="du-msg">—</div>
+            </div>
+            <div class="uact" style="display:flex;gap:8px">
+              <button class="btn ghost" onclick="navTo('update')" data-i18n="upd.details">Подробнее</button>
+              <button class="btn primary" onclick="startUpdate()" data-i18n="upd.now">Обновить</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- === Виджеты === -->
+        <div class="widgets">
+
+          <!-- Меш -->
+          <div class="widget" id="dash-mesh-widget">
+            <div class="widget-head">
+              <span class="ic">🕸️</span>
+              <b data-i18n="nav.mesh">Меш-сеть</b>
+              <span class="badge" id="w-mesh-st">—</span>
+            </div>
+            <div class="widget-body" id="w-mesh-body">—</div>
+            <div class="widget-foot">
+              <button class="btn small" onclick="navTo('mesh-topo')">🌌 <span data-i18n="nav.mesh-topo">Топология</span></button>
+              <button class="btn small" onclick="navTo('mesh-routes')">🧭 <span data-i18n="nav.mesh-routes">Маршруты</span></button>
+            </div>
+          </div>
+
+          <!-- Тариф -->
+          <div class="widget" id="dash-plan-widget">
+            <div class="widget-head">
+              <span class="ic">💎</span>
+              <b data-i18n="dash.plan">Тариф</b>
+              <span class="badge gold" id="plan-st">basic</span>
+            </div>
+            <div class="widget-body" id="w-plan-body">—</div>
+            <div class="widget-foot">
+              <button class="btn small" onclick="navTo('shop-plans')">💎 <span data-i18n="nav.shop-plans">Тарифы</span></button>
+              <button class="btn small" onclick="navTo('shop-features')">🧩 <span data-i18n="nav.shop-features">Функции</span></button>
+            </div>
+          </div>
+
+          <!-- Здоровье прокси -->
+          <div class="widget">
+            <div class="widget-head">
+              <span class="ic">🩺</span>
+              <b data-i18n="w.proxy">Состояние прокси</b>
+              <span class="badge ok" id="w-proxy-st">работает</span>
+            </div>
+            <div class="widget-body">
+              Активный ключ <b id="w-key">—</b>, exit <b id="w-exit">—</b>. Восстановлений за сутки: <b id="w-rec">0</b>.
+            </div>
+            <div class="widget-foot">
+              <button class="btn small" onclick="navTo('keys')">🔑 <span data-i18n="nav.keys">Ключи</span></button>
+              <button class="btn small" onclick="navTo('logs')">📜 <span data-i18n="nav.logs">Логи</span></button>
+            </div>
+          </div>
+
+          <!-- Ру-сегмент -->
+          <div class="widget">
+            <div class="widget-head">
+              <span class="ic">🇷🇺</span>
+              <b data-i18n="nav.rusegment">Ру-сегмент</b>
+              <span class="badge warn" id="w-ru-st">—</span>
+            </div>
+            <div class="widget-body" id="w-ru-body">—</div>
+            <div class="widget-foot">
+              <button class="btn small" onclick="navTo('rusegment')">🧪 <span data-i18n="w.check-ru">Проверить</span></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2><span class="ic">🛠️</span><span data-i18n="dash.manage">Управление</span></h2>
+          <div class="actions" style="margin-top:0">
+            <button class="btn" id="btn-refresh" data-i18n="pool.refresh-btn">🔄 Обновить ключи</button>
+            <button class="btn" id="btn-check" data-i18n="pool.check-btn">🧪 Проверить ключи</button>
+            <button class="btn ghost" id="btn-ping-mesh" style="display:none" data-i18n="mesh.ping-btn">📡 Пинг меш</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================================================
+           КЛЮЧИ
+           ================================================== -->
+      <section class="tab" id="t-keys">
+        <div class="card">
+          <h2><span class="ic">🔑</span><span data-i18n="nav.keys">Ключи</span><span class="count" id="keyinfo" data-i18n="k.keys">ключей: 0</span></h2>
+          <div class="cmd-row" style="margin-top:0">
+            <input type="text" id="keyuri" data-i18n-placeholder="keys.uri-ph" placeholder="vless://… вставьте свою ссылку (Reality)">
+            <button class="btn primary" onclick="keyAdd()">➕ <span data-i18n="keys.add">Свой ключ</span></button>
+          </div>
+          <div class="actions tight">
+            <button class="btn small" onclick="keyClean()">🧹 <span data-i18n="keys.clean">Очистить мёртвые</span></button>
+            <span class="spacer"></span>
+            <span class="badge mono" data-i18n="keys.src">github + свои</span>
+          </div>
+          <div class="tbl-wrap" style="margin-top:12px">
+            <table>
+              <thead><tr><th data-i18n="th.tag">Тег</th><th data-i18n="th.source">Источник</th><th data-i18n="th.status">Статус</th><th data-i18n="th.ping">Пинг</th><th data-i18n="th.exit">Exit IP</th><th data-i18n="th.sites">Sites</th><th></th></tr></thead>
+              <tbody id="keyrows"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================================================
+           УСТРОЙСТВА
+           ================================================== -->
+      <section class="tab" id="t-devices">
+        <div class="card">
+          <h2><span class="ic">📱</span><span data-i18n="dev.head">Устройства в сети</span></h2>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th data-i18n="th.device">Устройство</th><th>IP</th><th data-i18n="th.conn">Conn</th><th data-i18n="th.dl">↓ Скачано</th><th data-i18n="th.ul">↑ Отдано</th></tr></thead>
+              <tbody id="devrows"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================================================
+           ВНЕШНИЙ ДОСТУП
+           ================================================== -->
+      <section class="tab" id="t-connect">
+        <div class="card">
+          <h2><span class="ic">🌐</span><span data-i18n="cx.head">Подключение извне</span><span class="count" id="cx-flag-wrap"><span class="badge off" id="cx-flag">выключено</span></span></h2>
+          <p class="hint" data-i18n="cx.hint">Готовая vless-ссылка на ваш прокси. Вставьте её в v2rayN / v2rayNG / NekoBox — и трафик пойдёт через этот сервер откуда угодно.</p>
+          <div class="qr-box" id="cx-qr"></div>
+          <div class="cmd-row">
+            <input type="text" id="cx-link" readonly>
+            <button class="btn" onclick="cxCopy()">📋 <span data-i18n="btn.copy">Копировать</span></button>
+          </div>
+          <div class="metrics" style="margin:12px 0 0">
+            <div class="stat"><div class="k">🔗 <span data-i18n="cx.addr">Адрес</span></div><div class="v mono" id="cx-host" style="font-size:13px">–</div></div>
+            <div class="stat"><div class="k">🔌 <span data-i18n="cx.port">Порт</span></div><div class="v mono" id="cx-port" style="font-size:13px">–</div></div>
+            <div class="stat"><div class="k">🆔 <span data-i18n="cx.uuid">UUID</span></div><div class="v mono" id="cx-uuid" style="font-size:11px">–</div></div>
+            <div class="stat"><div class="k">🛡️ <span data-i18n="cx.sni">SNI</span></div><div class="v mono" id="cx-sni" style="font-size:13px">–</div></div>
+          </div>
+          <p class="hint" style="margin-top:12px">⚠️ Пробросьте порт <b id="cx-hint-port">–</b> на роутере (WAN → <span id="cx-hint-host">–</span>), иначе извне сервер недоступен.</p>
+        </div>
+      </section>
+
+      <!-- ==================================================
+           РУ-СЕГМЕНТ
+           ================================================== -->
+      <section class="tab" id="t-rusegment">
+        <div class="card">
+          <h2><span class="ic">🇷🇺</span><span data-i18n="nav.rusegment">Ру-сегмент</span><span class="count" id="ru-flag-wrap"><span class="badge warn" id="ru-flag">частично</span></span></h2>
+          <p class="hint" data-i18n="ru.hint">Доступность российских ресурсов напрямую с сервера (без VPN). Если сегмент работает — RU-сайты открываются без прокси.</p>
+          <div class="metrics" style="margin:0 0 12px">
+            <div class="stat"><div class="k">✅ <span data-i18n="ru.ok">Доступно</span></div><div class="v" id="ru-ok">0/0</div></div>
+            <div class="stat"><div class="k">💀 <span data-i18n="ru.bad">Проблемы</span></div><div class="v" id="ru-bad">0</div></div>
+            <div class="stat"><div class="k">⚡ <span data-i18n="ru.med">Медиана</span></div><div class="v mono" id="ru-med">–</div></div>
+            <div class="stat"><div class="k">🕐 <span data-i18n="ru.ts">Проверено</span></div><div class="v mono" id="ru-ts" style="font-size:13px">–</div></div>
+          </div>
+          <div class="actions" style="margin-top:0">
+            <button class="btn" id="ru-run" onclick="ruCheck()">🧪 <span data-i18n="ru.check-now">Проверить сейчас</span></button>
+            <button class="btn small" id="ru-failonly" onclick="ruToggleFail()">💀 Только проблемы</button>
+          </div>
+          <div class="tbl-wrap" style="margin-top:12px">
+            <table>
+              <thead><tr><th data-i18n="th.domain">Домен</th><th>IP</th><th>HTTP</th><th data-i18n="th.time">Время</th><th data-i18n="th.status">Статус</th></tr></thead>
+              <tbody id="rurows"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================================================
+           TG-WS
+           ================================================== -->
+      <section class="tab" id="t-tgws">
+        <div class="card">
+          <h2><span class="ic">✈️</span><span data-i18n="tgws.head">Telegram WS-прокси</span></h2>
+          <div class="metrics" style="margin:0 0 12px">
+            <div class="stat"><div class="k">⚙️ <span data-i18n="tgws.proc">Процесс</span></div><div class="v" id="tg-on">–</div></div>
+            <div class="stat"><div class="k">🔌 <span data-i18n="cx.port">Порт</span></div><div class="v mono" id="tg-port" style="font-size:13px">–</div></div>
+            <div class="stat"><div class="k">🤫 <span data-i18n="tgws.secret">Секрет</span></div><div class="v mono" id="tg-sec" style="font-size:13px">–</div></div>
+          </div>
+          <div class="actions" style="margin-top:0">
+            <button class="btn" onclick="tgRestart()">🔄 <span data-i18n="tgws.restart">Рестарт TG-WS</span></button>
+          </div>
+          <div class="qr-box" id="tg-qr"></div>
+        </div>
+      </section>
+
+      <!-- ==================================================
+           МЕШ · ПОДКЛЮЧЕНИЕ
+           ================================================== -->
+      <section class="tab" id="t-mesh-join">
+        <div class="invite-box">
+          <h3><span>🔗</span><span data-i18n="mj.head">Подключение к меш-сети</span></h3>
+          <p data-i18n="mj.p">Ваш прокси может быть частью приватной меш-сети Aurora. Это даёт доступ к эксклюзивным локациям других участников, автоматический обход блокировок и резервные маршруты.</p>
+          <div class="invite-input">
+            <input type="text" id="mesh-invite" data-i18n-placeholder="mj.invite-ph" placeholder="Вставьте invite-код меша (например: aurora-home-a1b2c3d4)">
+            <button class="btn primary" onclick="meshJoin()">🔗 <span data-i18n="mj.join">Подключиться</span></button>
+          </div>
+        </div>
+
+        <div class="metrics">
+          <div class="stat"><div class="k">🕸️ <span data-i18n="mj.st">Статус меша</span></div><div class="v" id="mesh-join-st">–</div></div>
+          <div class="stat"><div class="k">📛 <span data-i18n="mj.name">Имя меша</span></div><div class="v mono" style="font-size:14px" id="mi-name">–</div></div>
+          <div class="stat"><div class="k">👤 <span data-i18n="mj.role">Роль</span></div><div class="v" id="mi-role">–</div></div>
+          <div class="stat"><div class="k">🛰️ <span data-i18n="mj.nodes">Узлов доступно</span></div><div class="v" id="mi-nodes">0</div></div>
+          <div class="stat"><div class="k">⏱️ <span data-i18n="mj.ping">Пинг до хаба</span></div><div class="v mono" style="font-size:14px" id="mi-ping">–</div></div>
+          <div class="stat"><div class="k">🔐 <span data-i18n="mj.enc">Шифрование</span></div><div class="v" id="mi-enc">–</div></div>
+        </div>
+
+        <div class="card">
+          <h2><span class="ic">📋</span><span data-i18n="mj.what">Что даёт меш</span></h2>
+          <div class="widget-body" style="font-size:13px">
+            <ul style="list-style:none;display:flex;flex-direction:column;gap:6px">
+              <li>✓ <b>Общие локации</b> — доступ к узлам других участников (Германия, Нидерланды, Турция и др.)</li>
+              <li>✓ <b>Резервные маршруты</b> — если один узел упал, трафик автоматически идёт через другой</li>
+              <li>✓ <b>Локальный обход блокировок</b> — трафик между устройствами меша идёт напрямую</li>
+              <li>✓ <b>Общий белый список</b> — синхронизация правил между всеми вашими прокси</li>
+            </ul>
+          </div>
+          <div class="actions">
+            <button class="btn danger" onclick="meshLeave()">⛔ <span data-i18n="mj.leave">Покинуть меш</span></button>
+            <button class="btn ghost" onclick="meshRegen()">🔄 <span data-i18n="mj.regen">Обновить invite</span></button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2><span class="ic">🎛</span><span data-i18n="mj.pol">Политика хаба</span></h2>
+          <p class="hint" data-i18n="mj.pol-hint">Головной сервер управляет тем, какие вкладки видны у клиентов меша. Клиенты, подключённые по invite этого сервера, автоматически применяют политику (обновление каждые 15&nbsp;сек).</p>
+          <div class="widget-body" style="display:flex;flex-direction:column;gap:8px;font-size:13px">
+            <label class="chk"><input type="checkbox" id="m-master" onchange="meshPolicySave()"> <span data-i18n="mj.master">Cервер — головной, управляет видимостью у клиентов</span></label>
+            <label class="chk"><input type="checkbox" id="m-show-mesh" onchange="meshPolicySave()"> <span data-i18n="mj.show-mesh">Показывать клиентам вкладку «Меш-сеть»</span></label>
+            <label class="chk"><input type="checkbox" id="m-show-subs" onchange="meshPolicySave()"> <span data-i18n="mj.show-subs">Показывать клиентам вкладку «Магазин»</span></label>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================================================
+           МЕШ · ТОПОЛОГИЯ
+           ================================================== -->
+      <section class="tab" id="t-mesh-topo">
+        <div class="card">
+          <h2><span class="ic">🌌</span><span data-i18n="nav.mesh-topo">Топология меша</span><span class="count" id="mesh-topo-name">–</span></h2>
+          <p class="hint" data-i18n="mt.hint">Ваш прокси (в центре) и узлы других участников меша. Соединения активны, если трафик ходит через них.</p>
+          <div class="mesh-canvas" id="mesh-svg">
+            <svg viewBox="0 0 800 340" preserveAspectRatio="xMidYMid meet">
+              <path class="mesh-link active" d="M400,170 L180,90"/>
+              <path class="mesh-link active" d="M400,170 L640,90"/>
+              <path class="mesh-link" d="M400,170 L180,250"/>
+              <path class="mesh-link active" d="M400,170 L640,250"/>
+              <path class="mesh-link" d="M180,90 L640,90"/>
+              <path class="mesh-link" d="M180,250 L640,250"/>
+              <path class="mesh-link" d="M180,90 L180,250"/>
+              <path class="mesh-link" d="M640,90 L640,250"/>
+
+              <g class="mesh-node" color="var(--primary)">
+                <circle cx="400" cy="170" r="22" fill="var(--primary)" opacity=".15"/>
+                <circle cx="400" cy="170" r="14" fill="var(--primary)"/>
+                <text x="400" y="205">🏠 <tspan data-i18n="g.you">Вы</tspan></text>
+              </g>
+
+              <g class="mesh-node" color="var(--ok)">
+                <circle cx="180" cy="90" r="12" fill="var(--ok)"/>
+                <text x="180" y="118">🇩🇪 Frankfurt</text>
+              </g>
+              <g class="mesh-node" color="var(--ok)">
+                <circle cx="640" cy="90" r="12" fill="var(--ok)"/>
+                <text x="640" y="118">🇳🇱 Amsterdam</text>
+              </g>
+              <g class="mesh-node" color="var(--warn)">
+                <circle cx="180" cy="250" r="12" fill="var(--warn)"/>
+                <text x="180" y="278">🇫🇮 Helsinki</text>
+              </g>
+              <g class="mesh-node" color="var(--ok)">
+                <circle cx="640" cy="250" r="12" fill="var(--ok)"/>
+                <text x="640" y="278">🇹🇷 Istanbul</text>
+              </g>
+            </svg>
+            <div class="mesh-toolbar">
+              <button class="on" title="Авто-раскладка" onclick="toast('Авто-раскладка 🐾', true)">🌐</button>
+              <button title="Обновить" onclick="meshRefresh()">🔄</button>
+            </div>
+            <div class="mesh-legend">
+              <span><i style="background:var(--primary)"></i><span data-i18n="g.you">Вы</span></span>
+              <span><i style="background:var(--ok)"></i><span data-i18n="status.on">Онлайн</span></span>
+              <span><i style="background:var(--warn)"></i><span data-i18n="status.warn">Нестабильно</span></span>
+              <span><i style="background:var(--bad)"></i><span data-i18n="status.off">Оффлайн</span></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card pad-0">
+          <div style="padding:14px 18px 12px;border-bottom:1px solid var(--line)">
+            <h2 style="margin:0"><span class="ic">🛰️</span><span data-i18n="mj.nodes">Доступные узлы</span></h2>
+          </div>
+          <div class="tbl-wrap" style="border-radius:0;border:none">
+            <table>
+              <thead><tr><th data-i18n="th.node">Узел</th><th data-i18n="th.region">Регион</th><th data-i18n="th.status">Статус</th><th data-i18n="th.ping">Пинг</th><th data-i18n="th.route">Маршрут</th></tr></thead>
+              <tbody id="mesh-nodes"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================================================
+           МЕШ · МАРШРУТЫ
+           ================================================== -->
+      <section class="tab" id="t-mesh-routes">
+        <div class="card">
+          <h2><span class="ic">🧭</span><span data-i18n="nav.mesh-routes">Маршруты</span></h2>
+          <p class="hint" data-i18n="mrt.hint">Правила, какой трафик через какой узел выходит в интернет. Порядок — сверху вниз.</p>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>#</th><th data-i18n="th.what">Что</th><th data-i18n="th.via">Куда</th><th data-i18n="th.proto">Протокол</th><th data-i18n="th.status">Статус</th><th></th></tr></thead>
+              <tbody id="mesh-routes"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================================================
+           МАГАЗИН · ТАРИФЫ
+           ================================================== -->
+      <section class="tab" id="t-shop-plans">
+        <div class="card">
+          <h2><span class="ic">💎</span><span data-i18n="sp.head">Тарифные планы</span></h2>
+          <p class="hint" data-i18n="sp.hint">Базовый набор функций прокси. Апгрейд — в один клик, применяется мгновенно, без потери соединений.</p>
+          <div class="plan-st" id="plans-loading"><span class="empty"><span class="ic">🐾</span><span data-i18n="sp.loading">загрузка тарифов…</span></span></div>
+          <div class="plans" id="plans-grid"></div>
+        </div>
+
+        <div class="card">
+          <h2><span class="ic">ℹ️</span><span data-i18n="sp.comp">Состав тарифов</span></h2>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th data-i18n="th.func">Функция</th><th data-i18n="th.val">Значение</th></tr></thead>
+              <tbody id="cmp-rows"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================================================
+           МАГАЗИН · ФУНКЦИИ
+           ================================================== -->
+      <section class="tab" id="t-shop-features">
+        <div class="card pad-0">
+          <div style="padding:14px 18px 12px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <h2 style="margin:0"><span class="ic">🧩</span><span data-i18n="nav.shop-features">Отдельные функции</span></h2>
+            <span class="spacer" style="flex:1"></span>
+            <span class="badge gold" data-i18n="sf.instant">+ активируются мгновенно</span>
+          </div>
+          <div class="feature-list" id="feat-list"></div>
+        </div>
+      </section>
+
+      <!-- ==================================================
+           МАГАЗИН · ПЛАТЕЖИ
+           ================================================== -->
+      <section class="tab" id="t-shop-billing">
+        <div class="card">
+          <h2><span class="ic">💳</span><span data-i18n="sb.head">Оплата и продление</span></h2>
+          <p class="hint" data-i18n="sb.hint">Активный план, срок действия и история платежей. Продление — в один клик.</p>
+          <div class="metrics" style="margin:0 0 12px">
+            <div class="stat"><div class="k">💎 <span data-i18n="sb.plan">Текущий план</span></div><div class="v" id="bill-plan">–</div></div>
+            <div class="stat"><div class="k">📅 <span data-i18n="sb.until">Активен до</span></div><div class="v mono" id="bill-until">–</div></div>
+            <div class="stat"><div class="k">📦 <span data-i18n="plans.traffic">Трафик</span></div><div class="v mono" id="bill-traffic">–</div></div>
+          </div>
+          <div class="actions" style="margin-top:0">
+            <button class="btn gold" onclick="buyPlan()">💳 <span data-i18n="sb.buy">Продлить / сменить план</span></button>
+          </div>
+          <h3 style="font-size:13px;font-weight:800;margin:14px 0 8px"><span data-i18n="sb.hist">История платежей</span></h3>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th data-i18n="th.date">Дата</th><th data-i18n="th.desc">Описание</th><th data-i18n="th.sum">Сумма</th><th data-i18n="th.status">Статус</th></tr></thead>
+              <tbody id="bill-rows"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================================================
+           ОБНОВЛЕНИЕ
+           ================================================== -->
+      <section class="tab" id="t-update">
+        <div class="update-card new" id="upd-card">
+          <div class="update-line">
+            <span class="ic">⬆️</span>
+            <div class="uinfo">
+              <div class="uver">
+                <span class="mono" id="upd-cur">—</span>
+                <span class="arrow">→</span>
+                <span class="mono new-ver" id="upd-new">—</span>
+                <span class="badge gold" style="font-size:10px" id="upd-state-b">–</span>
+              </div>
+              <div class="usub" id="upd-msg">—</div>
+            </div>
+            <div class="uact" style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn primary" onclick="startUpdate()">⬆️ <span data-i18n="upd.apply">Обновить сейчас</span></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2><span class="ic">⚙️</span><span data-i18n="upd.auto">Автообновление</span></h2>
+          <p class="hint" data-i18n="upd.auto-hint">Обновление производится из GitHub-релизов. Бинарник скачивается, проверяется, заменяется атомарно — прокси перезапускается за пару секунд.</p>
+          <div class="cmd-row">
+            <select id="upd-channel">
+              <option value="stable" selected data-i18n="upd.stable">stable — только стабильные</option>
+              <option value="rc" data-i18n="upd.rc">rc — кандидаты в релиз</option>
+              <option value="nightly" data-i18n="upd.nightly">nightly — ночные сборки</option>
+            </select>
+            <select id="upd-mode">
+              <option value="auto" selected data-i18n="upd.mode-auto">Автообновление включено</option>
+              <option value="notify" data-i18n="upd.mode-notify">Только уведомлять</option>
+              <option value="off" data-i18n="upd.mode-off">Не проверять</option>
+            </select>
+            <button class="btn small" onclick="updSave()" data-i18n="btn.save">Сохранить</button>
+          </div>
+          <div class="actions tight">
+            <button class="btn small" onclick="checkUpdate()">🔍 <span data-i18n="upd.check-now">Проверить сейчас</span></button>
+            <span class="spacer"></span>
+            <span class="badge" id="upd-last">Проверено: –</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2><span class="ic">🛡️</span><span data-i18n="upd.src">Источник обновлений</span></h2>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th data-i18n="th.param">Параметр</th><th data-i18n="th.val">Значение</th></tr></thead>
+              <tbody>
+                <tr><td data-i18n="upd.repo">Репозиторий</td><td class="mono" id="upd-repo">–</td></tr>
+                <tr><td data-i18n="upd.sig">Проверка подписи</td><td><span class="chip st-ok">sha256</span></td></tr>
+                <tr><td data-i18n="upd.rollback">Откат при сбое</td><td><span class="chip st-ok">бэкап</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================================================
+           ВЕРСИИ
+           ================================================== -->
+      <section class="tab" id="t-versions">
+        <div class="card pad-0">
+          <div style="padding:14px 18px 12px;border-bottom:1px solid var(--line)">
+            <h2 style="margin:0"><span class="ic">📚</span><span data-i18n="ver.head">История версий</span></h2>
+          </div>
+          <div id="ver-list"></div>
+        </div>
+      </section>
+
+      <!-- ==================================================
+           НАСТРОЙКИ · СЕРВЕР
+           ================================================== -->
+      <section class="tab" id="t-settings">
+        <div class="card">
+          <h2><span class="ic">🧩</span><span data-i18n="set.head">Параметры сервера</span></h2>
+          <div class="metrics" style="margin:0 0 12px">
+            <div class="stat"><div class="k">🖥️ <span data-i18n="set.host">Хост</span></div><div class="v mono" style="font-size:13px" id="set-host">–</div></div>
+            <div class="stat"><div class="k">🔌 <span data-i18n="set.port">Xray-порт</span></div><div class="v mono" style="font-size:13px" id="set-port">–</div></div>
+            <div class="stat"><div class="k">🏷️ <span data-i18n="set.ver">Версия</span></div><div class="v mono" style="font-size:13px" id="set-ver">–</div></div>
+            <div class="stat"><div class="k">⏱️ <span data-i18n="set.uptime">Аптайм</span></div><div class="v mono" style="font-size:13px" id="set-up">–</div></div>
+          </div>
+          <div style="font-size:11px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:var(--muted-2);margin:16px 0 8px" data-i18n="set.common">Общие</div>
+          <div class="cmd-row">
+            <input type="text" id="set-name" data-i18n-placeholder="set.name-ph" placeholder="Название сервера" value="">
+            <button class="btn small" onclick="settingsSave()" data-i18n="btn.save">Сохранить</button>
+          </div>
+          <div style="font-size:11px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:var(--muted-2);margin:16px 0 8px" data-i18n="set.mesh">Меш</div>
+          <div class="cmd-row">
+            <input type="text" id="meshid" data-i18n-placeholder="set.meshid-ph" placeholder="ID меша" value="" readonly>
+            <button class="btn small" onclick="inviteCopy()">🔗 <span data-i18n="set.copy-invite">Копировать invite</span></button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================================================
+           НАСТРОЙКИ · БЕЗОПАСНОСТЬ
+           ================================================== -->
+      <section class="tab" id="t-security">
+        <div class="card">
+          <h2><span class="ic">🛡️</span><span data-i18n="nav.security">Безопасность</span></h2>
+          <p class="hint" data-i18n="sec.hint">Admin-токен панели и Reality-ключи внешнего доступа. Меняется на живой конфиг.</p>
+          <div style="font-size:11px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:var(--muted-2);margin:16px 0 8px" data-i18n="sec.panel">Панель</div>
+          <div class="cmd-row">
+            <input type="password" id="sec-token" data-i18n-placeholder="sec.tok-ph" placeholder="Admin-токен (Bearer) — нужен для POST /api/*" autocomplete="off">
+            <button class="btn primary" onclick="secLogin()">🔑 <span data-i18n="btn.login">Войти</span></button>
+            <button class="btn ghost" id="sec-logout" style="display:none" onclick="secLogout()" data-i18n="btn.logout">Выйти</button>
+          </div>
+          <div class="metrics" style="margin:0 0 12px">
+            <div class="stat"><div class="k">⚙️ <span data-i18n="sec.tok">Admin-токен</span></div><div class="v mono" id="sec-en" style="font-size:13px">–</div></div>
+            <div class="stat"><div class="k">🔑 <span data-i18n="sec.acc-v">Access</span></div><div class="v mono" id="sec-acc" style="font-size:13px">–</div></div>
+          </div>
+          <div style="font-size:11px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:var(--muted-2);margin:16px 0 8px" data-i18n="sec.reality">Reality</div>
+          <div class="cmd-row">
+            <input type="text" id="sec-pbk" data-i18n-placeholder="sec.pbk-ph" placeholder="public key" readonly value="–">
+            <button class="btn small" onclick="secRotate()">🔄 <span data-i18n="sec.rotate">Ротация ключей</span></button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================================================
+           ЛОГИ
+           ================================================== -->
+      <section class="tab" id="t-logs">
+        <div class="card">
+          <h2><span class="ic">📜</span><span data-i18n="log.head">Системный лог</span><span class="count mono" id="log-count">0</span></h2>
+          <div class="logbox tall" id="log"><span data-i18n="log.loading">загрузка…</span></div>
+          <div class="actions tight">
+            <button class="btn small" onclick="loadLog()">🔄 <span data-i18n="log.refresh">Обновить</span></button>
+            <button class="btn small" onclick="toast('Лог скачивается с сервера…', true)">⬇ <span data-i18n="log.download">Скачать</span></button>
+          </div>
+        </div>
+        <div class="card">
+          <h2><span class="ic">🩹</span><span data-i18n="rclog.head">Журнал recovery</span><span class="count mono" id="rclog-count">0</span></h2>
+          <div class="logbox tall" id="rclog"><span data-i18n="log.loading">загрузка…</span></div>
+        </div>
+      </section>
+
+    </div>
   </div>
-</header>
+</div>
 
-<main class="wrap">
-  <div class="hero" id="hero">
-    <div class="cat">🐱</div>
-    <div>
-      <div class="hero-head">
-        <h1 id="hero-title">Котик просыпается…</h1>
-        <span class="badge on" id="hero-badge">VPN</span>
-      </div>
-      <div class="sub" id="hero-sub">Aurora v?.?.? · загрузка</div>
-    </div>
-    <div class="actions">
-      <button class="btn primary" id="btn-vpn">🌀 VPN</button>
-      <button class="btn" id="btn-rotate">🎲 Поменять ключ</button>
-    </div>
-  </div>
-
-  <div class="metrics">
-    <div class="stat"><div class="k">🐾 Режим</div><div class="v" id="mode">-</div></div>
-    <div class="stat"><div class="k">🔑 Активный ключ</div><div class="v mono" id="vless">-</div></div>
-    <div class="stat"><div class="k">🌍 Выходной IP</div><div class="v mono" id="egress">-</div></div>
-    <div class="stat"><div class="k">📶 Соединения</div><div class="v" id="conns">0</div></div>
-    <div class="stat"><div class="k">📦 Трафик ↓ / ↑</div><div class="v mono" id="traffic">0 / 0</div></div>
-  </div>
-
-  <section class="tab show" id="t-status">
-    <div class="card">
-      <h2><span class="ic">🛠️</span>Управление</h2>
-      <div class="actions">
-        <button class="btn" id="btn-refresh">🔄 Обновить из GitHub</button>
-        <button class="btn" id="btn-check">🧪 Проверить ключи</button>
-      </div>
-    </div>
-    <div class="card">
-      <h2><span class="ic">🩺</span>Журнал восстановления</h2>
-      <div class="logbox" id="rclog">пока пусто…</div>
-    </div>
-    <div class="card">
-      <h2><span class="ic">🗒️</span>Лог</h2>
-      <div class="logbox" id="log">загрузка…</div>
-    </div>
-  </section>
-
-  <section class="tab" id="t-keys">
-    <div class="card">
-      <h2><span class="ic">🔑</span>Ключи</h2>
-      <div class="cmd-row" style="margin-bottom:14px">
-        <input type="text" id="keyuri" placeholder="vless://… вставьте свою ссылку (Reality)">
-        <button class="btn" onclick="keyAdd()">➕ Свой ключ</button>
-      </div>
-      <div class="actions" style="margin-bottom:14px">
-        <span class="badge" id="keyinfo">ключей: 0</span>
-        <button class="btn" id="btn-clean" title="Удалить мёртвые github-ключи (без IP / пинг > 500мс / в блеклисте)" onclick="keyClean()">🧹 Очистить мёртвые</button>
-      </div>
-      <div class="tbl-wrap">
-        <table>
-          <thead><tr><th>Тег</th><th>Источник</th><th>Статус</th><th>Пинг</th><th>Exit IP</th><th>Sites</th><th>Действия</th></tr></thead>
-          <tbody id="keyrows"></tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  <section class="tab" id="t-devices">
-    <div class="card">
-      <h2><span class="ic">📱</span>Устройства</h2>
-      <div class="tbl-wrap">
-        <table>
-          <thead><tr><th>Устройство</th><th>IP</th><th>Conn</th><th>↓ скачано</th><th>↑ отдано</th></tr></thead>
-          <tbody id="devrows"></tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  <section class="tab" id="t-connect">
-    <div class="card">
-      <h2><span class="ic">🌐</span>Подключение извне <span class="badge off" id="cx-flag">выключено</span></h2>
-      <p class="hint">Готовая vless-ссылка на ваш домашний прокси. Вставьте её в v2rayN / v2rayNG / NekoBox на телефоне или ПК — и ваш трафик пойдёт через этот сервер откуда угодно.</p>
-      <div class="qr-box" id="cx-qr"></div>
-      <div class="cmd-row" style="margin-bottom:6px">
-        <input type="text" id="cx-link" readonly>
-        <button class="btn" id="cx-copy" onclick="cxCopy()">📋 Копировать</button>
-      </div>
-      <div class="metrics" style="margin:0 0 4px">
-        <div class="stat"><div class="k">🔗 Адрес</div><div class="v mono" id="cx-host">-</div></div>
-        <div class="stat"><div class="k">🔌 Порт</div><div class="v mono" id="cx-port">-</div></div>
-        <div class="stat"><div class="k">🆔 UUID</div><div class="v mono" id="cx-uuid">-</div></div>
-        <div class="stat"><div class="k">🛡️ SNI</div><div class="v mono" id="cx-sni">-</div></div>
-      </div>
-      <div class="hint" style="margin-top:10px">⚠️ Не забудьте пробросить порт <b>8443</b> на роутере (WAN → IP_ВАШЕГО_СЕРВЕРА:8443), иначе извне сервер недоступен.</div>
-    </div>
-  </section>
-
-  <section class="tab" id="t-rusegment">
-    <div class="card">
-      <h2><span class="ic">🇷🇺</span>Ру-сегмент <span class="badge off" id="ru-flag">не проверено</span></h2>
-      <p class="hint">Доступность российских ресурсов напрямую с сервера (без VPN). Проверяется HTTP-ответ каждого домена — если сегмент работает, RU-сайты открываются без прокси.</p>
-      <div class="metrics" style="margin:0 0 4px">
-        <div class="stat"><div class="k">✅ Доступно</div><div class="v" id="ru-ok">–</div></div>
-        <div class="stat"><div class="k">💀 Проблемы</div><div class="v" id="ru-bad">–</div></div>
-        <div class="stat"><div class="k">⚡ Медиана пинга</div><div class="v mono" id="ru-med">–</div></div>
-        <div class="stat"><div class="k">🕐 Проверено</div><div class="v mono" id="ru-ts">ещё не проверено</div></div>
-      </div>
-      <div class="actions" style="margin-bottom:14px">
-        <button class="btn" id="ru-run" onclick="ruCheck()">🧪 Проверить сейчас</button>
-        <button class="btn small" id="ru-failonly" onclick="ruToggleFail()">💀 Только проблемы</button>
-        <span class="badge mono" style="margin-left:auto">доступность · без VPN</span>
-      </div>
-      <div class="tbl-wrap">
-        <table>
-          <thead><tr><th>Домен</th><th>IP</th><th>HTTP</th><th>Время</th><th>Статус</th></tr></thead>
-          <tbody id="rurows">
-            <tr><td colspan="5" class="empty"><span class="ic">🌍</span>Данные появятся после проверки</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  <section class="tab" id="t-tgws">
-    <div class="card">
-      <h2><span class="ic">✈️</span>Telegram WS-прокси</h2>
-      <div class="metrics" style="margin:0 0 4px">
-        <div class="stat"><div class="k">⚙️ Процесс</div><div class="v" id="tg-on">-</div></div>
-        <div class="stat"><div class="k">🔌 Порт</div><div class="v mono" id="tg-port">-</div></div>
-        <div class="stat"><div class="k">🤫 Секрет</div><div class="v mono" id="tg-sec" style="font-size:14px">-</div></div>
-      </div>
-      <div class="actions">
-        <button class="btn" onclick="api('tgws/restart',{},refresh)">🔄 Рестарт TG-WS</button>
-      </div>
-      <div class="qr-box" id="tg-qr"></div>
-    </div>
-  </section>
-
-  <section class="tab" id="t-whitelist">
-    <div class="card">
-      <h2><span class="ic">⬜</span>Белый список</h2>
-      <p class="hint">Домены белого списка идут <b>напрямую (direct)</b>, минуя VPN. Белый IP — это IP вашего провайдера (не считается «выходом туннеля» при проверке egress).</p>
-      <div class="cmd-row" style="margin-bottom:14px">
-        <input type="text" id="wl-ip" placeholder="Белый IP провайдера, например 1.2.3.4">
-        <button class="btn" onclick="wlSave()">💾 Сохранить IP</button>
-      </div>
-      <div class="cmd-row" style="margin-bottom:6px">
-        <textarea id="wl-dom" rows="6" placeholder="Домены напрямую (по одному на строку):&#10;yandex.ru&#10;vk.com&#10;github.com"></textarea>
-        <button class="btn" onclick="wlSaveDom()">💾 Сохранить домены</button>
-      </div>
-      <div class="actions">
-        <span class="badge mono" id="wl-info">загрузка…</span>
-      </div>
-    </div>
-  </section>
-</main>
-
-<!-- ДОК-БАР: процесс загрузки и проверки ключей -->
-<aside class="dock" id="dock" onclick="dockToggle()">
-  <span class="dock-mascot" id="dock-mascot">🐱</span>
-  <div class="dock-faze" id="dock-faze">Все котики на месте</div>
-  <div class="dock-track"><div class="dock-fill" id="dock-fill"><i class="dock-tail"></i></div></div>
-  <span class="dock-pct mono" id="dock-pct"></span>
-  <div class="dock-stats" id="dock-stats"></div>
-  <div class="dock-detail" id="dock-detail"></div>
-</aside>
-
-<footer>Сделано с любовью и котиками 🐱💕<span class="ic"></span></footer>
 <div id="toast"></div>
+
 <script src="/qr.js"></script>
-<script src="/app.js"></script>
+  <script src="/app.js"></script>
 </body>
 </html>

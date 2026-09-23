@@ -1,7 +1,7 @@
-# Aurora v1.3.1 — авто-обновление: сверка версии с GitHub Releases, скачивание,
+# Aurora v1.6.0 — авто-обновление: сверка версии с GitHub Releases, скачивание,
 # sha256-проверка, бэкап текущих файлов, замена модулей, перезапуск.
 # Источник сборки фиксирован в config.UPDATE_REPO, отключить нельзя.
-# Windows-сборка: без security.py, статика включает qr.js, ассет релиза — windows.zip.
+# Windows-сборка: статика включает qr.js, ассет релиза — windows.zip.
 
 import hashlib
 import json
@@ -23,7 +23,7 @@ _RAW = "https://raw.githubusercontent.com/"
 _MODULES = [
     "config.py", "pool.py", "source.py", "core.py", "telemetry.py",
     "tgws.py", "recovery.py", "rusegment.py", "api.py", "ui.py", "run.py",
-    "updater.py",
+    "updater.py", "security.py", "subs.py", "mesh.py",
 ]
 _STATIC = ["ui/index.html", "ui/app.js", "ui/style.css", "ui/qr.js"]
 

@@ -1,0 +1,30 @@
+# Windows-сборка (инсталлер 47МБ, nssm, dist) в Docker НЕ входит
+windows
+
+# VCS / редактор
+.git
+.idea
+.vscode
+
+# рантайм-данные (монтируются volume ./data:/app/data)
+data
+.env
+.env.*
+
+# питоньи артефакты
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.pytest_cache
+
+# бинарники/архивы любого вида
+*.exe
+*.dll
+*.zip
+*.tar.gz
+*.whl
+*.log
+
+# юнит-файлы systemd оставляем на хосте
+# (Dockerfile сам запускает python3 /app/run.py — юниты не нужны)

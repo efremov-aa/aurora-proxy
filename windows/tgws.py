@@ -13,6 +13,13 @@ SECRET_FILE = os.path.join(config.BASE_DIR, "data", "tg_secret.txt")
 RUN_SCRIPT = os.path.join(config.BASE_DIR, "run_tgws.sh")
 
 
+def resource_path(rel):
+    """Путь к ресурсу: в PyInstaller-бандле — из _MEIPASS, иначе из BASE_DIR."""
+    if hasattr(sys, "_MEIPASS"):
+        return os.path.join(sys._MEIPASS, rel)
+    return os.path.join(config.BASE_DIR, rel)
+
+
 def _get_secret():
     """Секрет из data/tg_secret.txt или генерация нового."""
     try:
@@ -62,7 +69,7 @@ def restart():
         # убить старый процесс, если держит порт (иначе новый не поднимется)
         try:
             out = subprocess.run(["netstat", "-ano"], capture_output=True, text=True,
-                                 timeout=10).stdout
+                                 timeout=10, creationflags=config.HIDE_FLAG).stdout
             pids = []
             for ln in out.splitlines():
                 if ":%d" % config.TGWS_PORT in ln and "LISTENING" in ln:
@@ -71,15 +78,21 @@ def restart():
                         pids.append(parts[-1])
             for pid in pids:
                 subprocess.run(["taskkill", "/F", "/PID", pid],
-                               capture_output=True, timeout=10)
+                               capture_output=True, timeout=10,
+                               creationflags=config.HIDE_FLAG)
         except Exception:
             pass
         try:
-            subprocess.Popen(
-                [sys.executable, "-m", "proxy.tg_ws_proxy",
-                 "--host", "0.0.0.0", "--port", str(config.TGWS_PORT),
-                 "--secret", secret],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if getattr(sys, "frozen", False):
+                tgb = resource_path("bin/tg-ws-proxy.exe")
+                cmd = [tgb, "--host", "0.0.0.0",
+                       "--port", str(config.TGWS_PORT), "--secret", secret]
+            else:
+                cmd = [sys.executable, "-m", "proxy.tg_ws_proxy",
+                       "--host", "0.0.0.0", "--port", str(config.TGWS_PORT),
+                       "--secret", secret]
+            subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                             creationflags=config.HIDE_FLAG)
             return True
         except Exception:
             return False

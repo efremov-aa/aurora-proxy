@@ -18,3 +18,4 @@ def _load(name):
 PAGE = _load("index.html")    # разметка вкладок Aurora
 STYLE = _load("style.css")    # дизайн-система Neko (темы/адаптив/котики)
 APP = _load("app.js")         # вся логика панели (api/refresh/render/...)
+QR = _load("qr.js")           # локальный генератор QR-кодов (без CDN)

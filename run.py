@@ -9,6 +9,7 @@ import core
 import pool
 import rusegment
 import security
+import subs
 import telemetry
 import tgws
 import updater
@@ -20,6 +21,7 @@ def _boot():
     config.load_settings()
     security.init()  # admin-токен + chmod data/ (до любых действий)
     pool.load()
+    subs.load()  # подписки — до сборки конфига (клиенты vless-in)
     pool.cleanup()  # убрать мёртвые github-ключи при старте
     config.log("Aurora v%s boot" % config.VERSION)
 

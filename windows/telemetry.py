@@ -31,7 +31,8 @@ def _collect_conns_nt():
     by_ip = {}
     ports = {config.XRAY_PORT, config.TGWS_PORT}
     try:
-        out = subprocess.run(["netstat", "-ano"], capture_output=True, text=True, timeout=10).stdout
+        out = subprocess.run(["netstat", "-ano"], capture_output=True, text=True,
+                             timeout=10, creationflags=config.HIDE_FLAG).stdout
     except Exception:
         return total, by_ip
     for ln in out.splitlines():
