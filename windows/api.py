@@ -275,7 +275,7 @@ def build_state(local=True):
     st["server_name"] = config.get("server_name", "Home")
     st["show_mesh"] = config.get("show_mesh", True)
     st["show_subs"] = config.get("show_subs", True)
-    st["mesh_master"] = config.get("mesh_master", False)
+    st["mesh_master"] = False
     if not local and _UI_TOKEN:
         # секреты подключения скрываем только при настроенном ui_token
         # (пустой токен = «как раньше», ссылка и QR видны всем в LAN)
@@ -869,14 +869,15 @@ class Handler(BaseHTTPRequestHandler):
 
     def _settings_save(self, data):
         for key in ("server_name", "auto_refresh", "mesh_id",
-                    "show_mesh", "show_subs", "mesh_master"):
+                    "show_mesh", "show_subs"):
             if key in data:
                 val = data[key]
-                if key in ("auto_refresh", "show_mesh", "show_subs", "mesh_master"):
+                if key in ("auto_refresh", "show_mesh", "show_subs"):
                     val = _as_bool(val)
                 else:
                     val = str(val or "").strip()
                 config.set(key, val)
+        config.set("mesh_master", False)
         self._send(*_json({"ok": True, "settings": _settings()["settings"]}))
 
     def _settings_reset(self, data):
@@ -1010,7 +1011,7 @@ def _settings():
             "mesh_id": config.get("mesh_id", ""),
             "show_mesh": config.get("show_mesh", True),
             "show_subs": config.get("show_subs", True),
-            "mesh_master": config.get("mesh_master", False),
+            "mesh_master": False,
         },
     }
 

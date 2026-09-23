@@ -1697,10 +1697,16 @@
     setVis($('pill-plan'), subsOn);
   }
   function renderMeshPolicy(S) {
-    if (!$('m-master') || !$('m-show-mesh') || !$('m-show-subs')) return;
-    $('m-master').checked = !!S.mesh_master;
-    $('m-show-mesh').checked = (S.show_mesh !== false);
-    $('m-show-subs').checked = (S.show_subs !== false);
+    var card = $('mesh-policy-card');
+    if (S.mesh_master) {
+      if (card) setVis(card, true);
+      if (!$('m-master') || !$('m-show-mesh') || !$('m-show-subs')) return;
+      $('m-master').checked = !!S.mesh_master;
+      $('m-show-mesh').checked = (S.show_mesh !== false);
+      $('m-show-subs').checked = (S.show_subs !== false);
+    } else if (card) {
+      setVis(card, false);
+    }
   }
   window.meshPolicySave = function () {
     postJSON('/api/settings/save', {

@@ -208,7 +208,7 @@ def policy():
     """Публичная политика сервера. master=True только у головного сервера."""
     return {
         "ok": True,
-        "master": bool(config.get("mesh_master", False)),
+        "master": False,
         "show_mesh": config.get("show_mesh", True),
         "show_subs": config.get("show_subs", True),
     }
@@ -227,8 +227,6 @@ def _fetch_policy(host, port, timeout=3.0):
 
 def _policy_loop():
     """Фоновый опрос мастера: узел применяет show_mesh/show_subs мастера."""
-    if config.get("mesh_master", False):
-        return  # сам являюсь головным — политику не применяю
     while True:
         try:
             nodes = [dict(n) for n in _NODES]
