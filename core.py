@@ -78,6 +78,10 @@ def build_xray_config(final_tag):
         rules.insert(0, {"type": "field",
                          "domain": ["domain:" + d for d in ru_bypass],
                          "outboundTag": "direct"})
+    # Торрент-трафик на GitHub-сборках ВСЕГДА напрямую (правило юзера):
+    # публичные сборки не гонят битторрент через туннель. Правило первым.
+    rules.insert(0, {"type": "field", "protocol": ["bittorrent"],
+                     "outboundTag": "direct"})
 
     cfg = {
         "log": {"loglevel": "warning", "access": "", "error": ""},
@@ -86,7 +90,7 @@ def build_xray_config(final_tag):
                                     "statsUserDownlink": True}}},
         "inbounds": [
             {"tag": "http-in", "listen": "0.0.0.0", "port": config.XRAY_PORT,
-             "protocol": "http"},
+             "protocol": "http", "sniffing": {"enabled": True}},
             {"tag": "api-in", "listen": "127.0.0.1", "port": config.XRAY_API_PORT,
              "protocol": "dokodemo-door", "settings": {"address": "127.0.0.1"}},
         ],
@@ -94,8 +98,11 @@ def build_xray_config(final_tag):
         "routing": {"domainStrategy": "IPIfNonMatch", "rules": rules},
     }
     # Внешний VLESS-Reality inbound для подключения к прокси ИЗВНЕ.
+    # При замке master_only сервер не раскрывает наружу входящий VLESS:
+    # просочиться в этот сервер извне нельзя, работает только локальный http-in.
     vln = config.VLESS_PUBLIC
-    if vln.get("enabled") and vln.get("uuid"):
+    master_locked = config.get("master_only", False)
+    if vln.get("enabled") and vln.get("uuid") and not master_locked:
         # мастер-uuid (владелец сервера) + все активные подписочные клиенты
         clients = [{
             "id": vln["uuid"],
@@ -115,6 +122,7 @@ def build_xray_config(final_tag):
             "listen": "0.0.0.0",
             "port": int(vln.get("port", 8443)),
             "protocol": "vless",
+            "sniffing": {"enabled": True},
             "settings": {
                 "clients": clients,
                 "decryption": "none",

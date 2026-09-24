@@ -23,14 +23,13 @@ _EGRESS_CACHE = {"ip": "-", "ts": 0.0}
 _LAST_ROTATE = [0.0]
 _WATCH_STOP = threading.Event()
 
-# Как управлять xray: "systemctl" (Linux по умолчанию) или "proc" (Windows/Docker: xray — подпроцесс).
-XRAY_MANAGE = os.environ.get("XRAY_MANAGE", "proc" if os.name == "nt" else "systemctl")
+# Как управлять xray: "systemctl" (по умолчанию) или "proc" (в Docker: xray — подпроцесс).
+XRAY_MANAGE = os.environ.get("XRAY_MANAGE", "systemctl")
 _XRAY_PROC = [None]  # Popen (режим proc)
 
 
 def _xray_bin():
     cands = [
-        os.path.join(config.BASE_DIR, "bin", "xray.exe"),
         os.path.join(os.path.expanduser("~"), "xray"),
         os.path.join(config.BASE_DIR, "xray"),
         "/usr/local/bin/xray",
@@ -75,18 +74,14 @@ def build_xray_config(final_tag):
                  "network": "tcp,udp", "outboundTag": tag}
     rules = [http_rule]
     ru_bypass = config.ru_domains()
-    # кастомный белый список (Windows: вкладка/роут /api/whitelist) — в дополнение к RU-байпасу
-    custom_bypass = config.get_bypass_domains() if hasattr(config, "get_bypass_domains") else []
-    bypass_all = list(ru_bypass)
-    seen = {}
-    for d in custom_bypass:
-        if d and d not in seen:
-            seen[d] = 1
-            bypass_all.append(d)
-    if bypass_all:
+    if ru_bypass:
         rules.insert(0, {"type": "field",
-                         "domain": ["domain:" + d for d in bypass_all],
+                         "domain": ["domain:" + d for d in ru_bypass],
                          "outboundTag": "direct"})
+    # Торрент-трафик на GitHub-сборках ВСЕГДА напрямую (правило юзера):
+    # публичные сборки не гонят битторрент через туннель. Правило первым.
+    rules.insert(0, {"type": "field", "protocol": ["bittorrent"],
+                     "outboundTag": "direct"})
 
     cfg = {
         "log": {"loglevel": "warning", "access": "", "error": ""},
@@ -95,7 +90,7 @@ def build_xray_config(final_tag):
                                     "statsUserDownlink": True}}},
         "inbounds": [
             {"tag": "http-in", "listen": "0.0.0.0", "port": config.XRAY_PORT,
-             "protocol": "http"},
+             "protocol": "http", "sniffing": {"enabled": True}},
             {"tag": "api-in", "listen": "127.0.0.1", "port": config.XRAY_API_PORT,
              "protocol": "dokodemo-door", "settings": {"address": "127.0.0.1"}},
         ],
@@ -103,8 +98,11 @@ def build_xray_config(final_tag):
         "routing": {"domainStrategy": "IPIfNonMatch", "rules": rules},
     }
     # Внешний VLESS-Reality inbound для подключения к прокси ИЗВНЕ.
+    # При замке master_only сервер не раскрывает наружу входящий VLESS:
+    # просочиться в этот сервер извне нельзя, работает только локальный http-in.
     vln = config.VLESS_PUBLIC
-    if vln.get("enabled") and vln.get("uuid"):
+    master_locked = config.get("master_only", False)
+    if vln.get("enabled") and vln.get("uuid") and not master_locked:
         # мастер-uuid (владелец сервера) + все активные подписочные клиенты
         clients = [{
             "id": vln["uuid"],
@@ -124,6 +122,7 @@ def build_xray_config(final_tag):
             "listen": "0.0.0.0",
             "port": int(vln.get("port", 8443)),
             "protocol": "vless",
+            "sniffing": {"enabled": True},
             "settings": {
                 "clients": clients,
                 "decryption": "none",
@@ -187,8 +186,7 @@ def _xray_proc_start():
     try:
         _XRAY_PROC[0] = subprocess.Popen(
             [xbin, "run", "-c", config.XRAY_CONFIG],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            creationflags=config.HIDE_FLAG)
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except OSError as e:
         config.log("core: proc-старт xray не удался: %s" % e)
         return False

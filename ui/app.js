@@ -1,7 +1,7 @@
 (function () {
   'use strict';
   var V = { S: null, SUBS: null, MESH: null, RU: null, UPD: null, ROUTES: null, SET: null, SEC: null, TG: null };
-  var CFG = { tab: 'dashboard', ruFailOnly: false, _rid: 0 };
+  var CFG = { tab: 'dashboard', ruFailOnly: false, _rid: 0, policyOnce: false };
   var LS = { theme: 'aurora_theme', sec: 'aurora_sec_tok', lang: 'aurora_lang' };
 
   /* ================= I18N ================= */
@@ -12,6 +12,7 @@
   ];
   var I18N = {
     ru: {
+      'pol.head': 'Политика сервиса', 'pol.readOnly': 'Просмотр', 'pol.accept': 'Принимаю условия', 'ru.regions': 'Сегменты', 'ru.custom-ph': 'Свои домены через запятую (необязательно)',
       'dash.manage': 'Управление', 'pool.refresh-btn': 'Обновить ключи', 'pool.check-btn': 'Проверить ключи', 'mesh.ping-btn': 'Пинг меш',
       'nav.dash': 'Обзор', 'nav.keys': 'Ключи', 'nav.devices': 'Устройства',
       'nav.connect': 'Внешний доступ', 'nav.rusegment': 'Ру-сегмент', 'nav.tgws': 'TG-WS',
@@ -93,13 +94,14 @@
       'upd.mode-auto': 'Автообновление включено', 'upd.mode-notify': 'Только уведомлять', 'upd.mode-off': 'Не проверять',
       'ver.head': 'История версий',
       'set.head': 'Параметры сервера', 'set.host': 'Хост', 'set.port': 'Xray-порт', 'set.ver': 'Версия', 'set.uptime': 'Аптайм',
-      'set.common': 'Общие', 'set.mesh': 'Меш', 'set.name-ph': 'Название сервера', 'set.meshid-ph': 'ID меша', 'set.copy-invite': 'Копировать invite',
+      'set.common': 'Общие', 'set.vis': 'Видимость вкладок', 'set.show-mesh': 'Включить меш-сеть', 'set.show-subs': 'Включить магазин (подписки и тарифы)', 'set.mesh': 'Меш', 'set.name-ph': 'Название сервера', 'set.meshid-ph': 'ID меша', 'set.copy-invite': 'Копировать invite',
       'sec.hint': 'Admin-токен панели и Reality-ключи внешнего доступа. Меняется на живой конфиг.', 'sec.panel': 'Панель', 'sec.tok-ph': 'Admin-токен (Bearer) — нужен для POST /api/*', 'sec.acc-v': 'Access', 'sec.pbk-ph': 'public key', 'sec.rotate': 'Ротация ключей',
       'log.head': 'Системный лог', 'log.loading': 'загрузка…', 'log.refresh': 'Обновить', 'log.download': 'Скачать', 'rclog.head': 'Журнал recovery',
       'th.node': 'Узел', 'th.region': 'Регион', 'th.route': 'Маршрут', 'sec.tok': 'Admin-токен', 'sec.reality': 'Reality',
       'theme.sun': '🌙', 'theme.moon': '☀️'
     },
     en: {
+      'pol.head': 'Service policy', 'pol.readOnly': 'View', 'pol.accept': 'I accept the terms', 'ru.regions': 'Segments', 'ru.custom-ph': 'Custom domains, comma separated (optional)',
       'dash.manage': 'Manage', 'pool.refresh-btn': 'Refresh keys', 'pool.check-btn': 'Check keys', 'mesh.ping-btn': 'Mesh ping',
       'nav.dash': 'Dashboard', 'nav.keys': 'Keys', 'nav.devices': 'Devices',
       'nav.connect': 'External access', 'nav.rusegment': 'RU segment', 'nav.tgws': 'TG-WS',
@@ -181,13 +183,14 @@
       'upd.mode-auto': 'Auto-update enabled', 'upd.mode-notify': 'Notify only', 'upd.mode-off': 'Do not check',
       'ver.head': 'Version history',
       'set.head': 'Server parameters', 'set.host': 'Host', 'set.port': 'Xray port', 'set.ver': 'Version', 'set.uptime': 'Uptime',
-      'set.common': 'Common', 'set.mesh': 'Mesh', 'set.name-ph': 'Server name', 'set.meshid-ph': 'Mesh ID', 'set.copy-invite': 'Copy invite',
+      'set.common': 'Common', 'set.vis': 'Tab visibility', 'set.show-mesh': 'Enable mesh network', 'set.show-subs': 'Enable store (subscriptions and plans)', 'set.mesh': 'Mesh', 'set.name-ph': 'Server name', 'set.meshid-ph': 'Mesh ID', 'set.copy-invite': 'Copy invite',
       'sec.hint': 'Admin panel token and external Reality keys. Changes live config.', 'sec.panel': 'Panel', 'sec.tok-ph': 'Admin token (Bearer) — needed for POST /api/*', 'sec.acc-v': 'Access', 'sec.pbk-ph': 'public key', 'sec.rotate': 'Rotate keys',
       'log.head': 'System log', 'log.loading': 'loading…', 'log.refresh': 'Refresh', 'log.download': 'Download', 'rclog.head': 'Recovery journal',
       'th.node': 'Node', 'th.region': 'Region', 'th.route': 'Route', 'sec.tok': 'Admin token', 'sec.reality': 'Reality',
       'theme.sun': '🌙', 'theme.moon': '☀️'
     },
     es: {
+      'pol.head': 'Política del servicio', 'pol.readOnly': 'Ver', 'pol.accept': 'Acepto los términos', 'ru.regions': 'Segmentos', 'ru.custom-ph': 'Dominios propios separados por comas (opcional)',
       'dash.manage': 'Gestión', 'pool.refresh-btn': 'Actualizar claves', 'pool.check-btn': 'Comprobar claves', 'mesh.ping-btn': 'Ping mesh',
       'nav.dash': 'Panel', 'nav.keys': 'Claves', 'nav.devices': 'Dispositivos',
       'nav.connect': 'Acceso externo', 'nav.rusegment': 'Segmento RU', 'nav.tgws': 'TG-WS',
@@ -269,13 +272,14 @@
       'upd.mode-auto': 'Auto-actualización activada', 'upd.mode-notify': 'Solo notificar', 'upd.mode-off': 'No comprobar',
       'ver.head': 'Historial de versiones',
       'set.head': 'Parámetros del servidor', 'set.host': 'Host', 'set.port': 'Puerto Xray', 'set.ver': 'Versión', 'set.uptime': 'Uptime',
-      'set.common': 'General', 'set.mesh': 'Mesh', 'set.name-ph': 'Nombre del servidor', 'set.meshid-ph': 'ID del mesh', 'set.copy-invite': 'Copiar invite',
+      'set.common': 'General', 'set.vis': 'Visibilidad de pestañas', 'set.show-mesh': 'Activar red mesh', 'set.show-subs': 'Activar tienda (suscripciones y planes)', 'set.mesh': 'Mesh', 'set.name-ph': 'Nombre del servidor', 'set.meshid-ph': 'ID del mesh', 'set.copy-invite': 'Copiar invite',
       'sec.hint': 'Token de administración y claves Reality externas. Cambia la configuración en vivo.', 'sec.panel': 'Panel', 'sec.tok-ph': 'Token admin (Bearer) — necesario para POST /api/*', 'sec.acc-v': 'Acceso', 'sec.pbk-ph': 'clave pública', 'sec.rotate': 'Rotar claves',
       'log.head': 'Registro del sistema', 'log.loading': 'cargando…', 'log.refresh': 'Actualizar', 'log.download': 'Descargar', 'rclog.head': 'Registro de recovery',
       'th.node': 'Nodo', 'th.region': 'Región', 'th.route': 'Ruta', 'sec.tok': 'Token admin', 'sec.reality': 'Reality',
       'theme.sun': '🌙', 'theme.moon': '☀️'
     },
     de: {
+      'pol.head': 'Dienstrichtlinie', 'pol.readOnly': 'Ansehen', 'pol.accept': 'Ich akzeptiere die Bedingungen', 'ru.regions': 'Segmente', 'ru.custom-ph': 'Eigene Domains, durch Komma getrennt (optional)',
       'dash.manage': 'Verwaltung', 'pool.refresh-btn': 'Schlüssel aktualisieren', 'pool.check-btn': 'Schlüssel prüfen', 'mesh.ping-btn': 'Mesh-Ping',
       'nav.dash': 'Übersicht', 'nav.keys': 'Schlüssel', 'nav.devices': 'Geräte',
       'nav.connect': 'Externer Zugriff', 'nav.rusegment': 'RU-Segment', 'nav.tgws': 'TG-WS',
@@ -357,13 +361,14 @@
       'upd.mode-auto': 'Auto-Update aktiviert', 'upd.mode-notify': 'Nur benachrichtigen', 'upd.mode-off': 'Nicht prüfen',
       'ver.head': 'Versionshistorie',
       'set.head': 'Serverparameter', 'set.host': 'Host', 'set.port': 'Xray-Port', 'set.ver': 'Version', 'set.uptime': 'Uptime',
-      'set.common': 'Allgemein', 'set.mesh': 'Mesh', 'set.name-ph': 'Servername', 'set.meshid-ph': 'Mesh-ID', 'set.copy-invite': 'Invite kopieren',
+      'set.common': 'Allgemein', 'set.vis': 'Tab-Sichtbarkeit', 'set.show-mesh': 'Mesh-Netzwerk aktivieren', 'set.show-subs': 'Shop aktivieren (Abos und Tarife)', 'set.mesh': 'Mesh', 'set.name-ph': 'Servername', 'set.meshid-ph': 'Mesh-ID', 'set.copy-invite': 'Invite kopieren',
       'sec.hint': 'Admin-Token des Panels und externe Reality-Schlüssel. Änderung am laufenden Konfig.', 'sec.panel': 'Panel', 'sec.tok-ph': 'Admin-Token (Bearer) — nötig für POST /api/*', 'sec.acc-v': 'Zugriff', 'sec.pbk-ph': 'öffentlicher Schlüssel', 'sec.rotate': 'Schlüssel rotieren',
       'log.head': 'Systemlog', 'log.loading': 'laden…', 'log.refresh': 'Aktualisieren', 'log.download': 'Herunterladen', 'rclog.head': 'Recovery-Journal',
       'th.node': 'Knoten', 'th.region': 'Region', 'th.route': 'Route', 'sec.tok': 'Admin-Token', 'sec.reality': 'Reality',
       'theme.sun': '🌙', 'theme.moon': '☀️'
     },
     fr: {
+      'pol.head': 'Politique du service', 'pol.readOnly': 'Voir', 'pol.accept': 'J\'accepte les conditions', 'ru.regions': 'Segments', 'ru.custom-ph': 'Domaines personnalisés séparés par des virgules (optionnel)',
       'dash.manage': 'Gestion', 'pool.refresh-btn': 'Actualiser les clés', 'pool.check-btn': 'Vérifier les clés', 'mesh.ping-btn': 'Ping mesh',
       'nav.dash': 'Tableau de bord', 'nav.keys': 'Clés', 'nav.devices': 'Appareils',
       'nav.connect': 'Accès externe', 'nav.rusegment': 'Segment RU', 'nav.tgws': 'TG-WS',
@@ -445,13 +450,14 @@
       'upd.mode-auto': 'Mise à jour auto activée', 'upd.mode-notify': 'Notifier seulement', 'upd.mode-off': 'Ne pas vérifier',
       'ver.head': 'Historique des versions',
       'set.head': 'Paramètres du serveur', 'set.host': 'Hôte', 'set.port': 'Port Xray', 'set.ver': 'Version', 'set.uptime': 'Uptime',
-      'set.common': 'Général', 'set.mesh': 'Mesh', 'set.name-ph': 'Nom du serveur', 'set.meshid-ph': 'ID du mesh', 'set.copy-invite': 'Copier l\'invite',
+      'set.common': 'Général', 'set.vis': 'Visibilité des onglets', 'set.show-mesh': 'Activer le réseau mesh', 'set.show-subs': 'Activer la boutique (abonnements et offres)', 'set.mesh': 'Mesh', 'set.name-ph': 'Nom du serveur', 'set.meshid-ph': 'ID du mesh', 'set.copy-invite': 'Copier l\'invite',
       'sec.hint': 'Jeton du panneau admin et clés Reality externes. Change la config en direct.', 'sec.panel': 'Panneau', 'sec.tok-ph': 'Jeton admin (Bearer) — requis pour POST /api/*', 'sec.acc-v': 'Accès', 'sec.pbk-ph': 'clé publique', 'sec.rotate': 'Rotation des clés',
       'log.head': 'Journal système', 'log.loading': 'chargement…', 'log.refresh': 'Actualiser', 'log.download': 'Télécharger', 'rclog.head': 'Journal recovery',
       'th.node': 'Nœud', 'th.region': 'Région', 'th.route': 'Itinéraire', 'sec.tok': 'Jeton admin', 'sec.reality': 'Reality',
       'theme.sun': '🌙', 'theme.moon': '☀️'
     },
     tr: {
+      'pol.head': 'Hizmet politikası', 'pol.readOnly': 'Görüntüle', 'pol.accept': 'Koşulları kabul ediyorum', 'ru.regions': 'Segmentler', 'ru.custom-ph': 'Virgülle ayrılmış özel alan adları (isteğe bağlı)',
       'dash.manage': 'Yönetim', 'pool.refresh-btn': 'Anahtarları güncelle', 'pool.check-btn': 'Anahtarları kontrol et', 'mesh.ping-btn': 'Mesh ping',
       'nav.dash': 'Genel Bakış', 'nav.keys': 'Anahtarlar', 'nav.devices': 'Cihazlar',
       'nav.connect': 'Dış erişim', 'nav.rusegment': 'RU segmenti', 'nav.tgws': 'TG-WS',
@@ -533,13 +539,14 @@
       'upd.mode-auto': 'Otomatik güncelleme açık', 'upd.mode-notify': 'Yalnız bildir', 'upd.mode-off': 'Kontrol etme',
       'ver.head': 'Sürüm geçmişi',
       'set.head': 'Sunucu parametreleri', 'set.host': 'Host', 'set.port': 'Xray portu', 'set.ver': 'Sürüm', 'set.uptime': 'Çalışma süresi',
-      'set.common': 'Genel', 'set.mesh': 'Mesh', 'set.name-ph': 'Sunucu adı', 'set.meshid-ph': 'Mesh ID', 'set.copy-invite': 'Invite kopyala',
+      'set.common': 'Genel', 'set.vis': 'Sekme görünürlüğü', 'set.show-mesh': 'Mesh ağını etkinleştir', 'set.show-subs': 'Mağazayı etkinleştir (abonelikler ve planlar)', 'set.mesh': 'Mesh', 'set.name-ph': 'Sunucu adı', 'set.meshid-ph': 'Mesh ID', 'set.copy-invite': 'Invite kopyala',
       'sec.hint': 'Panel admin tokeni ve harici Reality anahtarları. Canlı konfigürasyonu değiştirir.', 'sec.panel': 'Panel', 'sec.tok-ph': 'Admin tokeni (Bearer) — POST /api/* için gerekli', 'sec.acc-v': 'Erişim', 'sec.pbk-ph': 'genel anahtar', 'sec.rotate': 'Anahtar döndür',
       'log.head': 'Sistem günlüğü', 'log.loading': 'yükleniyor…', 'log.refresh': 'Yenile', 'log.download': 'İndir', 'rclog.head': 'Recovery günlüğü',
       'th.node': 'Düğüm', 'th.region': 'Bölge', 'th.route': 'Güzergâh', 'sec.tok': 'Admin tokeni', 'sec.reality': 'Reality',
       'theme.sun': '🌙', 'theme.moon': '☀️'
     },
     pt: {
+      'pol.head': 'Política do serviço', 'pol.readOnly': 'Ver', 'pol.accept': 'Aceito os termos', 'ru.regions': 'Segmentos', 'ru.custom-ph': 'Domínios personalizados separados por vírgulas (opcional)',
       'dash.manage': 'Gestão', 'pool.refresh-btn': 'Atualizar chaves', 'pool.check-btn': 'Verificar chaves', 'mesh.ping-btn': 'Ping mesh',
       'nav.dash': 'Painel', 'nav.keys': 'Chaves', 'nav.devices': 'Dispositivos',
       'nav.connect': 'Acesso externo', 'nav.rusegment': 'Segmento RU', 'nav.tgws': 'TG-WS',
@@ -621,13 +628,14 @@
       'upd.mode-auto': 'Auto-atualização ativada', 'upd.mode-notify': 'Apenas notificar', 'upd.mode-off': 'Não verificar',
       'ver.head': 'Histórico de versões',
       'set.head': 'Parâmetros do servidor', 'set.host': 'Host', 'set.port': 'Porta Xray', 'set.ver': 'Versão', 'set.uptime': 'Uptime',
-      'set.common': 'Geral', 'set.mesh': 'Mesh', 'set.name-ph': 'Nome do servidor', 'set.meshid-ph': 'ID do mesh', 'set.copy-invite': 'Copiar invite',
+      'set.common': 'Geral', 'set.vis': 'Visibilidade das abas', 'set.show-mesh': 'Ativar rede mesh', 'set.show-subs': 'Ativar loja (assinaturas e planos)', 'set.mesh': 'Mesh', 'set.name-ph': 'Nome do servidor', 'set.meshid-ph': 'ID do mesh', 'set.copy-invite': 'Copiar invite',
       'sec.hint': 'Token do painel admin e chaves Reality externas. Muda a config ao vivo.', 'sec.panel': 'Painel', 'sec.tok-ph': 'Token admin (Bearer) — necessário para POST /api/*', 'sec.acc-v': 'Acesso', 'sec.pbk-ph': 'chave pública', 'sec.rotate': 'Rotacionar chaves',
       'log.head': 'Log do sistema', 'log.loading': 'carregando…', 'log.refresh': 'Atualizar', 'log.download': 'Baixar', 'rclog.head': 'Diário do recovery',
       'th.node': 'Nó', 'th.region': 'Região', 'th.route': 'Rota', 'sec.tok': 'Token admin', 'sec.reality': 'Reality',
       'theme.sun': '🌙', 'theme.moon': '☀️'
     },
     zh: {
+      'pol.head': '服务政策', 'pol.readOnly': '查看', 'pol.accept': '我接受条款', 'ru.regions': '分段', 'ru.custom-ph': '自定义域名，逗号分隔（可选）',
       'dash.manage': '管理', 'pool.refresh-btn': '更新密钥', 'pool.check-btn': '检查密钥', 'mesh.ping-btn': '网格ping',
       'nav.dash': '概览', 'nav.keys': '密钥', 'nav.devices': '设备',
       'nav.connect': '外部访问', 'nav.rusegment': 'RU 段', 'nav.tgws': 'TG-WS',
@@ -709,13 +717,14 @@
       'upd.mode-auto': '自动更新已开启', 'upd.mode-notify': '仅通知', 'upd.mode-off': '不检查',
       'ver.head': '版本历史',
       'set.head': '服务器参数', 'set.host': '主机', 'set.port': 'Xray 端口', 'set.ver': '版本', 'set.uptime': '运行时间',
-      'set.common': '通用', 'set.mesh': 'Mesh', 'set.name-ph': '服务器名称', 'set.meshid-ph': 'Mesh ID', 'set.copy-invite': '复制邀请',
+      'set.common': '通用', 'set.vis': '标签可见性', 'set.show-mesh': '启用 Mesh 网络', 'set.show-subs': '启用商店（订阅和计划）', 'set.mesh': 'Mesh', 'set.name-ph': '服务器名称', 'set.meshid-ph': 'Mesh ID', 'set.copy-invite': '复制邀请',
       'sec.hint': '面板管理员令牌和外部 Reality 密钥。修改会作用于实时配置。', 'sec.panel': '面板', 'sec.tok-ph': '管理员令牌（Bearer）— POST /api/* 需要', 'sec.acc-v': '访问', 'sec.pbk-ph': '公钥', 'sec.rotate': '轮换密钥',
       'log.head': '系统日志', 'log.loading': '加载中…', 'log.refresh': '刷新', 'log.download': '下载', 'rclog.head': '恢复日志',
       'th.node': '节点', 'th.region': '地区', 'th.route': '路由', 'sec.tok': '管理员令牌', 'sec.reality': 'Reality',
       'theme.sun': '🌙', 'theme.moon': '☀️'
     },
     ar: {
+      'pol.head': 'سياسة الخدمة', 'pol.readOnly': 'عرض', 'pol.accept': 'أوافق على الشروط', 'ru.regions': 'القطاعات', 'ru.custom-ph': 'نطاقات مخصصة مفصولة بفواصل (اختياري)',
       'dash.manage': 'إدارة', 'pool.refresh-btn': 'تحديث المفاتيح', 'pool.check-btn': 'فحص المفاتيح', 'mesh.ping-btn': 'بنج الشبكة',
       'nav.dash': 'لوحة التحكم', 'nav.keys': 'المفاتيح', 'nav.devices': 'الأجهزة',
       'nav.connect': 'الوصول الخارجي', 'nav.rusegment': 'قطاع RU', 'nav.tgws': 'TG-WS',
@@ -797,13 +806,14 @@
       'upd.mode-auto': 'التحديث التلقائي مفعل', 'upd.mode-notify': 'إشعار فقط', 'upd.mode-off': 'لا تتحقق',
       'ver.head': 'سجل الإصدارات',
       'set.head': 'معاملات الخادم', 'set.host': 'المضيف', 'set.port': 'منفذ Xray', 'set.ver': 'الإصدار', 'set.uptime': 'مدة التشغيل',
-      'set.common': 'عام', 'set.mesh': 'Mesh', 'set.name-ph': 'اسم الخادم', 'set.meshid-ph': 'معرّف mesh', 'set.copy-invite': 'نسخ الدعوة',
+      'set.common': 'عام', 'set.vis': 'رؤية الألسنة', 'set.show-mesh': 'تفعيل شبكة mesh', 'set.show-subs': 'تفعيل المتجر (الاشتراكات والخطط)', 'set.mesh': 'Mesh', 'set.name-ph': 'اسم الخادم', 'set.meshid-ph': 'معرّف mesh', 'set.copy-invite': 'نسخ الدعوة',
       'sec.hint': 'رمز لوحة الإدارة ومفاتيح Reality الخارجية. يغيّر الإعداد الحي.', 'sec.panel': 'اللوحة', 'sec.tok-ph': 'رمز المسؤول (Bearer) — مطلوب لـ POST /api/*', 'sec.acc-v': 'الوصول', 'sec.pbk-ph': 'المفتاح العام', 'sec.rotate': 'تدوير المفاتيح',
       'log.head': 'سجل النظام', 'log.loading': 'جارٍ التحميل…', 'log.refresh': 'تحديث', 'log.download': 'تنزيل', 'rclog.head': 'سجل الاسترداد',
       'th.node': 'العقدة', 'th.region': 'المنطقة', 'th.route': 'المسار', 'sec.tok': 'رمز المسؤول', 'sec.reality': 'Reality',
       'theme.sun': '🌙', 'theme.moon': '☀️'
     },
     hi: {
+      'pol.head': 'सेवा नीति', 'pol.readOnly': 'देखें', 'pol.accept': 'मैं शर्तें स्वीकार करता हूँ', 'ru.regions': 'सेगमेंट', 'ru.custom-ph': 'कस्टम डोमेन, अल्पविराम से अलग (वैकल्पिक)',
       'dash.manage': 'प्रबंधन', 'pool.refresh-btn': 'कुंजियाँ अपडेट करें', 'pool.check-btn': 'कुंजियाँ जाँचें', 'mesh.ping-btn': 'मेश पिंग',
       'nav.dash': 'डैशबोर्ड', 'nav.keys': 'कुंजियाँ', 'nav.devices': 'डिवाइस',
       'nav.connect': 'बाहरी पहुँच', 'nav.rusegment': 'RU सेगमेंट', 'nav.tgws': 'TG-WS',
@@ -885,7 +895,7 @@
       'upd.mode-auto': 'ऑटो-अपडेट चालू', 'upd.mode-notify': 'केवल सूचित करें', 'upd.mode-off': 'जाँच न करें',
       'ver.head': 'संस्करण इतिहास',
       'set.head': 'सर्वर पैरामीटर', 'set.host': 'होस्ट', 'set.port': 'Xray पोर्ट', 'set.ver': 'संस्करण', 'set.uptime': 'अपटाइम',
-      'set.common': 'सामान्य', 'set.mesh': 'Mesh', 'set.name-ph': 'सर्वर नाम', 'set.meshid-ph': 'Mesh ID', 'set.copy-invite': 'इन्वाइट कॉपी',
+      'set.common': 'सामान्य', 'set.vis': 'टैब दृश्यता', 'set.show-mesh': 'मेश नेटवर्क सक्षम करें', 'set.show-subs': 'स्टोर सक्षम करें (सदस्यता और प्लान)', 'set.mesh': 'Mesh', 'set.name-ph': 'सर्वर नाम', 'set.meshid-ph': 'Mesh ID', 'set.copy-invite': 'इन्वाइट कॉपी',
       'sec.hint': 'पैनल admin टोकन और बाहरी Reality कुंजियाँ। लाइव कॉन्फ़िग बदलता है।', 'sec.panel': 'पैनल', 'sec.tok-ph': 'Admin टोकन (Bearer) — POST /api/* के लिए आवश्यक', 'sec.acc-v': 'पहुँच', 'sec.pbk-ph': 'सार्वजनिक कुंजी', 'sec.rotate': 'कुंजी रोटेट',
       'log.head': 'सिस्टम लॉग', 'log.loading': 'लोड हो रहा…', 'log.refresh': 'रिफ़्रेश', 'log.download': 'डाउनलोड', 'rclog.head': 'रिकवरी जर्नल',
       'th.node': 'नोड', 'th.region': 'क्षेत्र', 'th.route': 'रूट', 'sec.tok': 'Admin टोकन', 'sec.reality': 'Reality',
@@ -1004,6 +1014,8 @@
     renderDevices(S);
     renderConnect(S);
     renderRu(S);
+    renderRegions(S);
+    renderPolicy(S);
     renderUpdateDash(S);
     renderWidgets(S);
     renderMeshPolicy(S);
@@ -1149,6 +1161,36 @@
         + '</tr>';
     });
     rows.innerHTML = h || '<tr><td colspan="5"><div class="empty">' + _t('ru.all') + '</div></td></tr>';
+  }
+
+  /* ================= POLICY + REGIONS ================= */
+  function renderPolicy(S) {
+    var t = $('policy-text');
+    if (t) t.textContent = S.policy_text || '';
+    var rev = $('policy-rev');
+    if (rev) rev.textContent = 'rev ' + (S.policy_rev || 0);
+    var need = !!(S.policy_rev && S.policy_rev > (S.policy_accepted_rev || 0));
+    if (!$('policy-screen')) return;
+    if (need && !CFG.policyOnce) {
+      CFG.policyOnce = true;
+      $('policy-screen').style.display = '';
+    }
+    var ab = $('policy-accept-btn');
+    if (ab) ab.style.display = need ? '' : 'none';
+  }
+  function renderRegions(S) {
+    var sel = $('rg-sel');
+    if (!sel) return;
+    var arr = (S.regions && S.regions.length) ? S.regions : [{ id: 'ru', flag: '🇷🇺', title: _t('nav.rusegment') }];
+    var picked = S.segment_regions && S.segment_regions.length ? S.segment_regions : ['ru'];
+    sel.innerHTML = arr.map(function (r) {
+      return '<option value="' + esc(r.id) + '"' + (picked.indexOf(r.id) !== -1 ? ' selected' : '') + '>' + esc(r.flag + ' ' + r.title) + '</option>';
+    }).join('');
+    var title = S.segment_title || _t('nav.rusegment');
+    var rg = $('rg-title');
+    if (rg) rg.innerHTML = S.segment_flag ? (S.segment_flag + ' ' + esc(title)) : esc(title);
+    var lb = document.querySelector('#nav button[data-t="rusegment"] .lb');
+    if (lb && S.segment_title) lb.textContent = S.segment_title;
   }
 
   /* ================= UPDATE DASH ================= */
@@ -1525,6 +1567,42 @@
     b.classList.toggle('primary', CFG.ruFailOnly);
     b.textContent = CFG.ruFailOnly ? _t('ru.failonly-on') : _t('ru.failonly');
     renderRu(V.S || {});
+  };
+  window.policyShow = function (ro) {
+    var s = $('policy-screen');
+    if (!s) return;
+    s.style.display = '';
+    var ab = $('policy-accept-btn');
+    if (!V.S || !(V.S.policy_rev > (V.S.policy_accepted_rev || 0))) {
+      if (ab) ab.style.display = 'none';
+    } else if (ab) {
+      ab.style.display = '';
+    }
+  };
+  window.policyAccept = function () {
+    var S = V.S || {};
+    postJSON('/api/policy/accept', { rev: (S.policy_rev || 0) }).then(function (j) {
+      if (j && j.ok) {
+        CFG.policyOnce = true;
+        $('policy-screen').style.display = 'none';
+        toast('OK 🐾', true);
+        loadState(true);
+      } else {
+        toast((j && j.error) || _t('t.err-gen'), false);
+      }
+    });
+  };
+  window.regionsSave = function () {
+    var sel = $('rg-sel');
+    var picked = [];
+    if (sel) Array.prototype.forEach.call(sel.options, function (o) { if (o.selected) picked.push(o.value); });
+    postJSON('/api/rusegment/region', {
+      regions: picked.length ? picked : ['ru'],
+      custom: ($('rg-custom') && $('rg-custom').value || '').trim()
+    }).then(function (j) {
+      toast((j && j.ok) ? _t('set.saved') : ((j && j.error) || _t('set.save-err')), !!(j && j.ok));
+      if (j && j.ok) loadState(true);
+    });
   };
   window.tgRestart = function () {
     postJSON('/api/tgws/restart', {}).then(function (j) {

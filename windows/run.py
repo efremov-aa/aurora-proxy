@@ -1,13 +1,16 @@
 # Aurora v1.0 — лаунчер: инициализация и запуск всех фоновых циклов.
 
+import os
 import signal
 import threading
-import time
 
 import config
 import core
+import mesh
 import pool
 import rusegment
+import security
+import subs
 import telemetry
 import tgws
 import updater
@@ -17,52 +20,34 @@ from api import serve
 def _boot():
     """Стартовая последовательность: настройки -> ключи -> sync -> фоновые треды."""
     config.load_settings()
+    security.init()  # admin-токен + chmod data/ (до любых действий)
+    # v1.8.0: уникальное имя сервера + авто-вступление в меш головного (фон)
+    mesh.ensure_unique_name()
+    threading.Thread(target=mesh.auto_join, daemon=True).start()
     pool.load()
+    subs.load()  # подписки — до сборки конфига (клиенты vless-in)
     pool.cleanup()  # убрать мёртвые github-ключи при старте
-
-    # внешний VLESS: автогенерация ключей (+inbound :8443) до сборки xray-конфига
-    if hasattr(config, "ensure_vless"):
-        config.ensure_vless()
-    # Windows: разрешить наши порты в брандмауэре (best-effort)
-    if hasattr(config, "open_firewall"):
-        config.open_firewall()
-
     config.log("Aurora v%s boot" % config.VERSION)
 
     # проверка/заполнение tgws-секрета и фоновый статус
     tgws.refresh_status()
-    # авто-старт tg-ws, если порт не открыт
-    if not tgws.running():
-        config.log("tgws: порт %d закрыт, авто-старт" % config.TGWS_PORT)
-        tgws.restart()
-        time.sleep(2)
-        tgws.refresh_status()
-
-    # фоновое определение публичного IP (для внешних ссылок/QR)
-    if hasattr(config, "refresh_public_ip_async"):
-        config.refresh_public_ip_async()
 
     # фоновые циклы
     threading.Thread(target=telemetry.poll, daemon=True).start()
     threading.Thread(target=_startup_sync, daemon=True).start()
     core.start_watch()
-
-    # самолечение tgws: каждые 30с проверяем порт, при падении — рестарт
+    # обновление tgws-статуса каждые 30с
     def tgws_loop():
+        import time
         while True:
             time.sleep(30)
-            if not tgws.running():
-                config.log("tgws: порт %d закрыт, авто-восстановление" % config.TGWS_PORT)
-                tgws.restart()
-                time.sleep(2)
             tgws.refresh_status()
     threading.Thread(target=tgws_loop, daemon=True).start()
     # обновление имён устройств
     threading.Thread(target=telemetry.resolve_names, daemon=True).start()
     # стартовая проверка ру-сегмента (фон, результаты — в /api/state)
     rusegment.start()
-
-    # обязательное авто-обновление (без обхода; управляется политикой релизов)
+    # обязательное авто-обновление (без обхода; сервера на ручном — вне этой сборки)
     updater.auto_update()
 
 

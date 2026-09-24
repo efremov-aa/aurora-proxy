@@ -7,6 +7,7 @@ import re
 import threading
 
 import config
+import crypt
 
 KEYS_FILE = os.path.join(config.DATA_DIR, "keys.json")
 STATUS_FILE = os.path.join(config.DATA_DIR, "status.json")
@@ -80,11 +81,7 @@ def load():
     """Загрузка keys.json / status.json / dead.json при старте. Безопасная."""
     global _KEYS, _STATUS, _DEAD
     with _LOCK:
-        try:
-            with open(KEYS_FILE, "r", encoding="utf-8") as f:
-                _KEYS = [_ensure_tag(dict(k)) for k in json.load(f)]
-        except (OSError, ValueError):
-            _KEYS = []
+        _KEYS = [_ensure_tag(dict(k)) for k in crypt.load_json(KEYS_FILE, default=[])]
         try:
             with open(STATUS_FILE, "r", encoding="utf-8") as f:
                 _STATUS = json.load(f)
@@ -112,7 +109,7 @@ def _atomic_write(path, obj):
 
 def _save_keys():
     with _LOCK:
-        _atomic_write(KEYS_FILE, _KEYS)
+        crypt.save_json(KEYS_FILE, _KEYS)
 
 
 def _save_status():

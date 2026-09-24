@@ -13,6 +13,7 @@ import time
 import uuid as _uuid
 
 import config
+import crypt
 
 SUBS_FILE = config.SUBS_FILE
 
@@ -53,12 +54,8 @@ def load():
     """Загрузка data/subs.json. Молчаливый фолбэк на пустой список."""
     global _SUBS
     with _LOCK:
-        try:
-            with open(SUBS_FILE, "r", encoding="utf-8") as f:
-                _SUBS = json.load(f)
-            if not isinstance(_SUBS, list):
-                _SUBS = []
-        except (OSError, ValueError):
+        _SUBS = crypt.load_json(SUBS_FILE, default=[])
+        if not isinstance(_SUBS, list):
             _SUBS = []
 
 
@@ -76,7 +73,7 @@ def _atomic_write(path, obj):
 
 def _save():
     with _LOCK:
-        _atomic_write(SUBS_FILE, _SUBS)
+        crypt.save_json(SUBS_FILE, _SUBS)
 
 
 def all():

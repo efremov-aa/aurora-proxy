@@ -12,9 +12,56 @@ import time
 # (xray run/keytest/statsquery/netstat/netsh/taskkill/tg-ws-proxy и т.п.).
 HIDE_FLAG = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
 
-VERSION = "1.6.0"
-VERSION_NAME = "Меш и Магазин"
+VERSION = "1.9.0"
+VERSION_NAME = "Кот-правозащитник"
 APP_NAME = "Aurora"
+
+# --- политика сервиса (GitHub-сборки: первая страница — правила) ---
+# POLICY_REV меняется ТОЛЬКО при изменении POLICY_TEXT.
+# REV > принятого => панель снова требует принять политику (после обновления).
+POLICY_REV = 2
+POLICY_TEXT = """ПОЛИТИКА И ПРАВИЛА ПРОЕКТА AURORA «Кот в законе»
+
+1. НАЗНАЧЕНИЕ
+Aurora — персональный VPN/прокси-сервер. Установка и использование подразумевают
+полное согласие с настоящей политикой. Если вы не согласны — не устанавливайте.
+
+2. РАЗРЕШЕНО
+- подключать собственные устройства (телефоны, планшеты, ПК, телевизоры);
+- использовать прокси в личных целях: приватность, доступ к заблокированным
+  сайтам, безопасные подключения в общественных сетях;
+- привлекать в свою сеть (меш) друзей с их согласия и на тех же правилах.
+
+3. ЗАПРЕЩЕНО
+- раздавать доступ посторонним без явного согласия владельца сервера;
+- использовать канал для DDoS, массового сканирования, покупки запрещённого,
+  кражи данных, мошенничества и любых нарушений закона;
+- обходить лимиты тарифов, маскировать свой трафик против владельца сервера;
+- продавать/перепродавать ключи и подписки без разрешения владельца;
+- вмешиваться в работу серверного ПО или панели управления.
+
+4. ОБЯЗАТЕЛЬСТВА ВЛАДЕЛЬЦА СЕРВЕРА
+- шифровать хранимые данные (подписки, ключи) и ограничивать доступ к файлам;
+- не передавать персональные данные клиентов третьим лицам без оснований;
+- немедленно уведомлять клиентов об изменении правил.
+При изменении текста политики ревизия увеличивается, и при следующем запуске
+панель снова запросит принятие — это обязательное условие продолжения работы.
+
+5. СОТРУДНИЧЕСТВО С ПРАВООХРАНИТЕЛЬНЫМИ ОРГАНАМИ
+Владелец гарантирует анонимность и конфиденциальность ВСЕГДА — до момента
+нарушения закона. По официальному письменному запросу правоохранительных
+органов (в т.ч. по официальным каналам связи) владелец обязан предоставить
+все имеющиеся данные об абоненте (адрес, логи, тайминг и т.п.).
+При нарушении закона любой страны владелец обязан сотрудничать
+с правоохранительными органами. Без официального запроса данные не передаются.
+
+6. ОГРАНИЧЕНИЕ ОТВЕТСТВЕННОСТИ
+Сервер предоставляется «как есть». Владелец не отвечает за доступность сторонних
+ресурсов, за действия клиентов сети и за последствия нарушения настоящих правил.
+
+7. СОГЛАСИЕ
+Нажатие кнопки «Принять» на панели управления означает безоговорочное принятие
+настоящей политики для всего оборудования, подключённого к серверу."""
 
 _BOOT_TS = time.time()   # время старта процесса (для /api/settings.uptime)
 
@@ -319,6 +366,15 @@ _SETTINGS_DEFAULTS = {
     "show_mesh": True,           # показывать вкладку «Меш-сеть» в панели
     "show_subs": True,           # показывать вкладку «Магазин» в панели
     "mesh_master": False,        # головной сервер: раздаёт политику видимости клиентам меша
+    "policy_rev_accepted": 0,    # принятая ревизия политики (0 = не принимал)
+    "segment_title": "",         # своё название сегмента монитора (пусто = авто)
+    "segment_regions": [],       # выбранные регионы (ru/global/eu/asia)
+    "segment_custom": "",        # пользовательские домены (по одному на строку)
+    # --- v1.8.0: гологоловной сервер (master) / авто-джойн / замок тестового сервера ---
+    "master_addr": "",           # URL головного сервера (напр. http://10.1.136.56:5053)
+    "master_token": "",          # секрет регистрации у головного (выдаёт головной)
+    "auto_join": False,          # при старте регистрироваться в меше головного (авто-джуin)
+    "master_only": False,        # замок: подключиться/использовать может только головной
     # --- windows: белый список (белый IP + кастомные домены на direct) ---
     "white_ip": "",          # белый IP провайдера (переопределяет env AURORA_WHITE_IP)
     "bypass_domains": [],    # кастомный белый список доменов, идущих на direct (в дополнение к RU-байпасу)
@@ -425,6 +481,118 @@ def ru_domains():
         log("ru-bypass: доменов %d (%s)" % (
             len(final), "github" if fetched else "static fallback"))
     return RU_DOMAINS_CACHE["list"]
+
+
+# --- сегменты монитора (t-rusegment): регионы + свои домены ---
+REGIONS = {
+    "ru": {"title": "Ру-сегмент", "flag": "🇷🇺", "domains": [
+        "yandex.ru", "ya.ru", "vk.com", "ok.ru", "mail.ru", "rambler.ru",
+        "lenta.ru", "rbc.ru", "gazeta.ru", "kommersant.ru", "rg.ru",
+        "kremlin.ru", "gosuslugi.ru", "gov.ru", "sberbank.ru", "tinkoff.ru",
+        "avito.ru", "ozon.ru", "wildberries.ru", "kinopoisk.ru", "rutube.ru",
+        "matchtv.ru", "kp.ru", "mos.ru",
+    ]},
+    "global": {"title": "Международный сегмент", "flag": "🌐", "domains": [
+        "google.com", "youtube.com", "wikipedia.org", "github.com",
+        "cloudflare.com", "mozilla.org", "openai.com", "netflix.com",
+        "amazon.com", "reddit.com", "x.com", "instagram.com",
+        "microsoft.com", "apple.com", "stackoverflow.com", "medium.com",
+    ]},
+    "eu": {"title": "ЕС-сегмент", "flag": "🇪🇺", "domains": [
+        "bbc.com", "dw.com", "lemonde.fr", "elpais.com", "ilpost.it",
+        "france24.com", "rtve.es", "europarl.europa.eu", "rtl.be", "oe24.at",
+    ]},
+    "asia": {"title": "Азия", "flag": "🌏", "domains": [
+        "baidu.com", "alibaba.com", "taobao.com", "tmall.com",
+        "naver.com", "yahoo.co.jp", "rakuten.co.jp", "kakaku.com",
+        "sina.com.cn", "line.me",
+    ]},
+}
+
+
+def _seg_line_to_domain(line):
+    """Нормализация строки списка доменов (переиспользует _normalize_ru_line)."""
+    d = _normalize_ru_line(line)
+    if not d or "." not in d:
+        return None
+    return d
+
+
+def segment_regions():
+    """Выбранные регионы списком (только существующие в REGIONS)."""
+    raw = get("segment_regions") or ["ru"]
+    if isinstance(raw, str):
+        raw = [raw]
+    out = []
+    for r in raw:
+        if r in REGIONS and r not in out:
+            out.append(r)
+    return out or ["ru"]
+
+
+def segment_title():
+    """Название вкладки монитора: своё или авто (один регион — его имя, иначе флаги)."""
+    own = (get("segment_title") or "").strip()
+    if own:
+        return own
+    sel = segment_regions()
+    if len(sel) == 1 and REGIONS.get(sel[0], {}).get("title"):
+        return REGIONS[sel[0]]["title"]
+    flags = [REGIONS[r]["flag"] for r in sel]
+    return "Сегмент" if not flags else " ".join(flags) + " сегмент"
+
+
+def segment_flag():
+    """Флаг/эмодзи вкладки монитора (регионы, иначе глобус)."""
+    sel = segment_regions()
+    if len(sel) == 1:
+        return REGIONS[sel[0]].get("flag", "🌐")
+    return "🌐"
+
+
+# --- v1.8.0: рандомное уникальное имя сервера ---
+_NAME_ADJ = ["Мур", "Барс", "Снеж", "Рыж", "Полос", "Тих", "Быстр", "Хит", "Добр", "Гром"]
+_NAME_NOUN = ["кот", "барсик", "мурзик", "лео", "тишка", "снежок", "рыжик", "марс", "симба", "том"]
+
+
+def random_server_name(taken=None, tries=20):
+    """Случайное имя сервера, не пересекающееся с уже существующими (taken)."""
+    import secrets
+    seen = {str(x or "").strip().lower() for x in (taken or [])}
+    for _ in range(tries):
+        name = "%s-%s-%s" % (
+            _NAME_ADJ[secrets.randbelow(len(_NAME_ADJ))],
+            _NAME_NOUN[secrets.randbelow(len(_NAME_NOUN))],
+            secrets.token_hex(2),
+        )
+        if name.lower() not in seen:
+            return name
+    return "Aurora-%s" % secrets.token_hex(3)
+
+
+def segment_domains():
+    """Домены монитора: выбранные регионы + пользовательские домены (custom)."""
+    domains = []
+    for r in segment_regions():
+        for d in REGIONS[r]["domains"]:
+            if d not in domains:
+                domains.append(d)
+    custom = (get("segment_custom") or "").strip()
+    if custom:
+        for ln in custom.splitlines():
+            d = _seg_line_to_domain(ln)
+            if d and d not in domains:
+                domains.append(d)
+    return domains
+
+
+def policy_required():
+    """True, пока не принята актуальная ревизия политики (после обновления — снова True)."""
+    try:
+        acc = int(get("policy_rev_accepted", 0) or 0)
+    except (TypeError, ValueError):
+        acc = 0
+    return POLICY_REV > acc
 
 
 def _ts():

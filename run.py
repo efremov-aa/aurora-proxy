@@ -6,6 +6,7 @@ import threading
 
 import config
 import core
+import mesh
 import pool
 import rusegment
 import security
@@ -20,6 +21,9 @@ def _boot():
     """Стартовая последовательность: настройки -> ключи -> sync -> фоновые треды."""
     config.load_settings()
     security.init()  # admin-токен + chmod data/ (до любых действий)
+    # v1.8.0: уникальное имя сервера + авто-вступление в меш головного (фон)
+    mesh.ensure_unique_name()
+    threading.Thread(target=mesh.auto_join, daemon=True).start()
     pool.load()
     subs.load()  # подписки — до сборки конфига (клиенты vless-in)
     pool.cleanup()  # убрать мёртвые github-ключи при старте

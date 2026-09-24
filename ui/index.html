@@ -92,6 +92,7 @@
         <option value="ar">العربية</option>
         <option value="hi">हिन्दी</option>
       </select>
+      <button id="btn-policy" class="icon-btn" title="Политика сервиса" onclick="policyShow()">🛡️</button>
       <button id="theme-btn" class="icon-btn" title="Сменить тему">🌙</button>
     </header>
 
@@ -284,6 +285,12 @@
         <div class="card">
           <h2><span class="ic">🇷🇺</span><span data-i18n="nav.rusegment">Ру-сегмент</span><span class="count" id="ru-flag-wrap"><span class="badge warn" id="ru-flag">частично</span></span></h2>
           <p class="hint" data-i18n="ru.hint">Доступность российских ресурсов напрямую с сервера (без VPN). Если сегмент работает — RU-сайты открываются без прокси.</p>
+          <div class="cmd-row region-row" style="flex-wrap:wrap;margin:0 0 12px">
+            <span class="badge" id="rg-title">🇷🇺 <span data-i18n="nav.rusegment">Ру-сегмент</span></span>
+            <select id="rg-sel" style="max-width:240px"></select>
+            <input type="text" id="rg-custom" data-i18n-placeholder="ru.custom-ph" placeholder="Доп. домены через запятую (необязательно)" style="flex:1;min-width:180px">
+            <button class="btn small" onclick="regionsSave()">💾 <span data-i18n="btn.save">Сохранить</span></button>
+          </div>
           <div class="metrics" style="margin:0 0 12px">
             <div class="stat"><div class="k">✅ <span data-i18n="ru.ok">Доступно</span></div><div class="v" id="ru-ok">0/0</div></div>
             <div class="stat"><div class="k">💀 <span data-i18n="ru.bad">Проблемы</span></div><div class="v" id="ru-bad">0</div></div>
@@ -603,6 +610,11 @@
             <input type="text" id="set-name" data-i18n-placeholder="set.name-ph" placeholder="Название сервера" value="">
             <button class="btn small" onclick="settingsSave()" data-i18n="btn.save">Сохранить</button>
           </div>
+          <div style="font-size:11px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:var(--muted-2);margin:16px 0 8px" data-i18n="set.vis">Видимость вкладок</div>
+          <div class="widget-body" style="display:flex;flex-direction:column;gap:8px;font-size:13px">
+            <label class="chk"><input type="checkbox" id="set-show-mesh" onchange="settingsSave()"> <span data-i18n="set.show-mesh">Включить меш-сеть</span></label>
+            <label class="chk"><input type="checkbox" id="set-show-subs" onchange="settingsSave()"> <span data-i18n="set.show-subs">Включить магазин (подписки и тарифы)</span></label>
+          </div>
           <div style="font-size:11px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:var(--muted-2);margin:16px 0 8px" data-i18n="set.mesh">Меш</div>
           <div class="cmd-row">
             <input type="text" id="meshid" data-i18n-placeholder="set.meshid-ph" placeholder="ID меша" value="" readonly>
@@ -659,6 +671,26 @@
 </div>
 
 <div id="toast"></div>
+
+<!-- ============================================================
+     ПОЛИТИКА СЕРВИСА (оверлей обязательного принятия)
+     ============================================================ -->
+<div id="policy-screen" style="display:none">
+  <div class="policy-mask">
+    <div class="policy-card">
+      <div class="policy-head">
+        <span class="ic">🛡️</span>
+        <b data-i18n="pol.head">Политика сервиса</b>
+        <span class="badge mono" id="policy-rev">rev 0</span>
+      </div>
+      <div class="policy-body" id="policy-text"></div>
+      <div class="policy-foot">
+        <button class="btn ghost" onclick="policyShow(true)">🔍 <span data-i18n="pol.readOnly">Просмотр</span></button>
+        <button class="btn primary" id="policy-accept-btn" onclick="policyAccept()">✅ <span data-i18n="pol.accept">Принимаю</span></button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script src="/qr.js"></script>
   <script src="/app.js"></script>

@@ -59,14 +59,15 @@ def check_all():
         st.setdefault("rusegment", {})["running"] = True
         config.update_state(rusegment=st["rusegment"])
     results = []
+    domains = config.segment_domains() or RU_DOMAINS
     with concurrent.futures.ThreadPoolExecutor(max_workers=_MAX_WORKERS) as ex:
-        futs = {ex.submit(_probe, h): h for h in RU_DOMAINS}
+        futs = {ex.submit(_probe, h): h for h in domains}
         for fut in concurrent.futures.as_completed(futs):
             try:
                 results.append(fut.result())
             except Exception:
                 results.append({"host": futs[fut], "ip": "", "code": -1, "ms": 0})
-    results.sort(key=lambda r: RU_DOMAINS.index(r["host"]) if r["host"] in RU_DOMAINS else 99)
+    results.sort(key=lambda r: domains.index(r["host"]) if r["host"] in domains else 99)
     with _LOCK:
         st = config.get_state()
         st.setdefault("rusegment", {})

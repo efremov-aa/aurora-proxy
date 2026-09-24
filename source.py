@@ -63,13 +63,19 @@ def _key_from_uri(uri):
                 v = v[0] if v else None
             return v or default
 
+        pbk = one("pbk")
+        if pbk and len(pbk) != 43:
+            # x25519 public key = ровно 43 символа; иначе xray v26.9.9 падает
+            # exit 23 'invalid password' (инцидент vless-31) — ключ отбрасываем
+            return None
+
         return {
             "uri": uri.rstrip("#").strip(),
             "tag": "",
             "host": p.hostname,
             "port": p.port or 443,
             "uuid": p.username or "",
-            "pbk": one("pbk"),
+            "pbk": pbk,
             "sid": one("sid"),
             "fp": one("fp", "chrome"),
             "sni": one("sni"),

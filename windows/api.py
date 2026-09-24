@@ -276,9 +276,9 @@ def build_state(local=True):
     st["show_mesh"] = config.get("show_mesh", True)
     st["show_subs"] = config.get("show_subs", True)
     st["mesh_master"] = False
-    if not local and _UI_TOKEN:
-        # секреты подключения скрываем только при настроенном ui_token
-        # (пустой токен = «как раньше», ссылка и QR видны всем в LAN)
+    if not local and (_UI_TOKEN or config.get("master_only", False)):
+        # секреты подключения скрываем при настроенном ui_token и/или замке master_only
+        # (пустой токен = «как раньше», ссылка и QR видны всем в LAN; замок = закрыто извне)
         v = dict(st["vless_ext"])
         for sec in ("link", "uuid", "pbk", "sid"):
             v.pop(sec, None)
@@ -288,7 +288,7 @@ def build_state(local=True):
     vless_now = st["vless_now"]
     st["keys_total"] = len(keys)
     st["keys"] = []
-    masked = (not local) and _UI_TOKEN   # скрываем uri ключей пула только при настроенном токене
+    masked = (not local) and (_UI_TOKEN or config.get("master_only", False))   # скрываем uri ключей пула только при настроенном токене/замке
     for k in keys:
         uri = k.get("uri", "")
         hs = pool.get_status(uri)
@@ -305,6 +305,14 @@ def build_state(local=True):
             "dead": pool.dead_reason(uri),
             "is_active": k.get("tag") == vless_now,
         })
+    st["policy_rev"] = config.POLICY_REV
+    st["policy_required"] = config.policy_required()
+    st["policy_accepted_rev"] = int(config.get("policy_rev_accepted", 0) or 0)
+    st["segment_title"] = config.segment_title()
+    st["segment_flag"] = config.segment_flag()
+    st["segment_regions"] = config.segment_regions()
+    st["regions"] = [{"id": k, "flag": v["flag"], "title": v["title"]}
+                     for k, v in config.REGIONS.items()]
     st["white_ip"] = config.get_white_ip()
     st["bypass_domains"] = config.get_bypass_domains()
     return st
@@ -321,6 +329,12 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Content-Security-Policy",
+                         "default-src 'self'; style-src 'self' 'unsafe-inline'; "
+                         "img-src 'self' data:; script-src 'self' 'unsafe-inline'")
         self.end_headers()
         self.wfile.write(body)
 
@@ -363,6 +377,20 @@ class Handler(BaseHTTPRequestHandler):
         # --- публичная политика меша: любой узел опрашивает мастера без авторизации ---
         if path == "/api/mesh/policy":
             self._send(*_json(mesh.policy()))
+            return
+        # --- публичная политика сервиса и регионы ру-сегмента (до auth-гейтов) ---
+        if path == "/api/policy":
+            self._send(*_json({"ok": True, "text": config.POLICY_TEXT,
+                               "rev": config.POLICY_REV}))
+            return
+        if path == "/api/rusegment/regions":
+            self._send(*_json({"ok": True,
+                               "regions": config.segment_regions(),
+                               "title": config.segment_title(),
+                               "flag": config.segment_flag(),
+                               "custom": config.get("segment_custom", ""),
+                               "all": [{"id": k, "flag": v["flag"], "title": v["title"]}
+                                       for k, v in config.REGIONS.items()]}))
             return
         # --- API: аутентификация (если токен настроен) + секреты только локально ---
         if not _auth_ok(self):
@@ -440,6 +468,14 @@ class Handler(BaseHTTPRequestHandler):
             self._send(*_json({"error": "internal: %s" % e}, 500))
 
     def _do_post(self):
+        # приём политики — публичный и без прочих auth-гейтов
+        path = self.path.split("?", 1)[0]
+        if path == "/api/policy/accept":
+            self._policy_accept_raw()
+            return
+        if path == "/api/mesh/register":
+            self._mesh_register_raw()
+            return
         if not _origin_ok(self):
             self._send(*_json({"error": "cross-origin blocked"}, 403))
             return
@@ -459,6 +495,9 @@ class Handler(BaseHTTPRequestHandler):
 
         try:
             length = int(self.headers.get("Content-Length", 0) or 0)
+            if length > 65536:
+                self._send(*_json({"ok": False, "error": "body too large"}, 400))
+                return
             body = self.rfile.read(length) if length else b""
         except ValueError:
             self._send(*_json({"ok": False, "error": "bad content-length"}, 400))
@@ -471,6 +510,11 @@ class Handler(BaseHTTPRequestHandler):
                 return
         else:
             data = {}
+
+        # блокирока управления, пока политика не принята (кроме самого приёма)
+        if config.policy_required() and path != "/api/policy/accept":
+            self._send(*_json({"error": "policy required"}, 403))
+            return
 
         handler = {
             "/api/vpn_mode": self._vpn_mode,
@@ -486,6 +530,7 @@ class Handler(BaseHTTPRequestHandler):
             "/api/recovery/conn": self._rc_conn,
             "/api/tgws/restart": self._tgws_restart,
             "/api/rusegment/check": self._rusegment_check,
+            "/api/rusegment/region": self._rusegment_region,
             "/api/security/rotate": self._security_rotate,
             "/api/security/password": self._security_password,
             "/api/security/twofa": self._security_twofa,
@@ -613,6 +658,81 @@ class Handler(BaseHTTPRequestHandler):
     def _rusegment_check(self, data):
         started = rusegment.check_all()
         self._send(*_json({"ok": True, "started": started}))
+
+    def _policy_accept_raw(self):
+        # публичный приём политики: без auth-цепочек, только тело {rev}
+        try:
+            length = int(self.headers.get("Content-Length", 0) or 0)
+            body = self.rfile.read(length) if length else b""
+        except ValueError:
+            self._send(*_json({"ok": False, "error": "bad content-length"}, 400))
+            return
+        try:
+            data = json.loads(body.decode("utf-8")) if body else {}
+        except (ValueError, UnicodeDecodeError):
+            self._send(*_json({"ok": False, "error": "invalid json body"}, 400))
+            return
+        try:
+            rev = int(data.get("rev") or 0)
+        except (TypeError, ValueError):
+            rev = 0
+        config.set("policy_rev_accepted", rev)
+        config.save_settings()
+        self._send(*_json({"ok": True, "rev": rev}))
+
+    def _mesh_register_raw(self):
+        # публичная регистрация узла у головного сервера: только по master_token
+        expected = (config.get("master_token") or "").strip()
+        if not expected:
+            self._send(*_json({"ok": False, "error": "registration closed"}, 403))
+            return
+        try:
+            length = int(self.headers.get("Content-Length", 0) or 0)
+            body = self.rfile.read(length) if length else b""
+        except ValueError:
+            self._send(*_json({"ok": False, "error": "bad content-length"}, 400))
+            return
+        if length > 65536:
+            self._send(*_json({"ok": False, "error": "body too large"}, 400))
+            return
+        try:
+            data = json.loads(body.decode("utf-8")) if body else {}
+        except (ValueError, UnicodeDecodeError):
+            self._send(*_json({"ok": False, "error": "invalid json body"}, 400))
+            return
+        if str(data.get("token") or "") != expected:
+            self._send(*_json({"ok": False, "error": "bad master token"}, 403))
+            return
+        node, err = mesh.add(
+            str(data.get("name") or ""),
+            str(data.get("region") or "RU"),
+            str(data.get("host") or ""),
+            int(data.get("port") or 0),
+            role="node",
+        )
+        if not node:
+            self._send(*_json({"ok": False, "error": err or "add failed"}, 400))
+            return
+        config.log("mesh: регистрация узла %s (%s:%s)" % (node["name"], node.get("host"), node.get("port")))
+        self._send(*_json({"ok": True, "id": node["id"], "node": node}))
+
+    def _rusegment_region(self, data):
+        raw = data.get("regions") or []
+        if isinstance(raw, list):
+            regions = [str(r) for r in raw if str(r) in config.REGIONS]
+        else:
+            regions = []
+        if not regions:
+            regions = ["ru"]
+        title = str(data.get("title") or "")[:80]
+        custom = str(data.get("custom") or "")[:4000]
+        config.set("segment_regions", regions)
+        config.set("segment_title", title or "")
+        config.set("segment_custom", custom or "")
+        config.save_settings()
+        threading.Thread(target=rusegment.check_all, daemon=True).start()
+        self._send(*_json({"ok": True, "title": config.segment_title(),
+                           "flag": config.segment_flag()}))
 
     def _security_rotate(self, data):
         # admin-токен панели (Bearer): чистая ротация, хранение data/admin_secret.json
@@ -897,11 +1017,17 @@ class Handler(BaseHTTPRequestHandler):
     def _mesh_node_add(self, data):
         node, err = mesh.add(data.get("name"), data.get("region"),
                              data.get("host"), data.get("port"),
-                             data.get("role"))
+                             data.get("role"),
+                             auto_name=_as_bool(data.get("auto_name")))
         if err:
             self._send(*_json({"ok": False, "error": err}, 400))
             return
-        self._send(*_json({"ok": True, "node": node}))
+        # секрет доверия эксклюзивного узла (role=test) отдаётся ТОЛЬКО при регистрации
+        secret = node.pop("secret", None)
+        resp = {"ok": True, "node": node}
+        if secret:
+            resp["secret"] = secret
+        self._send(*_json(resp))
 
     def _mesh_node_remove(self, data):
         nid = str(data.get("id") or "").strip()

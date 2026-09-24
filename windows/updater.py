@@ -23,7 +23,7 @@ _RAW = "https://raw.githubusercontent.com/"
 _MODULES = [
     "config.py", "pool.py", "source.py", "core.py", "telemetry.py",
     "tgws.py", "recovery.py", "rusegment.py", "api.py", "ui.py", "run.py",
-    "updater.py", "security.py", "subs.py", "mesh.py",
+    "updater.py", "security.py", "subs.py", "mesh.py", "crypt.py",
 ]
 _STATIC = ["ui/index.html", "ui/app.js", "ui/style.css", "ui/qr.js"]
 

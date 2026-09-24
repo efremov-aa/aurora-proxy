@@ -1,7 +1,7 @@
 (function () {
   'use strict';
   var V = { S: null, SUBS: null, MESH: null, RU: null, UPD: null, ROUTES: null, SET: null, SEC: null, TG: null };
-  var CFG = { tab: 'dashboard', ruFailOnly: false, _rid: 0 };
+  var CFG = { tab: 'dashboard', ruFailOnly: false, _rid: 0, policyOnce: false };
   var LS = { theme: 'aurora_theme', sec: 'aurora_sec_tok', lang: 'aurora_lang' };
 
   /* ================= I18N ================= */
@@ -12,6 +12,7 @@
   ];
   var I18N = {
     ru: {
+      'pol.head': 'Политика сервиса', 'pol.readOnly': 'Просмотр', 'pol.accept': 'Принимаю условия', 'ru.regions': 'Сегменты', 'ru.custom-ph': 'Свои домены через запятую (необязательно)',
       'dash.manage': 'Управление', 'pool.refresh-btn': 'Обновить ключи', 'pool.check-btn': 'Проверить ключи', 'mesh.ping-btn': 'Пинг меш',
       'nav.dash': 'Обзор', 'nav.keys': 'Ключи', 'nav.devices': 'Устройства',
       'nav.connect': 'Внешний доступ', 'nav.rusegment': 'Ру-сегмент', 'nav.tgws': 'TG-WS',
@@ -100,6 +101,7 @@
       'theme.sun': '🌙', 'theme.moon': '☀️'
     },
     en: {
+      'pol.head': 'Service policy', 'pol.readOnly': 'View', 'pol.accept': 'I accept the terms', 'ru.regions': 'Segments', 'ru.custom-ph': 'Custom domains, comma separated (optional)',
       'dash.manage': 'Manage', 'pool.refresh-btn': 'Refresh keys', 'pool.check-btn': 'Check keys', 'mesh.ping-btn': 'Mesh ping',
       'nav.dash': 'Dashboard', 'nav.keys': 'Keys', 'nav.devices': 'Devices',
       'nav.connect': 'External access', 'nav.rusegment': 'RU segment', 'nav.tgws': 'TG-WS',
@@ -188,6 +190,7 @@
       'theme.sun': '🌙', 'theme.moon': '☀️'
     },
     es: {
+      'pol.head': 'Política del servicio', 'pol.readOnly': 'Ver', 'pol.accept': 'Acepto los términos', 'ru.regions': 'Segmentos', 'ru.custom-ph': 'Dominios propios separados por comas (opcional)',
       'dash.manage': 'Gestión', 'pool.refresh-btn': 'Actualizar claves', 'pool.check-btn': 'Comprobar claves', 'mesh.ping-btn': 'Ping mesh',
       'nav.dash': 'Panel', 'nav.keys': 'Claves', 'nav.devices': 'Dispositivos',
       'nav.connect': 'Acceso externo', 'nav.rusegment': 'Segmento RU', 'nav.tgws': 'TG-WS',
@@ -276,6 +279,7 @@
       'theme.sun': '🌙', 'theme.moon': '☀️'
     },
     de: {
+      'pol.head': 'Dienstrichtlinie', 'pol.readOnly': 'Ansehen', 'pol.accept': 'Ich akzeptiere die Bedingungen', 'ru.regions': 'Segmente', 'ru.custom-ph': 'Eigene Domains, durch Komma getrennt (optional)',
       'dash.manage': 'Verwaltung', 'pool.refresh-btn': 'Schlüssel aktualisieren', 'pool.check-btn': 'Schlüssel prüfen', 'mesh.ping-btn': 'Mesh-Ping',
       'nav.dash': 'Übersicht', 'nav.keys': 'Schlüssel', 'nav.devices': 'Geräte',
       'nav.connect': 'Externer Zugriff', 'nav.rusegment': 'RU-Segment', 'nav.tgws': 'TG-WS',
@@ -364,6 +368,7 @@
       'theme.sun': '🌙', 'theme.moon': '☀️'
     },
     fr: {
+      'pol.head': 'Politique du service', 'pol.readOnly': 'Voir', 'pol.accept': 'J\'accepte les conditions', 'ru.regions': 'Segments', 'ru.custom-ph': 'Domaines personnalisés séparés par des virgules (optionnel)',
       'dash.manage': 'Gestion', 'pool.refresh-btn': 'Actualiser les clés', 'pool.check-btn': 'Vérifier les clés', 'mesh.ping-btn': 'Ping mesh',
       'nav.dash': 'Tableau de bord', 'nav.keys': 'Clés', 'nav.devices': 'Appareils',
       'nav.connect': 'Accès externe', 'nav.rusegment': 'Segment RU', 'nav.tgws': 'TG-WS',
@@ -452,6 +457,7 @@
       'theme.sun': '🌙', 'theme.moon': '☀️'
     },
     tr: {
+      'pol.head': 'Hizmet politikası', 'pol.readOnly': 'Görüntüle', 'pol.accept': 'Koşulları kabul ediyorum', 'ru.regions': 'Segmentler', 'ru.custom-ph': 'Virgülle ayrılmış özel alan adları (isteğe bağlı)',
       'dash.manage': 'Yönetim', 'pool.refresh-btn': 'Anahtarları güncelle', 'pool.check-btn': 'Anahtarları kontrol et', 'mesh.ping-btn': 'Mesh ping',
       'nav.dash': 'Genel Bakış', 'nav.keys': 'Anahtarlar', 'nav.devices': 'Cihazlar',
       'nav.connect': 'Dış erişim', 'nav.rusegment': 'RU segmenti', 'nav.tgws': 'TG-WS',
@@ -540,6 +546,7 @@
       'theme.sun': '🌙', 'theme.moon': '☀️'
     },
     pt: {
+      'pol.head': 'Política do serviço', 'pol.readOnly': 'Ver', 'pol.accept': 'Aceito os termos', 'ru.regions': 'Segmentos', 'ru.custom-ph': 'Domínios personalizados separados por vírgulas (opcional)',
       'dash.manage': 'Gestão', 'pool.refresh-btn': 'Atualizar chaves', 'pool.check-btn': 'Verificar chaves', 'mesh.ping-btn': 'Ping mesh',
       'nav.dash': 'Painel', 'nav.keys': 'Chaves', 'nav.devices': 'Dispositivos',
       'nav.connect': 'Acesso externo', 'nav.rusegment': 'Segmento RU', 'nav.tgws': 'TG-WS',
@@ -628,6 +635,7 @@
       'theme.sun': '🌙', 'theme.moon': '☀️'
     },
     zh: {
+      'pol.head': '服务政策', 'pol.readOnly': '查看', 'pol.accept': '我接受条款', 'ru.regions': '分段', 'ru.custom-ph': '自定义域名，逗号分隔（可选）',
       'dash.manage': '管理', 'pool.refresh-btn': '更新密钥', 'pool.check-btn': '检查密钥', 'mesh.ping-btn': '网格ping',
       'nav.dash': '概览', 'nav.keys': '密钥', 'nav.devices': '设备',
       'nav.connect': '外部访问', 'nav.rusegment': 'RU 段', 'nav.tgws': 'TG-WS',
@@ -716,6 +724,7 @@
       'theme.sun': '🌙', 'theme.moon': '☀️'
     },
     ar: {
+      'pol.head': 'سياسة الخدمة', 'pol.readOnly': 'عرض', 'pol.accept': 'أوافق على الشروط', 'ru.regions': 'القطاعات', 'ru.custom-ph': 'نطاقات مخصصة مفصولة بفواصل (اختياري)',
       'dash.manage': 'إدارة', 'pool.refresh-btn': 'تحديث المفاتيح', 'pool.check-btn': 'فحص المفاتيح', 'mesh.ping-btn': 'بنج الشبكة',
       'nav.dash': 'لوحة التحكم', 'nav.keys': 'المفاتيح', 'nav.devices': 'الأجهزة',
       'nav.connect': 'الوصول الخارجي', 'nav.rusegment': 'قطاع RU', 'nav.tgws': 'TG-WS',
@@ -804,6 +813,7 @@
       'theme.sun': '🌙', 'theme.moon': '☀️'
     },
     hi: {
+      'pol.head': 'सेवा नीति', 'pol.readOnly': 'देखें', 'pol.accept': 'मैं शर्तें स्वीकार करता हूँ', 'ru.regions': 'सेगमेंट', 'ru.custom-ph': 'कस्टम डोमेन, अल्पविराम से अलग (वैकल्पिक)',
       'dash.manage': 'प्रबंधन', 'pool.refresh-btn': 'कुंजियाँ अपडेट करें', 'pool.check-btn': 'कुंजियाँ जाँचें', 'mesh.ping-btn': 'मेश पिंग',
       'nav.dash': 'डैशबोर्ड', 'nav.keys': 'कुंजियाँ', 'nav.devices': 'डिवाइस',
       'nav.connect': 'बाहरी पहुँच', 'nav.rusegment': 'RU सेगमेंट', 'nav.tgws': 'TG-WS',
@@ -1004,6 +1014,8 @@
     renderDevices(S);
     renderConnect(S);
     renderRu(S);
+    renderRegions(S);
+    renderPolicy(S);
     renderUpdateDash(S);
     renderWidgets(S);
     renderMeshPolicy(S);
@@ -1149,6 +1161,36 @@
         + '</tr>';
     });
     rows.innerHTML = h || '<tr><td colspan="5"><div class="empty">' + _t('ru.all') + '</div></td></tr>';
+  }
+
+  /* ================= POLICY + REGIONS ================= */
+  function renderPolicy(S) {
+    var t = $('policy-text');
+    if (t) t.textContent = S.policy_text || '';
+    var rev = $('policy-rev');
+    if (rev) rev.textContent = 'rev ' + (S.policy_rev || 0);
+    var need = !!(S.policy_rev && S.policy_rev > (S.policy_accepted_rev || 0));
+    if (!$('policy-screen')) return;
+    if (need && !CFG.policyOnce) {
+      CFG.policyOnce = true;
+      $('policy-screen').style.display = '';
+    }
+    var ab = $('policy-accept-btn');
+    if (ab) ab.style.display = need ? '' : 'none';
+  }
+  function renderRegions(S) {
+    var sel = $('rg-sel');
+    if (!sel) return;
+    var arr = (S.regions && S.regions.length) ? S.regions : [{ id: 'ru', flag: '🇷🇺', title: _t('nav.rusegment') }];
+    var picked = S.segment_regions && S.segment_regions.length ? S.segment_regions : ['ru'];
+    sel.innerHTML = arr.map(function (r) {
+      return '<option value="' + esc(r.id) + '"' + (picked.indexOf(r.id) !== -1 ? ' selected' : '') + '>' + esc(r.flag + ' ' + r.title) + '</option>';
+    }).join('');
+    var title = S.segment_title || _t('nav.rusegment');
+    var rg = $('rg-title');
+    if (rg) rg.innerHTML = S.segment_flag ? (S.segment_flag + ' ' + esc(title)) : esc(title);
+    var lb = document.querySelector('#nav button[data-t="rusegment"] .lb');
+    if (lb && S.segment_title) lb.textContent = S.segment_title;
   }
 
   /* ================= UPDATE DASH ================= */
@@ -1525,6 +1567,42 @@
     b.classList.toggle('primary', CFG.ruFailOnly);
     b.textContent = CFG.ruFailOnly ? _t('ru.failonly-on') : _t('ru.failonly');
     renderRu(V.S || {});
+  };
+  window.policyShow = function (ro) {
+    var s = $('policy-screen');
+    if (!s) return;
+    s.style.display = '';
+    var ab = $('policy-accept-btn');
+    if (!V.S || !(V.S.policy_rev > (V.S.policy_accepted_rev || 0))) {
+      if (ab) ab.style.display = 'none';
+    } else if (ab) {
+      ab.style.display = '';
+    }
+  };
+  window.policyAccept = function () {
+    var S = V.S || {};
+    postJSON('/api/policy/accept', { rev: (S.policy_rev || 0) }).then(function (j) {
+      if (j && j.ok) {
+        CFG.policyOnce = true;
+        $('policy-screen').style.display = 'none';
+        toast('OK 🐾', true);
+        loadState(true);
+      } else {
+        toast((j && j.error) || _t('t.err-gen'), false);
+      }
+    });
+  };
+  window.regionsSave = function () {
+    var sel = $('rg-sel');
+    var picked = [];
+    if (sel) Array.prototype.forEach.call(sel.options, function (o) { if (o.selected) picked.push(o.value); });
+    postJSON('/api/rusegment/region', {
+      regions: picked.length ? picked : ['ru'],
+      custom: ($('rg-custom') && $('rg-custom').value || '').trim()
+    }).then(function (j) {
+      toast((j && j.ok) ? _t('set.saved') : ((j && j.error) || _t('set.save-err')), !!(j && j.ok));
+      if (j && j.ok) loadState(true);
+    });
   };
   window.tgRestart = function () {
     postJSON('/api/tgws/restart', {}).then(function (j) {
