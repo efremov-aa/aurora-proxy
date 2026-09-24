@@ -360,7 +360,8 @@ def auto_join():
         reg = _fetch_post(host, port, "/api/mesh/register", payload)
     if reg and reg.get("ok"):
         node_info = reg.get("node") or {}
-        if node_info.get("name"):
+        cur = (config.get("server_name") or "").strip()
+        if node_info.get("name") and cur in ("", "Home", "-"):
             config.set("server_name", node_info["name"])
         secret = reg.get("secret")
         if secret:
@@ -368,7 +369,7 @@ def auto_join():
         config.log("mesh: авто-вступление в меш головного %s:%s OK (id=%s, "
                    "name='%s', role=%s)" % (
             host, port, node_info.get("id") or reg.get("id") or "?",
-            config.get("server_name"), role))
+            node_info.get("name") or config.get("server_name"), role))
     else:
         config.log("mesh: авто-вступление в меш головного %s:%s не удалось" % (
             host, port))

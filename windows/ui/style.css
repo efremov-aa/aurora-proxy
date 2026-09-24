@@ -554,3 +554,27 @@ select{cursor:pointer;appearance:none;padding-right:32px;
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.001s!important;animation-iteration-count:1!important;transition-duration:.001s!important}
 }
+
+/* --- экран политики сервиса (первая страница при установке) --- */
+#policy-screen{position:fixed;inset:0;z-index:100}
+.policy-mask{position:absolute;inset:0;display:grid;place-items:center;
+  background:rgba(0,0,0,.55);backdrop-filter:blur(6px);padding:20px}
+.policy-card{width:min(680px,100%);max-height:82vh;display:flex;flex-direction:column;
+  background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r-xl);
+  box-shadow:var(--shadow);overflow:hidden;animation:pol-in .28s var(--ease)}
+@keyframes pol-in{from{transform:translateY(14px) scale(.98);opacity:0}
+  to{transform:none;opacity:1}}
+.policy-head{display:flex;align-items:center;gap:10px;padding:16px 20px;
+  border-bottom:1px solid var(--line);background:var(--surface-2)}
+.policy-head .ic{font-size:22px}
+.policy-head b{flex:1;font-size:16px}
+.policy-head .badge{background:var(--act-bg);color:var(--primary);padding:2px 10px;
+  border-radius:var(--r-pill);font-size:12px}
+.policy-body{padding:18px 20px;white-space:pre-wrap;line-height:1.6;color:var(--text);
+  overflow-y:auto;flex:1;font-size:13.5px}
+.policy-foot{display:flex;justify-content:flex-end;gap:10px;padding:14px 20px;
+  border-top:1px solid var(--line);background:var(--surface-2)}
+@media(max-width:480px){
+  .policy-foot{flex-direction:column-reverse;align-items:stretch}
+  .policy-foot .btn{width:100%}
+}

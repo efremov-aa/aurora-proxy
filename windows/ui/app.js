@@ -987,7 +987,8 @@
     return h;
   }
   function getJSON(url) {
-    return fetch(url, { cache: 'no-store' }).then(function (r) { return r.json().catch(function () { return {}; }); });
+    return fetch(url, { cache: 'no-store' }).then(function (r) { return r.json().catch(function () { return {}; }); })
+      .catch(function () { return {}; });
   }
   function postJSON(url, data) {
     var body = data ? JSON.stringify(data) : '';
@@ -1215,6 +1216,23 @@
     });
   }
   function renderUpdateDash() { loadUpdate(); }
+
+  /* ================= VERSIONS ================= */
+  function loadVersions() {
+    getJSON('/api/versions').then(function (j) {
+      j = j || {};
+      V.VERS = j;
+      var arr = j.versions || [];
+      var box = $('ver-list');
+      if (!box) return;
+      box.innerHTML = arr.map(function (x) {
+        return '<div class="ver-item" style="padding:10px 18px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center;font-size:13px">' +
+          '<span class="badge">v' + esc(x.v || '') + '</span>' +
+          '<b style="flex:1">' + esc(x.name || '') + '</b>' +
+          '<span class="muted mono" style="font-size:12px">' + esc(x.date || '') + '</span></div>';
+      }).join('') || '<div class="empty" style="padding:18px;color:var(--muted);font-size:13px">' + _t('log.empty') + '</div>';
+    });
+  }
 
   /* ================= WIDGETS ================= */
   function renderWidgets(S) {
@@ -1518,7 +1536,7 @@
   }
   function loadTab(t) {
     if (t === 'logs') loadLog();
-    if (t === 'update' || t === 'versions') loadUpdate();
+    if (t === 'update' || t === 'versions') { loadUpdate(); if (t === 'versions') loadVersions(); }
     if (t.indexOf('mesh') === 0 || t === 'mesh-topo' || t === 'mesh-routes') { loadMesh(); if (t === 'mesh-routes') loadRoutes(); }
     if (t === 'shop-plans' || t === 'shop-billing') loadSubs();
     if (t === 'settings') loadSettings();

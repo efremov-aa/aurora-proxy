@@ -305,6 +305,7 @@ def build_state(local=True):
             "dead": pool.dead_reason(uri),
             "is_active": k.get("tag") == vless_now,
         })
+    st["policy_text"] = config.POLICY_TEXT
     st["policy_rev"] = config.POLICY_REV
     st["policy_required"] = config.policy_required()
     st["policy_accepted_rev"] = int(config.get("policy_rev_accepted", 0) or 0)
@@ -429,6 +430,12 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/update/status":
             self._send(*_json(updater.status()))
+            return
+        if path == "/api/versions":
+            # история версий для вкладки «Версии»
+            self._send(*_json({"ok": True, "versions": [
+                {"v": v, "name": nm, "date": d}
+                for v, nm, d in config.VERSION_HISTORY]}))
             return
         if path == "/api/subs/list":
             self._send(*_json(_subs_list()))
