@@ -1446,6 +1446,10 @@
       $('set-up').textContent = fmtTs(s.uptime);
       var nm = (s.server_name && s.server_name !== '-') ? s.server_name : '';
       $('set-name').value = nm;
+      var stMesh = $('set-st-mesh');
+      if (stMesh) { stMesh.textContent = (s.show_mesh !== false) ? _t('sec.on') : _t('sec.off'); stMesh.className = 'chip ' + ((s.show_mesh !== false) ? 'st-ok' : 'st-dim'); }
+      var stSubs = $('set-st-subs');
+      if (stSubs) { stSubs.textContent = (s.show_subs !== false) ? _t('sec.on') : _t('sec.off'); stSubs.className = 'chip ' + ((s.show_subs !== false) ? 'st-ok' : 'st-dim'); }
     });
   }
 

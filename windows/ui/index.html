@@ -610,6 +610,11 @@
             <input type="text" id="set-name" data-i18n-placeholder="set.name-ph" placeholder="Название сервера" value="">
             <button class="btn small" onclick="settingsSave()" data-i18n="btn.save">Сохранить</button>
           </div>
+          <div style="font-size:11px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:var(--muted-2);margin:16px 0 8px" data-i18n="set.vis">Видимость вкладок</div>
+          <div class="widget-body" style="display:flex;flex-direction:column;gap:8px;font-size:13px">
+            <div><span class="ic">🕸️</span> <span data-i18n="set.show-mesh">Включить меш-сеть</span>: <b class="chip" id="set-st-mesh">–</b></div>
+            <div><span class="ic">🛒</span> <span data-i18n="set.show-subs">Включить магазин (подписки и тарифы)</span>: <b class="chip" id="set-st-subs">–</b></div>
+          </div>
           <div style="font-size:11px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:var(--muted-2);margin:16px 0 8px" data-i18n="set.mesh">Меш</div>
           <div class="cmd-row">
             <input type="text" id="meshid" data-i18n-placeholder="set.meshid-ph" placeholder="ID меша" value="" readonly>

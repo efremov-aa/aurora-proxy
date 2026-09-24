@@ -273,8 +273,8 @@ def build_state(local=True):
     st["vless_ext"] = _vless_ext()
     st["mesh_nodes"] = mesh.node_count()
     st["server_name"] = config.get("server_name", "Home")
-    st["show_mesh"] = config.get("show_mesh", True)
-    st["show_subs"] = config.get("show_subs", True)
+    st["show_mesh"] = config.get("show_mesh", False)
+    st["show_subs"] = config.get("show_subs", False)
     st["mesh_master"] = False
     if not local and (_UI_TOKEN or config.get("master_only", False)):
         # секреты подключения скрываем при настроенном ui_token и/или замке master_only
@@ -403,6 +403,15 @@ class Handler(BaseHTTPRequestHandler):
             self._send(*_json({"error": "outside lan"}, 403))
             return
         trusted = _is_local(self) or bool(_UI_TOKEN and _auth_ok(self) and self.headers.get("X-Auth"))
+        # гейт видимости: меш-разделы и подписки закрыты, пока головной сервер
+        # не поставит show_mesh/show_subs (правятся только через mesh._policy_loop)
+        if path in ("/api/mesh", "/api/nodes", "/api/routes") and not config.get("show_mesh", False):
+            self._send(*_json({"ok": False, "error": "mesh: закрыто до команды мастера"}, 403))
+            return
+        if path in ("/api/subs/list", "/api/subs/plans", "/api/plans", "/api/stats") \
+                and not config.get("show_subs", False):
+            self._send(*_json({"ok": False, "error": "subs: закрыто до команды мастера"}, 403))
+            return
         if path == "/api/state":
             self._send(*_json(build_state(local=trusted)))
             return
@@ -514,6 +523,16 @@ class Handler(BaseHTTPRequestHandler):
         # блокирока управления, пока политика не принята (кроме самого приёма)
         if config.policy_required() and path != "/api/policy/accept":
             self._send(*_json({"error": "policy required"}, 403))
+            return
+
+        # гейт видимости: POST-изменения меша/подписок закрыты, пока мастер
+        # не разрешил (show_mesh/show_subs), /api/mesh/policy — public выше
+        if path.startswith("/api/mesh/") and not config.get("show_mesh", False):
+            self._send(*_json({"ok": False, "error": "mesh: закрыто до команды мастера"}, 403))
+            return
+        if (path.startswith("/api/subs/") or path in ("/api/plans/save",)) \
+                and not config.get("show_subs", False):
+            self._send(*_json({"ok": False, "error": "subs: закрыто до команды мастера"}, 403))
             return
 
         handler = {
@@ -988,11 +1007,10 @@ class Handler(BaseHTTPRequestHandler):
         self._send(*_json({"ok": True, "plans": config.SUBS_PLANS}))
 
     def _settings_save(self, data):
-        for key in ("server_name", "auto_refresh", "mesh_id",
-                    "show_mesh", "show_subs"):
+        for key in ("server_name", "auto_refresh", "mesh_id"):
             if key in data:
                 val = data[key]
-                if key in ("auto_refresh", "show_mesh", "show_subs"):
+                if key == "auto_refresh":
                     val = _as_bool(val)
                 else:
                     val = str(val or "").strip()
@@ -1135,8 +1153,8 @@ def _settings():
             "server_name": config.get("server_name", "Home"),
             "auto_refresh": config.get("auto_refresh", True),
             "mesh_id": config.get("mesh_id", ""),
-            "show_mesh": config.get("show_mesh", True),
-            "show_subs": config.get("show_subs", True),
+            "show_mesh": config.get("show_mesh", False),
+            "show_subs": config.get("show_subs", False),
             "mesh_master": False,
         },
     }

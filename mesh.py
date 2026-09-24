@@ -383,8 +383,8 @@ def policy():
     return {
         "ok": True,
         "master": False,
-        "show_mesh": config.get("show_mesh", True),
-        "show_subs": config.get("show_subs", True),
+        "show_mesh": config.get("show_mesh", False),
+        "show_subs": config.get("show_subs", False),
     }
 
 
