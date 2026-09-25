@@ -496,7 +496,7 @@ _CSP = ("default-src 'self'; base-uri 'none'; object-src 'none'; "
 
 _TLS_ENABLED = False
 
-_TRANSPORT_EXEMPT = ("/sub", "/api/mesh/policy", "/api/mesh/join", "/api/policy",
+_TRANSPORT_EXEMPT = ("/api/ext/config", "/sub", "/api/mesh/policy", "/api/mesh/join", "/api/policy",
                      "/api/policy/accept", "/api/rusegment/regions")
 
 
@@ -605,6 +605,59 @@ def _sub_publish(self):
         'inline; filename="aurora-sub-%s.txt"' % _opaque_uid(s.get("uid")))
     self.end_headers()
     self.wfile.write(data)
+
+
+
+def _ext_config(req):
+    """GET /api/ext/config?token=... — конфиг браузерного расширения (MV3/DNR).
+
+    Публичный маршрут по device-ссылке (как /sub, без origin-проверки): отдаёт
+    адрес прокси, режим, RU-байпас, признак блокировки, план/срок/трафик,
+    ссылку на бота и версию правил. При недоступной подписке — мастер-код
+    с buy_url, чтобы popup показал «купить»."""
+    qs = urllib.parse.parse_qs((getattr(req, "path", "") or "").split("?", 1)[-1])
+    token = (qs.get("token") or [""])[0].strip()
+    if not token or len(token) > 256 or not token.isascii():
+        req._send(*_json({"error": "invalid subscription request",
+                          "buy_url": config.BUY_URL}, 400))
+        return
+    s, _status = subs.by_token_status(token)
+    if not s:
+        req._send(*_json({"error": "subscription not found",
+                          "buy_url": config.BUY_URL}, 404))
+        return
+    state = subs.access_state(s)
+    if not state.get("ok"):
+        status = int(state.get("status") or 403)
+        req._send(*_json({
+            "error": "subscription access denied",
+            "reason": str(state.get("reason") or "invalid"),
+            "status": status,
+            "buy": True,
+            "message": "Подписка недоступна (%s) — продлить в Telegram-боте."
+                       % str(state.get("reason") or "invalid"),
+            "buy_url": config.BUY_URL,
+        }, status))
+        return
+    now = int(time.time())
+    req._send(*_json({
+        "ok": True,
+        "proxy": {
+            "host": config.ext_proxy_host(),
+            "port": int(config.XRAY_PORT),
+            "type": "http",
+        },
+        "mode": "vpn" if config.get("vpn_mode", True) else "direct",
+        "ru_bypass": bool(config.RU_BYPASS),
+        "blocked": (not bool(s.get("enabled", True))
+                    or int(s.get("blocked_until", 0) or 0) > now),
+        "plan": str(s.get("plan", "")),
+        "expires": int(s.get("expires", 0) or 0),
+        "used": int(s.get("used_bytes", 0) or 0),
+        "limit": int(s.get("limit_bytes", 0) or 0),
+        "buy_url": config.BUY_URL,
+        "rules_version": config.RULES_VERSION,
+    }, 200))
 
 
 def _setup_reject(req, reason, status=400):
@@ -809,6 +862,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/sub":
             self._sub_publish()
+            return
+        if path == "/api/ext/config" or path.startswith("/api/ext/config?"):
+            _ext_config(self)
             return
         # --- публичная выдача подписки: без авторизации и без LAN-ограничений ---
         # --- публичная политика меша: любой узел опрашивает мастера без авторизации ---

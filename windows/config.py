@@ -154,6 +154,19 @@ XRAY_API_PORT = int(os.environ.get("AURORA_XRAY_API_PORT", "8897"))  # доко�
 TGWS_PORT = int(os.environ.get("AURORA_TGWS_PORT", "443"))        # Telegram WS-прокси (443; 1443 блокировался РКН снаружи)
 BUY_BOT = (os.environ.get("AURORA_BUY_BOT", "@aurorahomevpn_bot").strip() or "@aurorahomevpn_bot")  # бот для оплаты тарифов
 BUY_URL = "https://t.me/" + BUY_BOT.lstrip("@").strip("/")
+# Браузерное расширение (MV3/DNR): хост прокси, режим RU-байпаса, версия правил.
+RU_BYPASS = os.environ.get("AURORA_RU_BYPASS", "1").strip().lower() not in (
+    "0", "false", "no", "off", "нет", "выкл")
+RULES_VERSION = (os.environ.get("AURORA_RULES_VERSION", "1").strip() or "1")[:32]
+EXT_HOST = os.environ.get("AURORA_EXT_HOST", "").strip()
+
+
+def ext_proxy_host():
+    """Адрес прокси для расширения: AURORA_EXT_HOST -> VM_HOST -> 127.0.0.1."""
+    for cand in (EXT_HOST, VM_HOST, ""):
+        if cand and cand not in ("0.0.0.0", "::", "*"):
+            return cand
+    return "127.0.0.1"
 
 # --- сеть (значения из env, дефолты безопасны) ---
 # На Windows локальный адрес авто-определяется (для внешних ссылок/QR).
