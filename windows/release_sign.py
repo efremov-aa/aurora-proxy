@@ -160,9 +160,16 @@ def generate_keypair():
 
 
 def parse_pubkey(value):
+    if isinstance(value, (bytes, bytearray)):
+        raw = bytes(value)
+        if len(raw) != PUBKEY_BYTES:
+            raise SignatureError("публичный ключ должен быть %d байт" % PUBKEY_BYTES)
+        return raw
     text = str(value or "").strip()
     if not text:
         return b""
+    if text.lower().startswith("ed25519:"):
+        text = text.split(":", 1)[1].strip()
     if re.fullmatch(r"[0-9a-fA-F]{64}", text):
         return bytes.fromhex(text)
     try:
@@ -179,8 +186,10 @@ def encode_pubkey(pub):
 
 
 def load_pubkey(configured=None):
-    raw = os.environ.get(PUBKEY_ENV) or str(configured or "")
-    if not raw.strip():
+    raw = os.environ.get(PUBKEY_ENV) or configured
+    if isinstance(raw, (bytes, bytearray)):
+        return parse_pubkey(raw)
+    if not str(raw or "").strip():
         return b""
     return parse_pubkey(raw)
 
@@ -220,7 +229,18 @@ def verify_release(data, signature, pubkey=None, repo="", version="", asset=""):
         except Exception:
             raise SignatureError("подпись релиза повреждена")
     else:
-        sig = bytes(signature)
+        raw = bytes(signature).strip()
+        sig = raw
+        if raw and all(32 < c < 127 for c in raw):
+            text = raw.decode("ascii", "ignore")
+            if text.lower().startswith("ed25519:"):
+                text = text.split(":", 1)[1].strip()
+            try:
+                decoded = base64.b64decode(text + "=" * (-len(text) % 4), validate=True)
+            except Exception:
+                decoded = b""
+            if len(decoded) == SIG_BYTES:
+                sig = decoded
     if len(sig) != SIG_BYTES:
         raise SignatureError("подпись релиза неверной длины")
     digest = hashlib.sha256(bytes(data)).hexdigest()

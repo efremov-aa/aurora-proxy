@@ -20,12 +20,13 @@ import uuid
 # (xray run/keytest/statsquery/netstat/netsh/taskkill/tg-ws-proxy и т.п.).
 HIDE_FLAG = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
 
-VERSION = "1.9.1"
-VERSION_NAME = "Кот-крепость"
+VERSION = "1.9.2"
+VERSION_NAME = "Кот-починщик"
 APP_NAME = "Aurora"
 
 # История версий для вкладки «Версии» (v, имя, дата).
 VERSION_HISTORY = (
+    ("1.9.2", "Кот-починщик", "25.09.2026"),
     ("1.9.1", "Кот-крепость", "25.09.2026"),
     ("1.9.0", "Кот-правозащитник", "24.09.2026"),
     ("1.8.0", "Кот-именитый", "24.09.2026"),

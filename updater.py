@@ -2,6 +2,7 @@
 # sha256-проверка, бэкап текущих файлов, замена модулей, перезапуск.
 # Источник сборки фиксирован в config.UPDATE_REPO, отключить нельзя.
 
+import errno
 import hashlib
 import io
 import json
@@ -218,6 +219,27 @@ def _validate_staged(staged, expected_version):
         raise RuntimeError("версия config.py не совпадает с релизом")
 
 
+def _install_file(src, dst):
+    try:
+        os.replace(src, dst)
+    except OSError as e:
+        if getattr(e, "errno", None) != errno.EXDEV:
+            raise
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(dst), suffix=".aurora-new")
+        os.close(fd)
+        try:
+            shutil.copy2(src, tmp)
+            os.replace(tmp, dst)
+        except Exception:
+            if os.path.exists(tmp):
+                os.unlink(tmp)
+            raise
+        try:
+            os.unlink(src)
+        except OSError:
+            pass
+
+
 def _replace_staged(staged, rollback_dir):
     history = []
     try:
@@ -230,7 +252,7 @@ def _replace_staged(staged, rollback_dir):
             if had_old:
                 shutil.copy2(dst, backup)
             history.append((dst, backup, had_old))
-            os.replace(src, dst)
+            _install_file(src, dst)
     except Exception:
         for dst, backup, had_old in reversed(history):
             try:

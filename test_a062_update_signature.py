@@ -10,6 +10,7 @@ TREES = (ROOT / "windows", ROOT)
 WORKER = r'''
 import base64
 import hashlib
+import os
 import sys
 sys.path.insert(0, sys.argv[1])
 import release_sign as rs
@@ -120,7 +121,26 @@ def release_flow():
     check("keypair", len(pair[0]) == 32 and len(pair[1]) == 32)
     check("parse hex", rs.parse_pubkey(pub.hex()) == pub)
     check("parse b64", rs.parse_pubkey(base64.b64encode(pub).decode()) == pub)
-    check("parse prefixed raises", raises(rs.parse_pubkey, "ed25519:" + pub.hex()))
+    check("parse bytes", rs.parse_pubkey(pub) == pub)
+    check("parse bytearray", rs.parse_pubkey(bytearray(pub)) == pub)
+    check("parse prefixed ok", rs.parse_pubkey("ed25519:" + pub.hex()) == pub)
+    check("parse bytes short raises", raises(rs.parse_pubkey, b"\x00" * 31))
+    check("parse bytes long raises", raises(rs.parse_pubkey, b"\x00" * 33))
+    os.environ.pop("AURORA_UPDATE_PUBKEY", None)
+    check("load bytes", rs.load_pubkey(pub) == pub)
+    check("load hex", rs.load_pubkey(key) == pub)
+    check("load empty", rs.load_pubkey("") == b"")
+    check("load none", rs.load_pubkey() == b"")
+    check("load bad bytes raises", raises(rs.load_pubkey, b"\x01" * 33))
+    check("release bytes key", rs.verify_release(data, sig, pubkey=pub, repo=repo, version=version, asset=asset)["key"] == rs.fingerprint(pub))
+    check("release bytes key raw sig", rs.verify_release(data, base64.b64decode(sig), pubkey=bytearray(pub), repo=repo, version=version, asset=asset)["digest"] == good["digest"])
+    check("release bytes wrong key", raises(rs.verify_release, data, sig, pubkey=other_pub, repo=repo, version=version, asset=asset))
+    check("release sig file bytes", rs.verify_release(data, sig.encode("ascii"), pubkey=key, repo=repo, version=version, asset=asset)["digest"] == good["digest"])
+    check("release sig file crlf", rs.verify_release(data, sig.encode("ascii") + b"\r\n", pubkey=key, repo=repo, version=version, asset=asset)["digest"] == good["digest"])
+    check("release sig file prefixed", rs.verify_release(data, ("ed25519:" + sig).encode("ascii"), pubkey=key, repo=repo, version=version, asset=asset)["digest"] == good["digest"])
+    check("release sig file garbage", raises(rs.verify_release, data, b"!!!!" * 24, pubkey=key, repo=repo, version=version, asset=asset))
+    check("release sig file short", raises(rs.verify_release, data, b"AQID", pubkey=key, repo=repo, version=version, asset=asset))
+    check("release raw sig bytes", rs.verify_release(data, base64.b64decode(sig), pubkey=key, repo=repo, version=version, asset=asset)["digest"] == good["digest"])
     check("parse empty", rs.parse_pubkey("") == b"")
     check("parse short raises", raises(rs.parse_pubkey, "aabb"))
     check("fingerprint", len(rs.fingerprint(pub)) == 16)
@@ -195,6 +215,16 @@ def updater_contract(tree):
         assert ".sig" in ins, tree
         assert "_verify_signature" in ins, tree
         assert ins.index("_verify_signature") < ins.index("_verify_sha256"), tree
+    assert "import errno" in text, tree
+    assert text.count("def _install_file(src, dst):") == 1, tree
+    inst = region(text, "def _install_file(src, dst):", "def _replace_staged(")
+    assert "errno.EXDEV" in inst, tree
+    assert "shutil.copy2" in inst, tree
+    assert inst.count("os.replace(") == 2, tree
+    rep = region(text, "def _replace_staged(", "def hmac_compare(")
+    assert "_install_file(src, dst)" in rep, tree
+    assert "os.replace(src, dst)" not in rep, tree
+    assert "shutil.copy2(backup, dst)" in rep, tree
     return True
 
 
@@ -216,8 +246,9 @@ def parity():
         sign = read(tree / "release_sign.py")
         regions.add(region(sign, "def parse_pubkey(", "def encode_pubkey("))
         regions.add(region(sign, "def verify_release(", "def verify_pair("))
+        regions.add(region(updater, "def _install_file(src, dst):", "def _replace_staged("))
     assert len(keys) == 1, "UPDATE_PUBKEY differs between trees: %s" % keys
-    assert len(regions) == 4, "signature helpers differ between trees"
+    assert len(regions) == 5, "signature helpers differ between trees"
     return keys.pop()
 
 

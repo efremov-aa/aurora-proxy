@@ -6,7 +6,7 @@
 ![кот](https://img.shields.io/badge/mascot-%F0%9F%90%B1-pink)
 ![python](https://img.shields.io/badge/python-3.12-blue)
 ![xray](https://img.shields.io/badge/xray-v26.9.9-blue)
-![version](https://img.shields.io/badge/version-1.9.1%20%C2%AB%D0%9A%D0%BE%D1%82-%D0%BA%D1%80%D0%B5%D0%BF%D0%BE%D1%81%D1%82%D1%8C%C2%BB-pink)
+![version](https://img.shields.io/badge/version-1.9.2%20%C2%AB%D0%9A%D0%BE%D1%82-%D0%BF%D0%BE%D1%87%D0%B8%D0%BD%D1%89%D0%B8%D0%BA%C2%BB-pink)
 
 > Мяу! Готово 🐾 — панель в стиле Neko: тёплые кошачьи тона, тосты «Мяу! Готово 🐾».
 
@@ -23,15 +23,15 @@
 
 ## 📥 Загрузка
 
-Архивы и список изменений — в [Release v1.9.1](https://github.com/efremov-aa/aurora-proxy/releases):
+Архивы и список изменений — в [Release v1.9.2](https://github.com/efremov-aa/aurora-proxy/releases):
 
-- **`Aurora-v1.9.1-linux.zip`** — Linux-версия: исходники + `Dockerfile`/`docker-compose.yml`
+- **`Aurora-v1.9.2-linux.zip`** — Linux-версия: исходники + `Dockerfile`/`docker-compose.yml`
   (Docker, `XRAY_MANAGE=proc`) или развёртывание на сервере с systemd (`aurora.service` и юниты).
-- **`Aurora-v1.9.1-windows.zip`** — Windows-версия (папка `windows/`): авто-детект локального и
+- **`Aurora-v1.9.2-windows.zip`** — Windows-версия (папка `windows/`): авто-детект локального и
   публичного IP, телеметрия через `netstat`, служба **NSSM «Aurora»** (`nssm/install_service.bat`),
   бинарь xray ставится скриптом `download_xray.ps1`. Подробности — в `windows/README-windows.md`.
 
-Версия для обеих платформ: `VERSION=1.9.1`, `VERSION_NAME=Кот-крепость`.
+Версия для обеих платформ: `VERSION=1.9.2`, `VERSION_NAME=Кот-починщик`.
 
 ## ✨ Возможности
 
