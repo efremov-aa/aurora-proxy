@@ -708,6 +708,8 @@ def build_state(local=True):
         })
     st["policy_text"] = config.POLICY_TEXT
     st["policy_rev"] = config.POLICY_REV
+    st["buy_bot"] = config.BUY_BOT
+    st["buy_url"] = config.BUY_URL
     st["policy_required"] = config.policy_required()
     st["policy_accepted_rev"] = int(config.get("policy_rev_accepted", 0) or 0)
     st["segment_title"] = config.segment_title()

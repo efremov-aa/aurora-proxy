@@ -17,7 +17,7 @@
       'nav.dash': 'Обзор', 'nav.keys': 'Ключи', 'nav.devices': 'Устройства',
       'nav.connect': 'Внешний доступ', 'nav.rusegment': 'Ру-сегмент', 'nav.tgws': 'TG-WS',
       'nav.mesh': 'Меш-сеть', 'nav.mesh-join': 'Подключение', 'nav.mesh-topo': 'Топология', 'nav.mesh-routes': 'Маршруты',
-      'nav.shop': 'Магазин', 'nav.shop-plans': 'Тарифы', 'nav.shop-features': 'Функции', 'nav.shop-billing': 'Платежи',
+      'nav.shop': 'Магазин', 'nav.shop-plans': 'Тарифы VPN', 'nav.shop-features': 'Дополнительные возможности Aurora', 'nav.shop-billing': 'Платежи',
       'nav.update': 'Обновление', 'nav.versions': 'Версии', 'nav.settings': 'Сервер', 'nav.security': 'Безопасность', 'nav.logs': 'Логи',
       'nav.group.home': 'Домашний прокси', 'nav.group.upd': 'Обновления', 'nav.group.set': 'Настройки',
       'g.you': 'Вы', 'g.yours': 'ваш', 'status.on': 'онлайн', 'status.off': 'оффлайн', 'status.warn': 'нестабильно',
@@ -84,9 +84,9 @@
       'mj.master': 'Cервер — головной, управляет видимостью у клиентов', 'mj.show-mesh': 'Показывать клиентам вкладку «Меш-сеть»', 'mj.show-subs': 'Показывать клиентам вкладку «Магазин»',
       'mt.hint': 'Ваш прокси (в центре) и узлы других участников меша. Соединения активны, если трафик ходит через них.',
       'mrt.hint': 'Правила, какой трафик через какой узел выходит в интернет. Порядок — сверху вниз.', 'th.what': 'Что', 'th.via': 'Куда', 'th.proto': 'Протокол',
-      'sp.head': 'Тарифные планы', 'sp.hint': 'Базовый набор функций прокси. Апгрейд — в один клик, применяется мгновенно, без потери соединений.', 'sp.loading': 'загрузка тарифов…', 'sp.comp': 'Состав тарифов', 'th.func': 'Функция', 'th.val': 'Значение',
-      'sf.instant': '+ активируются мгновенно',
-      'sb.head': 'Оплата и продление', 'sb.hint': 'Активный план, срок действия и история платежей. Продление — в один клик.', 'sb.plan': 'Текущий план', 'sb.until': 'Активен до', 'sb.buy': 'Продлить / сменить план', 'sb.hist': 'История платежей', 'sb.active': 'Активных', 'sb.income': 'Доход за месяц', 'sb.traffic-month': 'Трафик за месяц',
+      'sp.head': 'Тарифные планы VPN', 'sp.hint': 'Тарифные планы VPN — для тех, у кого серый IP: нужен обход блокировок. Оплата и продление — через Telegram-бота, тариф подключается сразу.', 'sp.loading': 'загрузка тарифов…', 'sp.comp': 'Состав тарифов', 'th.func': 'Функция', 'th.val': 'Значение',
+      'sf.instant': '+ оплата в Telegram-боте, активация мгновенно',
+      'sb.head': 'Оплата и продление', 'sb.hint': 'Активный план, срок действия и история платежей. Продление — в один клик.', 'sb.plan': 'Текущий план', 'sb.until': 'Активен до', 'sb.buy': 'Оплатить в Telegram', 'btn.buy-tg': '💬 Купить в Telegram', 'sb.hist': 'История платежей', 'sb.active': 'Активных', 'sb.income': 'Доход за месяц', 'sb.traffic-month': 'Трафик за месяц',
       'th.date': 'Дата', 'th.desc': 'Описание', 'th.sum': 'Сумма',
       'upd.apply': 'Обновить сейчас', 'upd.auto': 'Автообновление', 'upd.auto-hint': 'Обновление производится из GitHub-релизов. Бинарник скачивается, проверяется, заменяется атомарно — прокси перезапускается за пару секунд.',
       'upd.src': 'Источник обновлений', 'th.param': 'Параметр', 'upd.repo': 'Репозиторий', 'upd.sig': 'Проверка подписи', 'upd.rollback': 'Откат при сбое',
@@ -106,7 +106,7 @@
       'nav.dash': 'Dashboard', 'nav.keys': 'Keys', 'nav.devices': 'Devices',
       'nav.connect': 'External access', 'nav.rusegment': 'RU segment', 'nav.tgws': 'TG-WS',
       'nav.mesh': 'Mesh', 'nav.mesh-join': 'Connect', 'nav.mesh-topo': 'Topology', 'nav.mesh-routes': 'Routes',
-      'nav.shop': 'Store', 'nav.shop-plans': 'Plans', 'nav.shop-features': 'Features', 'nav.shop-billing': 'Billing',
+      'nav.shop': 'Store', 'nav.shop-plans': 'VPN plans', 'nav.shop-features': 'Additional Aurora features', 'nav.shop-billing': 'Billing',
       'nav.update': 'Update', 'nav.versions': 'Versions', 'nav.settings': 'Server', 'nav.security': 'Security', 'nav.logs': 'Logs',
       'nav.group.home': 'Home proxy', 'nav.group.upd': 'Updates', 'nav.group.set': 'Settings',
       'g.you': 'You', 'g.yours': 'yours', 'status.on': 'online', 'status.off': 'offline', 'status.warn': 'unstable',
@@ -173,9 +173,9 @@
       'mj.master': 'Server is hub, controls visibility for clients', 'mj.show-mesh': 'Show “Mesh network” tab to clients', 'mj.show-subs': 'Show “Store” tab to clients',
       'mt.hint': 'Your proxy (in the center) and nodes of other mesh members. Connections are active if traffic goes through them.',
       'mrt.hint': 'Rules for which traffic goes to the internet via which node. Order is top to bottom.', 'th.what': 'What', 'th.via': 'Where', 'th.proto': 'Protocol',
-      'sp.head': 'Plans', 'sp.hint': 'Basic set of proxy features. Upgrade in one click, applied instantly, without losing connections.', 'sp.loading': 'loading plans…', 'sp.comp': 'Plan contents', 'th.func': 'Feature', 'th.val': 'Value',
-      'sf.instant': '+ activate instantly',
-      'sb.head': 'Billing and renewal', 'sb.hint': 'Active plan, validity and payment history. Renewal — in one click.', 'sb.plan': 'Current plan', 'sb.until': 'Active until', 'sb.buy': 'Renew / change plan', 'sb.hist': 'Payment history',
+      'sp.head': 'VPN plans', 'sp.hint': 'VPN plans for those with a grey IP who need to bypass blocking. Payment and renewal go through the Telegram bot, the plan is applied instantly.', 'sp.loading': 'loading plans…', 'sp.comp': 'Plan contents', 'th.func': 'Feature', 'th.val': 'Value',
+      'sf.instant': '+ paid via the Telegram bot, instant activation',
+      'sb.head': 'Billing and renewal', 'sb.hint': 'Active plan, validity and payment history. Renewal — in one click.', 'sb.plan': 'Current plan', 'sb.until': 'Active until', 'sb.buy': 'Pay via Telegram', 'btn.buy-tg': '💬 Buy via Telegram', 'sb.hist': 'Payment history',
       'th.date': 'Date', 'th.desc': 'Description', 'th.sum': 'Amount',
       'upd.apply': 'Update now', 'upd.auto': 'Auto-update', 'upd.auto-hint': 'Update is performed from GitHub releases. Binary is downloaded, verified, replaced atomically — proxy restarts in a couple of seconds.',
       'upd.src': 'Update source', 'th.param': 'Parameter', 'upd.repo': 'Repository', 'upd.sig': 'Signature check', 'upd.rollback': 'Rollback on failure',
@@ -195,7 +195,7 @@
       'nav.dash': 'Panel', 'nav.keys': 'Claves', 'nav.devices': 'Dispositivos',
       'nav.connect': 'Acceso externo', 'nav.rusegment': 'Segmento RU', 'nav.tgws': 'TG-WS',
       'nav.mesh': 'Red mesh', 'nav.mesh-join': 'Conexión', 'nav.mesh-topo': 'Topología', 'nav.mesh-routes': 'Rutas',
-      'nav.shop': 'Tienda', 'nav.shop-plans': 'Planes', 'nav.shop-features': 'Funciones', 'nav.shop-billing': 'Pagos',
+      'nav.shop': 'Tienda', 'nav.shop-plans': 'Planes VPN', 'nav.shop-features': 'Funciones adicionales de Aurora', 'nav.shop-billing': 'Pagos',
       'nav.update': 'Actualización', 'nav.versions': 'Versiones', 'nav.settings': 'Servidor', 'nav.security': 'Seguridad', 'nav.logs': 'Registros',
       'nav.group.home': 'Proxy doméstico', 'nav.group.upd': 'Actualizaciones', 'nav.group.set': 'Ajustes',
       'g.you': 'Usted', 'g.yours': 'suyo', 'status.on': 'en línea', 'status.off': 'desconectado', 'status.warn': 'inestable',
@@ -262,9 +262,9 @@
       'mj.master': 'El servidor es hub, controla la visibilidad de los clientes', 'mj.show-mesh': 'Mostrar la pestaña “Red mesh” a los clientes', 'mj.show-subs': 'Mostrar la pestaña “Tienda” a los clientes',
       'mt.hint': 'Tu proxy (en el centro) y los nodos de otros miembros del mesh. Las conexiones están activas si el tráfico pasa por ellos.',
       'mrt.hint': 'Reglas de qué tráfico sale a internet por cada nodo. Orden de arriba a abajo.', 'th.what': 'Qué', 'th.via': 'Dónde', 'th.proto': 'Protocolo',
-      'sp.head': 'Planes', 'sp.hint': 'Conjunto básico de funciones del proxy. Mejora con un clic, se aplica al instante, sin cortar conexiones.', 'sp.loading': 'cargando planes…', 'sp.comp': 'Contenido del plan', 'th.func': 'Función', 'th.val': 'Valor',
-      'sf.instant': '+ se activan al instante',
-      'sb.head': 'Pago y renovación', 'sb.hint': 'Plan activo, vigencia e historial de pagos. Renovación con un clic.', 'sb.plan': 'Plan actual', 'sb.until': 'Válido hasta', 'sb.buy': 'Renovar / cambiar plan', 'sb.hist': 'Historial de pagos',
+      'sp.head': 'Planes VPN', 'sp.hint': 'Planes VPN para quien tiene IP gris y necesita saltar el bloqueo. El pago y la renovación se hacen en el bot de Telegram, el plan se activa al instante.', 'sp.loading': 'cargando planes…', 'sp.comp': 'Contenido del plan', 'th.func': 'Función', 'th.val': 'Valor',
+      'sf.instant': '+ pago en el bot de Telegram, activación inmediata',
+      'sb.head': 'Pago y renovación', 'sb.hint': 'Plan activo, vigencia e historial de pagos. Renovación con un clic.', 'sb.plan': 'Plan actual', 'sb.until': 'Válido hasta', 'sb.buy': 'Pagar por Telegram', 'btn.buy-tg': '💬 Comprar en Telegram', 'sb.hist': 'Historial de pagos',
       'th.date': 'Fecha', 'th.desc': 'Descripción', 'th.sum': 'Importe',
       'upd.apply': 'Actualizar ahora', 'upd.auto': 'Auto-actualización', 'upd.auto-hint': 'La actualización se realiza desde los lanzamientos de GitHub. El binario se descarga, verifica y reemplaza atómicamente — el proxy se reinicia en un par de segundos.',
       'upd.src': 'Fuente de actualización', 'th.param': 'Parámetro', 'upd.repo': 'Repositorio', 'upd.sig': 'Verificación de firma', 'upd.rollback': 'Reversión en fallo',
@@ -284,7 +284,7 @@
       'nav.dash': 'Übersicht', 'nav.keys': 'Schlüssel', 'nav.devices': 'Geräte',
       'nav.connect': 'Externer Zugriff', 'nav.rusegment': 'RU-Segment', 'nav.tgws': 'TG-WS',
       'nav.mesh': 'Mesh', 'nav.mesh-join': 'Verbinden', 'nav.mesh-topo': 'Topologie', 'nav.mesh-routes': 'Routen',
-      'nav.shop': 'Shop', 'nav.shop-plans': 'Tarife', 'nav.shop-features': 'Funktionen', 'nav.shop-billing': 'Zahlungen',
+      'nav.shop': 'Shop', 'nav.shop-plans': 'VPN-Tarife', 'nav.shop-features': 'Zusätzliche Aurora-Funktionen', 'nav.shop-billing': 'Zahlungen',
       'nav.update': 'Update', 'nav.versions': 'Versionen', 'nav.settings': 'Server', 'nav.security': 'Sicherheit', 'nav.logs': 'Logs',
       'nav.group.home': 'Heim-Proxy', 'nav.group.upd': 'Updates', 'nav.group.set': 'Einstellungen',
       'g.you': 'Sie', 'g.yours': 'Ihres', 'status.on': 'online', 'status.off': 'offline', 'status.warn': 'instabil',
@@ -351,9 +351,9 @@
       'mj.master': 'Server ist Hub, steuert Sichtbarkeit der Clients', 'mj.show-mesh': 'Den Tabs „Mesh-Netzwerk“ für Clients zeigen', 'mj.show-subs': 'Den Tab „Shop“ für Clients zeigen',
       'mt.hint': 'Dein Proxy (in der Mitte) und die Knoten anderer Teilnehmer. Verbindungen sind aktiv, wenn der Datenverkehr darüber läuft.',
       'mrt.hint': 'Regeln, welcher Datenverkehr über welchen Knoten ins Internet geht. Reihenfolge von oben nach unten.', 'th.what': 'Was', 'th.via': 'Wohin', 'th.proto': 'Protokoll',
-      'sp.head': 'Tarife', 'sp.hint': 'Basissatz der Proxy-Funktionen. Upgrade mit einem Klick, wird sofort angewendet, ohne Verbindungsverlust.', 'sp.loading': 'Tarife laden…', 'sp.comp': 'Tarifinhalt', 'th.func': 'Funktion', 'th.val': 'Wert',
-      'sf.instant': '+ aktivieren sofort',
-      'sb.head': 'Zahlung und Verlängerung', 'sb.hint': 'Aktiver Tarif, Laufzeit und Zahlungshistorie. Verlängerung mit einem Klick.', 'sb.plan': 'Aktueller Tarif', 'sb.until': 'Gültig bis', 'sb.buy': 'Verlängern / Tarif wechseln', 'sb.hist': 'Zahlungshistorie',
+      'sp.head': 'VPN-Tarife', 'sp.hint': 'VPN-Tarife für alle mit grauer IP, die Sperren umgehen müssen. Zahlung und Verlängerung laufen über den Telegram-Bot, der Tarif startet sofort.', 'sp.loading': 'Tarife laden…', 'sp.comp': 'Tarifinhalt', 'th.func': 'Funktion', 'th.val': 'Wert',
+      'sf.instant': '+ Bezahlung per Telegram-Bot, sofortige Aktivierung',
+      'sb.head': 'Zahlung und Verlängerung', 'sb.hint': 'Aktiver Tarif, Laufzeit und Zahlungshistorie. Verlängerung mit einem Klick.', 'sb.plan': 'Aktueller Tarif', 'sb.until': 'Gültig bis', 'sb.buy': 'Per Telegram bezahlen', 'btn.buy-tg': '💬 Per Telegram kaufen', 'sb.hist': 'Zahlungshistorie',
       'th.date': 'Datum', 'th.desc': 'Beschreibung', 'th.sum': 'Betrag',
       'upd.apply': 'Jetzt aktualisieren', 'upd.auto': 'Auto-Update', 'upd.auto-hint': 'Das Update kommt aus den GitHub-Releases. Der Binär wird heruntergeladen, verifiziert, atomar ersetzt — der Proxy startet in wenigen Sekunden neu.',
       'upd.src': 'Update-Quelle', 'th.param': 'Parameter', 'upd.repo': 'Repository', 'upd.sig': 'Signaturprüfung', 'upd.rollback': 'Rollback bei Fehler',
@@ -373,7 +373,7 @@
       'nav.dash': 'Tableau de bord', 'nav.keys': 'Clés', 'nav.devices': 'Appareils',
       'nav.connect': 'Accès externe', 'nav.rusegment': 'Segment RU', 'nav.tgws': 'TG-WS',
       'nav.mesh': 'Réseau mesh', 'nav.mesh-join': 'Connexion', 'nav.mesh-topo': 'Topologie', 'nav.mesh-routes': 'Itinéraires',
-      'nav.shop': 'Boutique', 'nav.shop-plans': 'Forfaits', 'nav.shop-features': 'Fonctions', 'nav.shop-billing': 'Paiements',
+      'nav.shop': 'Boutique', 'nav.shop-plans': 'Forfaits VPN', 'nav.shop-features': 'Fonctions Aurora supplémentaires', 'nav.shop-billing': 'Paiements',
       'nav.update': 'Mise à jour', 'nav.versions': 'Versions', 'nav.settings': 'Serveur', 'nav.security': 'Sécurité', 'nav.logs': 'Journaux',
       'nav.group.home': 'Proxy domestique', 'nav.group.upd': 'Mises à jour', 'nav.group.set': 'Réglages',
       'g.you': 'Vous', 'g.yours': 'vôtre', 'status.on': 'en ligne', 'status.off': 'hors ligne', 'status.warn': 'instable',
@@ -440,9 +440,9 @@
       'mj.master': 'Le serveur est hub, contrôle la visibilité des clients', 'mj.show-mesh': 'Afficher l\'onglet « Réseau mesh » aux clients', 'mj.show-subs': 'Afficher l\'onglet « Boutique » aux clients',
       'mt.hint': 'Votre proxy (au centre) et les nœuds d\'autres membres du mesh. Les connexions sont actives si le trafic passe par eux.',
       'mrt.hint': 'Règles de quel trafic sort vers internet via quel nœud. Ordre de haut en bas.', 'th.what': 'Quoi', 'th.via': 'Où', 'th.proto': 'Protocole',
-      'sp.head': 'Forfaits', 'sp.hint': 'Ensemble de base des fonctions du proxy. Amélioration en un clic, appliquée instantanément, sans couper les connexions.', 'sp.loading': 'chargement des forfaits…', 'sp.comp': 'Contenu du forfait', 'th.func': 'Fonction', 'th.val': 'Valeur',
-      'sf.instant': '+ s\'activent instantanément',
-      'sb.head': 'Paiement et prolongation', 'sb.hint': 'Forfait actif, validité et historique des paiements. Prolongation en un clic.', 'sb.plan': 'Forfait actuel', 'sb.until': 'Valable jusqu\'au', 'sb.buy': 'Prolonger / changer de forfait', 'sb.hist': 'Historique des paiements',
+      'sp.head': 'Forfaits VPN', 'sp.hint': 'Forfaits VPN pour les IP grises qui doivent contourner le blocage. Paiement et renouvellement passent par le bot Telegram, le forfait est actif aussitôt.', 'sp.loading': 'chargement des forfaits…', 'sp.comp': 'Contenu du forfait', 'th.func': 'Fonction', 'th.val': 'Valeur',
+      'sf.instant': '+ paiement dans le bot Telegram, activation immédiate',
+      'sb.head': 'Paiement et prolongation', 'sb.hint': 'Forfait actif, validité et historique des paiements. Prolongation en un clic.', 'sb.plan': 'Forfait actuel', 'sb.until': 'Valable jusqu\'au', 'sb.buy': 'Payer via Telegram', 'btn.buy-tg': '💬 Acheter via Telegram', 'sb.hist': 'Historique des paiements',
       'th.date': 'Date', 'th.desc': 'Description', 'th.sum': 'Montant',
       'upd.apply': 'Mettre à jour maintenant', 'upd.auto': 'Mise à jour auto', 'upd.auto-hint': 'La mise à jour provient des releases GitHub. Le binaire est téléchargé, vérifié, remplacé atomiquement — le proxy redémarre en quelques secondes.',
       'upd.src': 'Source de mise à jour', 'th.param': 'Paramètre', 'upd.repo': 'Dépôt', 'upd.sig': 'Vérification de signature', 'upd.rollback': 'Restauration en cas d\'échec',
@@ -462,7 +462,7 @@
       'nav.dash': 'Genel Bakış', 'nav.keys': 'Anahtarlar', 'nav.devices': 'Cihazlar',
       'nav.connect': 'Dış erişim', 'nav.rusegment': 'RU segmenti', 'nav.tgws': 'TG-WS',
       'nav.mesh': 'Mesh', 'nav.mesh-join': 'Bağlan', 'nav.mesh-topo': 'Topoloji', 'nav.mesh-routes': 'Rotalar',
-      'nav.shop': 'Mağaza', 'nav.shop-plans': 'Planlar', 'nav.shop-features': 'Özellikler', 'nav.shop-billing': 'Ödemeler',
+      'nav.shop': 'Mağaza', 'nav.shop-plans': 'VPN planları', 'nav.shop-features': 'Aurora ek özellikleri', 'nav.shop-billing': 'Ödemeler',
       'nav.update': 'Güncelleme', 'nav.versions': 'Sürümler', 'nav.settings': 'Sunucu', 'nav.security': 'Güvenlik', 'nav.logs': 'Günlükler',
       'nav.group.home': 'Ev proxy', 'nav.group.upd': 'Güncellemeler', 'nav.group.set': 'Ayarlar',
       'g.you': 'Siz', 'g.yours': 'sizin', 'status.on': 'çevrimiçi', 'status.off': 'çevrimdışı', 'status.warn': 'dengesiz',
@@ -529,9 +529,9 @@
       'mj.master': 'Sunucu hub\'dır, istemci görünürlüğünü kontrol eder', 'mj.show-mesh': 'İstemcilere «Mesh ağı» sekmesini göster', 'mj.show-subs': 'İstemcilere «Mağaza» sekmesini göster',
       'mt.hint': 'Proxy\'nuz (merkezde) ve diğer mesh katılımcılarının düğümleri. Trafik onlardan geçiyorsa bağlantılar aktiftir.',
       'mrt.hint': 'Hangi trafiğin hangi düğümden internete çıktığı kuralları. Sıra yukarıdan aşağıya.', 'th.what': 'Ne', 'th.via': 'Nereye', 'th.proto': 'Protokol',
-      'sp.head': 'Tarifeler', 'sp.hint': 'Proxy işlevlerinin temel seti. Tek tıkla yükseltme, anında uygulanır, bağlantılar kesilmez.', 'sp.loading': 'tarifeler yükleniyor…', 'sp.comp': 'Tarife içeriği', 'th.func': 'İşlev', 'th.val': 'Değer',
-      'sf.instant': '+ anında etkinleşir',
-      'sb.head': 'Ödeme ve uzatma', 'sb.hint': 'Aktif tarife, süre ve ödeme geçmişi. Tek tıkla uzatma.', 'sb.plan': 'Mevcut tarife', 'sb.until': 'Geçerlilik', 'sb.buy': 'Uzat / tarife değiştir', 'sb.hist': 'Ödeme geçmişi',
+      'sp.head': 'VPN planları', 'sp.hint': 'Gri IP nedeniyle engellenmeleri aşması gerekenler için VPN planları. Ödeme ve yenileme Telegram botunda yapılır, plan anında açılır.', 'sp.loading': 'tarifeler yükleniyor…', 'sp.comp': 'Tarife içeriği', 'th.func': 'İşlev', 'th.val': 'Değer',
+      'sf.instant': '+ Telegram botunda ödeme, anında etkinleşir',
+      'sb.head': 'Ödeme ve uzatma', 'sb.hint': 'Aktif tarife, süre ve ödeme geçmişi. Tek tıkla uzatma.', 'sb.plan': 'Mevcut tarife', 'sb.until': 'Geçerlilik', 'sb.buy': 'Telegram ile öde', 'btn.buy-tg': '💬 Telegram\'dan satın al', 'sb.hist': 'Ödeme geçmişi',
       'th.date': 'Tarih', 'th.desc': 'Açıklama', 'th.sum': 'Tutar',
       'upd.apply': 'Şimdi güncelle', 'upd.auto': 'Otomatik güncelleme', 'upd.auto-hint': 'Güncelleme GitHub sürümlerinden yapılır. İkili indirilir, doğrulanır, atomik değiştirilir — proxy birkaç saniyede yeniden başlar.',
       'upd.src': 'Güncelleme kaynağı', 'th.param': 'Parametre', 'upd.repo': 'Depo', 'upd.sig': 'İmza kontrolü', 'upd.rollback': 'Hata durumunda geri dönüş',
@@ -551,7 +551,7 @@
       'nav.dash': 'Painel', 'nav.keys': 'Chaves', 'nav.devices': 'Dispositivos',
       'nav.connect': 'Acesso externo', 'nav.rusegment': 'Segmento RU', 'nav.tgws': 'TG-WS',
       'nav.mesh': 'Rede mesh', 'nav.mesh-join': 'Conectar', 'nav.mesh-topo': 'Topologia', 'nav.mesh-routes': 'Rotas',
-      'nav.shop': 'Loja', 'nav.shop-plans': 'Planos', 'nav.shop-features': 'Recursos', 'nav.shop-billing': 'Pagamentos',
+      'nav.shop': 'Loja', 'nav.shop-plans': 'Planos VPN', 'nav.shop-features': 'Recursos adicionais do Aurora', 'nav.shop-billing': 'Pagamentos',
       'nav.update': 'Atualização', 'nav.versions': 'Versões', 'nav.settings': 'Servidor', 'nav.security': 'Segurança', 'nav.logs': 'Logs',
       'nav.group.home': 'Proxy doméstico', 'nav.group.upd': 'Atualizações', 'nav.group.set': 'Configurações',
       'g.you': 'Você', 'g.yours': 'seu', 'status.on': 'online', 'status.off': 'offline', 'status.warn': 'instável',
@@ -618,9 +618,9 @@
       'mj.master': 'Servidor é hub, controla a visibilidade dos clientes', 'mj.show-mesh': 'Mostrar a aba “Rede mesh” aos clientes', 'mj.show-subs': 'Mostrar a aba “Loja” aos clientes',
       'mt.hint': 'Seu proxy (no centro) e os nós de outros membros do mesh. As conexões estão ativas se o tráfego passa por eles.',
       'mrt.hint': 'Regras de qual tráfego sai para a internet via qual nó. Ordem de cima para baixo.', 'th.what': 'O quê', 'th.via': 'Onde', 'th.proto': 'Protocolo',
-      'sp.head': 'Planos', 'sp.hint': 'Conjunto básico de funções do proxy. Upgrade em um clique, aplicado na hora, sem perder conexões.', 'sp.loading': 'carregando planos…', 'sp.comp': 'Conteúdo do plano', 'th.func': 'Função', 'th.val': 'Valor',
-      'sf.instant': '+ ativam na hora',
-      'sb.head': 'Pagamento e renovação', 'sb.hint': 'Plano ativo, validade e histórico de pagamentos. Renovação em um clique.', 'sb.plan': 'Plano atual', 'sb.until': 'Válido até', 'sb.buy': 'Renovar / mudar plano', 'sb.hist': 'Histórico de pagamentos',
+      'sp.head': 'Planos VPN', 'sp.hint': 'Planos VPN para quem tem IP cinza e precisa contornar bloqueios. Pagamento e renovação são feitos no bot do Telegram, o plano é ativado na hora.', 'sp.loading': 'carregando planos…', 'sp.comp': 'Conteúdo do plano', 'th.func': 'Função', 'th.val': 'Valor',
+      'sf.instant': '+ pagamento no bot do Telegram, ativação na hora',
+      'sb.head': 'Pagamento e renovação', 'sb.hint': 'Plano ativo, validade e histórico de pagamentos. Renovação em um clique.', 'sb.plan': 'Plano atual', 'sb.until': 'Válido até', 'sb.buy': 'Pagar via Telegram', 'btn.buy-tg': '💬 Comprar via Telegram', 'sb.hist': 'Histórico de pagamentos',
       'th.date': 'Data', 'th.desc': 'Descrição', 'th.sum': 'Valor',
       'upd.apply': 'Atualizar agora', 'upd.auto': 'Auto-atualização', 'upd.auto-hint': 'A atualização vem dos releases do GitHub. O binário é baixado, verificado, substituído atomicamente — o proxy reinicia em alguns segundos.',
       'upd.src': 'Origem da atualização', 'th.param': 'Parâmetro', 'upd.repo': 'Repositório', 'upd.sig': 'Verificação de assinatura', 'upd.rollback': 'Reversão em falha',
@@ -640,7 +640,7 @@
       'nav.dash': '概览', 'nav.keys': '密钥', 'nav.devices': '设备',
       'nav.connect': '外部访问', 'nav.rusegment': 'RU 段', 'nav.tgws': 'TG-WS',
       'nav.mesh': 'Mesh 网络', 'nav.mesh-join': '连接', 'nav.mesh-topo': '拓扑', 'nav.mesh-routes': '路由',
-      'nav.shop': '商店', 'nav.shop-plans': '套餐', 'nav.shop-features': '功能', 'nav.shop-billing': '支付',
+      'nav.shop': '商店', 'nav.shop-plans': 'VPN 套餐', 'nav.shop-features': 'Aurora 附加功能', 'nav.shop-billing': '支付',
       'nav.update': '更新', 'nav.versions': '版本', 'nav.settings': '服务器', 'nav.security': '安全', 'nav.logs': '日志',
       'nav.group.home': '家用代理', 'nav.group.upd': '更新', 'nav.group.set': '设置',
       'g.you': '您', 'g.yours': '您的', 'status.on': '在线', 'status.off': '离线', 'status.warn': '不稳定',
@@ -707,9 +707,9 @@
       'mj.master': '服务器是中心，控制客户端的可见性', 'mj.show-mesh': '向客户端显示“Mesh 网络”标签页', 'mj.show-subs': '向客户端显示“商店”标签页',
       'mt.hint': '你的代理（中心）和 Mesh 其他成员的节点。如果流量经过它们，连接就是活动的。',
       'mrt.hint': '哪些流量通过哪个节点出网的规则。从上到下的顺序。', 'th.what': '什么', 'th.via': '去向', 'th.proto': '协议',
-      'sp.head': '套餐方案', 'sp.hint': '代理功能的基础套件。一键升级，即时生效，不中断连接。', 'sp.loading': '加载中…', 'sp.comp': '套餐内容', 'th.func': '功能', 'th.val': '数值',
-      'sf.instant': '+ 即时启用',
-      'sb.head': '支付与续费', 'sb.hint': '当前套餐、有效期和支付记录。一键续费。', 'sb.plan': '当前套餐', 'sb.until': '有效至', 'sb.buy': '续费 / 更换套餐', 'sb.hist': '支付记录',
+      'sp.head': 'VPN 套餐', 'sp.hint': '面向需要绕过封锁的灰 IP 用户。付款与续费在 Telegram 机器人中完成，套餐立即开通。', 'sp.loading': '加载中…', 'sp.comp': '套餐内容', 'th.func': '功能', 'th.val': '数值',
+      'sf.instant': '+ 通过 Telegram 机器人付款，即时开通',
+      'sb.head': '支付与续费', 'sb.hint': '当前套餐、有效期和支付记录。一键续费。', 'sb.plan': '当前套餐', 'sb.until': '有效至', 'sb.buy': '通过 Telegram 支付', 'btn.buy-tg': '💬 通过 Telegram 购买', 'sb.hist': '支付记录',
       'th.date': '日期', 'th.desc': '描述', 'th.sum': '金额',
       'upd.apply': '立即更新', 'upd.auto': '自动更新', 'upd.auto-hint': '更新来自 GitHub 发布版。二进制下载、验证、原子替换 — 代理几秒后重启。',
       'upd.src': '更新来源', 'th.param': '参数', 'upd.repo': '仓库', 'upd.sig': '签名验证', 'upd.rollback': '失败时回滚',
@@ -729,7 +729,7 @@
       'nav.dash': 'لوحة التحكم', 'nav.keys': 'المفاتيح', 'nav.devices': 'الأجهزة',
       'nav.connect': 'الوصول الخارجي', 'nav.rusegment': 'قطاع RU', 'nav.tgws': 'TG-WS',
       'nav.mesh': 'شبكة ميش', 'nav.mesh-join': 'الاتصال', 'nav.mesh-topo': 'الطوبولوجيا', 'nav.mesh-routes': 'المسارات',
-      'nav.shop': 'المتجر', 'nav.shop-plans': 'الباقات', 'nav.shop-features': 'الميزات', 'nav.shop-billing': 'المدفوعات',
+      'nav.shop': 'المتجر', 'nav.shop-plans': 'باقات VPN', 'nav.shop-features': 'ميزات Aurora الإضافية', 'nav.shop-billing': 'المدفوعات',
       'nav.update': 'التحديث', 'nav.versions': 'الإصدارات', 'nav.settings': 'الخادم', 'nav.security': 'الأمان', 'nav.logs': 'السجلات',
       'nav.group.home': 'بروكسي المنزلي', 'nav.group.upd': 'التحديثات', 'nav.group.set': 'الإعدادات',
       'g.you': 'أنت', 'g.yours': 'الخاص بك', 'status.on': 'متصل', 'status.off': 'غير متصل', 'status.warn': 'غير مستقر',
@@ -796,9 +796,9 @@
       'mj.master': 'الخادم هو المحور ويتحكم في رؤية العملاء', 'mj.show-mesh': 'إظهار تبويب "شبكة mesh" للعملاء', 'mj.show-subs': 'إظهار تبويب "المتجر" للعملاء',
       'mt.hint': 'بروكسيك (في المركز) وعقد أعضاء mesh الآخرين. الاتصالات نشطة إذا مرت الحركة عبرها.',
       'mrt.hint': 'قواعد أي حركة تخرج للإنترنت عبر أي عقدة. الترتيب من الأعلى للأسفل.', 'th.what': 'ماذا', 'th.via': 'إلى أين', 'th.proto': 'البروتوكول',
-      'sp.head': 'الخطط', 'sp.hint': 'مجموعة أساسية من وظائف البروكسي. ترقية بنقرة واحدة، تُطبق فوراً، دون فقدان الاتصالات.', 'sp.loading': 'جارٍ تحميل الخطط…', 'sp.comp': 'محتوى الخطة', 'th.func': 'الوظيفة', 'th.val': 'القيمة',
-      'sf.instant': '+ تُفعّل فوراً',
-      'sb.head': 'الدفع والتجديد', 'sb.hint': 'الخطة النشطة وصلاحيتها وسجل الدفعات. التجديد بنقرة واحدة.', 'sb.plan': 'الخطة الحالية', 'sb.until': 'صالحة حتى', 'sb.buy': 'تجديد / تغيير الخطة', 'sb.hist': 'سجل الدفعات',
+      'sp.head': 'خطط VPN', 'sp.hint': 'خطط VPN لمن لديه IP رمادي ويحتاج إلى تجاوز الحظر. الدفع والتجديد عبر بوت تيليجرام، ويُفعَّل الخطة فورًا.', 'sp.loading': 'جارٍ تحميل الخطط…', 'sp.comp': 'محتوى الخطة', 'th.func': 'الوظيفة', 'th.val': 'القيمة',
+      'sf.instant': '+ الدفع عبر بوت تيليجرام، تفعيل فوري',
+      'sb.head': 'الدفع والتجديد', 'sb.hint': 'الخطة النشطة وصلاحيتها وسجل الدفعات. التجديد بنقرة واحدة.', 'sb.plan': 'الخطة الحالية', 'sb.until': 'صالحة حتى', 'sb.buy': 'الدفع عبر Telegram', 'btn.buy-tg': '💬 الشراء عبر Telegram', 'sb.hist': 'سجل الدفعات',
       'th.date': 'التاريخ', 'th.desc': 'الوصف', 'th.sum': 'المبلغ',
       'upd.apply': 'تحديث الآن', 'upd.auto': 'تحديث تلقائي', 'upd.auto-hint': 'يتم التحديث من إصدارات GitHub. يُنزل الملف، يُتحقق منه، يُستبدل ذرياً — يعاد تشغيل البروكسي خلال ثوانٍ.',
       'upd.src': 'مصدر التحديث', 'th.param': 'المعامل', 'upd.repo': 'المستودع', 'upd.sig': 'التحقق من التوقيع', 'upd.rollback': 'تراجع عند الفشل',
@@ -818,7 +818,7 @@
       'nav.dash': 'डैशबोर्ड', 'nav.keys': 'कुंजियाँ', 'nav.devices': 'डिवाइस',
       'nav.connect': 'बाहरी पहुँच', 'nav.rusegment': 'RU सेगमेंट', 'nav.tgws': 'TG-WS',
       'nav.mesh': 'मेश नेटवर्क', 'nav.mesh-join': 'कनेक्ट', 'nav.mesh-topo': 'टोपोलॉजी', 'nav.mesh-routes': 'रूट',
-      'nav.shop': 'दुकान', 'nav.shop-plans': 'योजनाएँ', 'nav.shop-features': 'सुविधाएँ', 'nav.shop-billing': 'भुगतान',
+      'nav.shop': 'दुकान', 'nav.shop-plans': 'VPN योजनाएँ', 'nav.shop-features': 'Aurora अतिरिक्त सुविधाएँ', 'nav.shop-billing': 'भुगतान',
       'nav.update': 'अपडेट', 'nav.versions': 'संस्करण', 'nav.settings': 'सर्वर', 'nav.security': 'सुरक्षा', 'nav.logs': 'लॉग',
       'nav.group.home': 'घरेलू प्रॉक्सी', 'nav.group.upd': 'अपडेट', 'nav.group.set': 'सेटिंग्स',
       'g.you': 'आप', 'g.yours': 'आपका', 'status.on': 'ऑनलाइन', 'status.off': 'ऑफ़लाइन', 'status.warn': 'अस्थिर',
@@ -885,9 +885,9 @@
       'mj.master': 'सर्वर हब है, क्लाइंट की दृश्यता नियंत्रित करता है', 'mj.show-mesh': 'क्लाइंट्स को “Mesh नेटवर्क” टैब दिखाएँ', 'mj.show-subs': 'क्लाइंट्स को “स्टोर” टैब दिखाएँ',
       'mt.hint': 'आपका प्रॉक्सी (केंद्र में) और अन्य mesh सदस्यों के नोड। कनेक्शन सक्रिय हैं यदि ट्रैफ़िक उनसे होकर जाता है।',
       'mrt.hint': 'नियम कि कौन-सा ट्रैफ़िक किस नोड से इंटरनेट जाता है। क्रम ऊपर से नीचे।', 'th.what': 'क्या', 'th.via': 'कहाँ', 'th.proto': 'प्रोटोकॉल',
-      'sp.head': 'प्लान', 'sp.hint': 'प्रॉक्सी सुविधाओं का मूल सेट। एक क्लिक में अपग्रेड, तुरंत लागू, कनेक्शन बिना खोए।', 'sp.loading': 'प्लान लोड हो रहे…', 'sp.comp': 'प्लान सामग्री', 'th.func': 'सुविधा', 'th.val': 'मान',
-      'sf.instant': '+ तुरंत सक्रिय होते हैं',
-      'sb.head': 'भुगतान और नवीनीकरण', 'sb.hint': 'सक्रिय प्लान, अवधि और भुगतान इतिहास। एक क्लिक में नवीनीकरण।', 'sb.plan': 'वर्तमान प्लान', 'sb.until': 'मान्य तक', 'sb.buy': 'नवीनीकरण / प्लान बदलें', 'sb.hist': 'भुगतान इतिहास',
+      'sp.head': 'VPN प्लान', 'sp.hint': 'ग्रे IP वालों के लिए VPN प्लान — ब्लॉक हटाने के लिए। भुगतान और नवीनीकरण Telegram बॉट में, प्लान तुरंत सक्रिय।', 'sp.loading': 'प्लान लोड हो रहे…', 'sp.comp': 'प्लान सामग्री', 'th.func': 'सुविधा', 'th.val': 'मान',
+      'sf.instant': '+ टेलीग्राम बॉट में भुगतान, तुरंत सक्रिय',
+      'sb.head': 'भुगतान और नवीनीकरण', 'sb.hint': 'सक्रिय प्लान, अवधि और भुगतान इतिहास। एक क्लिक में नवीनीकरण।', 'sb.plan': 'वर्तमान प्लान', 'sb.until': 'मान्य तक', 'sb.buy': 'Telegram से भुगतान', 'btn.buy-tg': '💬 Telegram से खरीदें', 'sb.hist': 'भुगतान इतिहास',
       'th.date': 'दिनांक', 'th.desc': 'विवरण', 'th.sum': 'राशि',
       'upd.apply': 'अभी अपडेट करें', 'upd.auto': 'ऑटो-अपडेट', 'upd.auto-hint': 'अपडेट GitHub रिलीज़ से होता है। बाइनरी डाउनलोड, सत्यापित, परमाणु रूप से बदली जाती है — प्रॉक्सी कुछ सेकंड में पुनः आरंभ हो जाता है।',
       'upd.src': 'अपडेट स्रोत', 'th.param': 'पैरामीटर', 'upd.repo': 'रिपॉज़िटरी', 'upd.sig': 'हस्ताक्षर जाँच', 'upd.rollback': 'विफलता पर रोलबैक',
@@ -1442,7 +1442,7 @@
         + '<h3>' + esc(p.name || id) + (cur ? ' <span class="chip st-act">' + _t('plans.current') + '</span>' : '') + '</h3>'
         + '<div class="price">' + priceTxt + '<small>' + _t('plans.per-mo') + '</small></div>'
         + '<ul>' + feats.map(function (f) { return '<li' + (f.no ? ' class="no"' : '') + '>' + esc(f.t) + '</li>'; }).join('') + '</ul>'
-        + '<button class="btn' + (hot ? ' gold' : '') + '" data-act="plan-buy" data-plan-id="' + esc(id) + '">' + _t('btn.choose') + '</button>'
+        + '<button class="btn' + (hot ? ' gold' : '') + '" data-act="plan-buy" data-plan-id="' + esc(id) + '">' + _t('btn.buy-tg') + '</button>'
         + '</div>';
     });
     grid.innerHTML = h;
@@ -1808,10 +1808,21 @@
   window.updSave = function () {
     toast(_t('upd.admin'), true);
   };
+  function tgBuy(start) {
+    var st = V.S || {};
+    var url = st.buy_url || st.buy_bot || '';
+    if (!url) return false;
+    if (url.indexOf('t.me/') < 0) url = 'https://t.me/' + url.replace(/^[@\/]+/, '');
+    if (start) url += (url.indexOf('?') < 0 ? '?' : '&') + 'start=' + encodeURIComponent(start);
+    window.open(url, '_blank', 'noopener');
+    return true;
+  }
   window.buyPlan = function (id) {
+    if (tgBuy('buy' + (id ? '_' + id : ''))) return;
     toast(id ? (_t('plans.buy') + id + _t('plans.buy2')) : _t('plans.admin'), true);
   };
   window.buyFeature = function (id) {
+    if (tgBuy('feature' + (id ? '_' + id : ''))) return;
     toast(id ? (_t('feat.buy') + id + _t('feat.buy2')) : _t('feat.admin'), true);
   };
 

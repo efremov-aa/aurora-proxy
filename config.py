@@ -139,6 +139,8 @@ UI_PORT = int(os.environ.get("AURORA_UI_PORT", "8890"))  # панель Aurora
 XRAY_PORT = int(os.environ.get("AURORA_XRAY_PORT", "8899"))  # mixed-вход xray (http+socks)
 XRAY_API_PORT = int(os.environ.get("AURORA_XRAY_API_PORT", "8897"))  # докодемо-API xray (статистика)
 TGWS_PORT = int(os.environ.get("AURORA_TGWS_PORT", "443"))  # Telegram WS-прокси (443; 1443 блокировался РКН снаружи)
+BUY_BOT = (os.environ.get("AURORA_BUY_BOT", "@aurorahomevpn_bot").strip() or "@aurorahomevpn_bot")  # бот для оплаты тарифов
+BUY_URL = "https://t.me/" + BUY_BOT.lstrip("@").strip("/")
 
 # --- сеть (значения из env, дефолты безопасны/пустые) ---
 VM_HOST = os.environ.get("AURORA_HOST", "127.0.0.1")    # адрес сервера для внешних ссылок/QR

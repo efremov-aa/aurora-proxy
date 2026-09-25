@@ -42,7 +42,7 @@
 
       <div class="ngroup" id="g-shop">
         <div class="ngroup-title" data-short="🛒">🛒 <span data-i18n="nav.shop">Магазин</span></div>
-        <button data-t="shop-plans"><span class="ic">💎</span><span class="lb" data-i18n="nav.shop-plans">Тарифы</span><span class="tag gold" id="tag-plan">basic</span></button>
+        <button data-t="shop-plans"><span class="ic">💎</span><span class="lb" data-i18n="nav.shop-plans">Тарифы VPN</span><span class="tag gold" id="tag-plan">basic</span></button>
         <button data-t="shop-features"><span class="ic">🧩</span><span class="lb" data-i18n="nav.shop-features">Функции</span><span class="tag" id="tag-feat">2</span></button>
         <button data-t="shop-billing"><span class="ic">💳</span><span class="lb" data-i18n="nav.shop-billing">Платежи</span></button>
       </div>
@@ -173,7 +173,7 @@
             </div>
             <div class="widget-body" id="w-plan-body">—</div>
             <div class="widget-foot">
-              <button class="btn small" data-act="nav" data-tab="shop-plans">💎 <span data-i18n="nav.shop-plans">Тарифы</span></button>
+              <button class="btn small" data-act="nav" data-tab="shop-plans">💎 <span data-i18n="nav.shop-plans">Тарифы VPN</span></button>
               <button class="btn small" data-act="nav" data-tab="shop-features">🧩 <span data-i18n="nav.shop-features">Функции</span></button>
             </div>
           </div>
@@ -466,8 +466,8 @@
            ================================================== -->
       <section class="tab" id="t-shop-plans">
         <div class="card">
-          <h2><span class="ic">💎</span><span data-i18n="sp.head">Тарифные планы</span></h2>
-          <p class="hint" data-i18n="sp.hint">Базовый набор функций прокси. Апгрейд — в один клик, применяется мгновенно, без потери соединений.</p>
+          <h2><span class="ic">💎</span><span data-i18n="sp.head">Тарифные планы VPN</span></h2>
+          <p class="hint" data-i18n="sp.hint">Тарифные планы VPN — для тех, у кого серый IP: нужен обход блокировок. Оплата и продление — через Telegram-бота, тариф подключается сразу.</p>
           <div class="plan-st" id="plans-loading"><span class="empty"><span class="ic">🐾</span><span data-i18n="sp.loading">загрузка тарифов…</span></span></div>
           <div class="plans" id="plans-grid"></div>
         </div>
@@ -489,9 +489,9 @@
       <section class="tab" id="t-shop-features">
         <div class="card pad-0">
           <div style="padding:14px 18px 12px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-            <h2 style="margin:0"><span class="ic">🧩</span><span data-i18n="nav.shop-features">Отдельные функции</span></h2>
+            <h2 style="margin:0"><span class="ic">🧩</span><span data-i18n="nav.shop-features">Дополнительные возможности Aurora</span></h2>
             <span class="spacer" style="flex:1"></span>
-            <span class="badge gold" data-i18n="sf.instant">+ активируются мгновенно</span>
+            <span class="badge gold" data-i18n="sf.instant">+ оплата в Telegram-боте, активация мгновенно</span>
           </div>
           <div class="feature-list" id="feat-list"></div>
         </div>
@@ -513,7 +513,7 @@
             <div class="stat"><div class="k"><span data-i18n="sb.traffic-month">Трафик за месяц</span></div><div class="v mono" id="bill-traffic-month">–</div></div>
           </div>
           <div class="actions" style="margin-top:0">
-            <button class="btn gold" data-act="plan-buy">💳 <span data-i18n="sb.buy">Продлить / сменить план</span></button>
+            <button class="btn gold" data-act="plan-buy">💳 <span data-i18n="sb.buy">Оплатить в Telegram</span></button>
           </div>
           <h3 style="font-size:13px;font-weight:800;margin:14px 0 8px"><span data-i18n="sb.hist">История платежей</span></h3>
           <div class="tbl-wrap">
