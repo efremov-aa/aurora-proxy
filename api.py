@@ -14,6 +14,7 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import config
+import crypt
 import core
 import mesh
 import pool
@@ -411,6 +412,59 @@ def _vless_ext():
     }
 
 
+def _key_handle(uid, key_id):
+    return crypt.opaque_id("%s:%s" % (str(uid or ""), str(key_id or "")), "subkey")
+
+
+def _opaque_uid(uid):
+    return crypt.opaque_id(str(uid or ""), "subuid")
+
+
+def _subs_safe(s, masked=False, include_secrets=False):
+    uid = str(s.get("uid", ""))
+    state = subs.access_state(s)
+    revoked = set(str(x) for x in (s.get("revoked_key_ids") or []))
+    keys = []
+    for k in s.get("keys") or []:
+        if not isinstance(k, dict):
+            continue
+        kid = str(k.get("id", ""))
+        keys.append({
+            "key_handle": _key_handle(uid, kid),
+            "id_masked": (kid[:8] + "\u2026") if kid else "",
+            "revoked": kid in revoked,
+            "created": 0 if masked else k.get("created", 0),
+            "remark": "" if masked else k.get("remark", ""),
+        })
+    return {
+        "uid": uid if include_secrets else ((uid[:8] + "\u2026") if uid else ""),
+        "name": "" if masked else s.get("name", ""),
+        "plan": s.get("plan", ""),
+        "remark": "" if masked else s.get("remark", ""),
+        "token": s.get("token", "") if include_secrets else "",
+        "created": 0 if masked else s.get("created", 0),
+        "expires": s.get("expires", 0),
+        "plan_next": s.get("plan_next"),
+        "expires_next": 0 if masked else s.get("expires_next", 0),
+        "plan_next_starts": 0 if masked else s.get("plan_next_starts", 0),
+        "used_bytes": s.get("used_bytes", 0),
+        "limit_bytes": s.get("limit_bytes", 0),
+        "limit_devices": s.get("limit_devices", 0),
+        "limit_keys": s.get("limit_keys", 0),
+        "enabled": bool(s.get("enabled", True)),
+        "access_ok": bool(state["ok"]),
+        "access_status": int(state["status"]),
+        "access_reason": str(state["reason"]),
+        "access_detail": "" if masked else str(state.get("detail", "")),
+        "access_state": subs.access_status(s),
+        "blocked_until": 0 if masked else s.get("blocked_until", 0),
+        "block_reason": "" if masked else s.get("block_reason", ""),
+        "keys": keys,
+        "sub_url": "",
+        "credential_required": False,
+    }
+
+
 def _subs_list(include_secrets=False):
     masked = bool(config.SUBS_MASK_UUID) or not include_secrets
     v = config.vless_public()
@@ -423,37 +477,8 @@ def _subs_list(include_secrets=False):
         "flow": v.get("flow", ""),
         "enabled": bool(v.get("enabled")),
     } if include_secrets else {"enabled": bool(v.get("enabled"))})
-    out = []
-    for s in subs.all():
-        keys = []
-        for k in s.get("keys", []):
-            kid = k.get("id", "")
-            keys.append({
-                "id": kid if include_secrets else "",
-                "id_masked": str(kid)[:8] + "…" if masked else kid,
-                "created": 0 if masked else k.get("created", 0),
-                "remark": "" if masked else k.get("remark", ""),
-                "note": "" if masked else k.get("note", ""),
-            })
-        out.append({
-            "uid": str(s.get("uid", ""))[:8] + "…" if masked else s.get("uid", ""),
-            "name": "" if masked else s.get("name", ""),
-            "plan": s.get("plan", ""),
-            "remark": "" if masked else s.get("remark", ""),
-            "token": s.get("token", "") if include_secrets else "",
-            "created": 0 if masked else s.get("created", 0),
-            "expires": s.get("expires", 0),
-            "plan_next": s.get("plan_next"),
-            "expires_next": 0 if masked else s.get("expires_next", 0),
-            "used_bytes": s.get("used_bytes", 0),
-            "limit_bytes": s.get("limit_bytes", 0),
-            "limit_devices": s.get("limit_devices", 0),
-            "enabled": bool(s.get("enabled", True)),
-            "access_status": subs.access_status(s),
-            "access_ok": subs.access_status(s) == "ok",
-            "keys": keys,
-            "sub_url": subs.public_link(s) if include_secrets else "",
-        })
+    out = [_subs_safe(s, masked=masked, include_secrets=include_secrets)
+           for s in subs.all()]
     return {
         "ok": True,
         "subs": out,
@@ -541,34 +566,45 @@ def _security_headers():
 
 def _sub_publish(self):
     """GET /sub?token=... — публичная выдача текст-подписки (vless-ссылки).
-    Без origin-проверки: клиентские приложения (v2rayNG и т.п.) грузят её напрямую."""
+    Без origin-проверки: клиентские приложения (v2rayNG и т.п.) грузят её напрямую.
+    Параметр credential принимается для совместимости с головным сервером,
+    устройства в публичной сборке не регистрируются."""
     qs = urllib.parse.parse_qs(self.path.split("?", 1)[-1])
     token = (qs.get("token") or [""])[0].strip()
     if not token:
-        self._send(*_json({"error": "token required"}, 400))
+        self._send(*_json({"error": "invalid subscription request"}, 400))
         return
-    s, status = subs.by_token_status(token)
-    if status == "missing":
+    if len(token) > 256 or not token.isascii():
+        self._send(*_json({"error": "invalid subscription request"}, 400))
+        return
+    s, _status = subs.by_token_status(token)
+    if not s:
         self._send(*_json({"error": "subscription not found"}, 404))
         return
-    if status == "expired":
-        self._send(*_json({"error": "subscription expired"}, 410))
+    state = subs.access_state(s)
+    if not state.get("ok"):
+        self._send(*_json({"error": "subscription access denied",
+                           "reason": str(state.get("reason") or "invalid"),
+                           "status": int(state.get("status") or 403)},
+                          int(state.get("status") or 403)))
         return
-    if status == "quota":
-        self._send(*_json({"error": "subscription quota exceeded"}, 410))
+    try:
+        data = subs.subscription_text(s).encode("utf-8")
+    except (OSError, TypeError, ValueError):
+        self._send(*_json({"error": "subscription state unavailable"}, 503))
         return
-    if status != "ok" or not s:
-        self._send(*_json({"error": "subscription unavailable"}, 403))
+    if len(data) > 1024 * 1024:
+        self._send(*_json({"error": "subscription response too large"}, 503))
         return
-    data = subs.subscription_text(s).encode("utf-8")
     self.send_response(200)
     self.send_header("Content-Type", "text/plain; charset=utf-8")
     self.send_header("Content-Length", str(len(data)))
     self.send_header("Cache-Control", "no-store")
     for _name, _value in _security_headers():
         self.send_header(_name, _value)
-    self.send_header("Content-Disposition",
-                     'inline; filename="aurora-sub.txt"')
+    self.send_header(
+        "Content-Disposition",
+        'inline; filename="aurora-sub-%s.txt"' % _opaque_uid(s.get("uid")))
     self.end_headers()
     self.wfile.write(data)
 
@@ -1409,9 +1445,16 @@ class Handler(BaseHTTPRequestHandler):
         name = str(data.get("name", "") or "").strip()
         plan = str(data.get("plan", "") or config.SUBS_PLAN_DEFAULT).strip()
         remark = str(data.get("remark", "") or "").strip()
-        s = subs.create(name=name or None, plan=plan, remark=remark)
+        try:
+            s = subs.create(name=name or None, plan=plan, remark=remark)
+        except (TypeError, ValueError) as exc:
+            self._send(*_json({"ok": False, "error": str(exc)}, 400))
+            return
+        except OSError:
+            self._send(*_json({"ok": False, "error": "subscription write failed"}, 500))
+            return
         self._subs_apply_clients_bg()
-        self._send(*_json({"ok": True, "sub": s}))
+        self._send(*_json({"ok": True, "sub": _subs_safe(s)}))
 
     def _subs_update(self, data):
         uid = str(data.get("uid", "") or "").strip()
@@ -1420,7 +1463,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         upd = {}
         for f in ("name", "remark", "plan", "enabled", "expires",
-                  "limit_bytes", "limit_devices"):
+                  "limit_bytes", "limit_devices", "limit_keys"):
             if f in data:
                 upd[f] = data[f]
         if not upd:
@@ -1430,9 +1473,13 @@ class Handler(BaseHTTPRequestHandler):
         if not s:
             self._send(*_json({"ok": False, "error": "subscription not found"}, 400))
             return
-        subs.update(uid, **upd)
+        try:
+            subs.update(uid, **upd)
+        except (TypeError, ValueError) as exc:
+            self._send(*_json({"ok": False, "error": str(exc)}, 400))
+            return
         self._subs_apply_clients_bg()
-        self._send(*_json({"ok": True, "sub": subs.find(uid)}))
+        self._send(*_json({"ok": True, "sub": _subs_safe(subs.find(uid) or {})}))
 
     def _subs_delete(self, data):
         uid = str(data.get("uid", "") or "").strip()
@@ -1440,7 +1487,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send(*_json({"ok": False, "error": "subscription not found"}, 400))
             return
         self._subs_apply_clients_bg()
-        self._send(*_json({"ok": True}))
+        self._send(*_json({"ok": True, "deleted": uid}))
 
     def _subs_add_key(self, data):
         uid = str(data.get("uid", "") or "").strip()
@@ -1450,28 +1497,37 @@ class Handler(BaseHTTPRequestHandler):
         if not s:
             self._send(*_json({"ok": False, "error": "subscription not found"}, 400))
             return
-        key, sub = subs.add_key(uid, remark=remark, device_id=device_id)
+        try:
+            key, sub = subs.add_key(uid, remark=remark, device_id=device_id)
+        except PermissionError as exc:
+            self._send(*_json({"ok": False, "error": str(exc)}, 403))
+            return
+        except (TypeError, ValueError) as exc:
+            self._send(*_json({"ok": False, "error": str(exc)}, 400))
+            return
         if not sub:
             self._send(*_json({"ok": False, "error": "subscription not found"}, 400))
             return
         if not key:
-            self._send(*_json({"ok": False, "error": "subscription key/device limit reached"}, 400))
+            self._send(*_json({"ok": False, "error": "key limit reached"}, 409))
             return
         self._subs_apply_clients_bg()
-        self._send(*_json({"ok": True, "key": key, "sub": sub}))
+        self._send(*_json({"ok": True, "key": {"key_handle": _key_handle(uid, key.get("id", ""))},
+                           "sub": _subs_safe(sub)}))
 
     def _subs_remove_key(self, data):
         uid = str(data.get("uid", "") or "").strip()
-        kid = str(data.get("key_id", "") or "").strip()
+        kid = str(data.get("key_id", "") or data.get("key_handle", "") or "").strip()
         if not uid or not subs.remove_key(uid, kid):
             self._send(*_json({"ok": False, "error": "key not found"}, 400))
             return
         self._subs_apply_clients_bg()
-        self._send(*_json({"ok": True}))
+        self._send(*_json({"ok": True, "removed": kid or True}))
 
     def _subs_apply(self, data):
         ok, msg = core.apply_sub_clients()
-        self._send(*_json({"ok": ok, "msg": msg}))
+        self._send(*_json({"ok": bool(ok), "pending": not ok, "msg": msg},
+                          200 if ok else 503))
 
     def _subs_purchase(self, data):
         """Внесение оплаты: создание/продление подписки."""
@@ -1493,9 +1549,13 @@ class Handler(BaseHTTPRequestHandler):
         if status == "error":
             self._send(*_json({"ok": False, "error": msg}, 400))
             return
+        if status == "conflict":
+            self._send(*_json({"ok": False, "error": msg, "status": status}, 409))
+            return
         if status == "created":
             self._subs_apply_clients_bg()
-        self._send(*_json({"ok": True, "sub": sub, "status": status, "msg": msg, "payment": payment}))
+        self._send(*_json({"ok": True, "sub": _subs_safe(sub or {}),
+                           "status": status, "msg": msg, "payment": payment}))
 
     def _plans_save(self, data):
         plans = data.get("plans")
@@ -1503,6 +1563,33 @@ class Handler(BaseHTTPRequestHandler):
             self._send(*_json({"ok": False, "error": "no plans"}, 400))
             return
         need = ("name", "price", "bytes", "days", "devices", "keys")
+        in_use = {}
+        for row in subs.all():
+            for pid in (row.get("plan"), row.get("plan_next")):
+                if pid:
+                    in_use.setdefault(str(pid), row)
+        blocked = []
+        for pid, value in plans.items():
+            if not isinstance(value, dict):
+                continue
+            pid = str(pid or "").strip()
+            if pid not in in_use or pid not in config.SUBS_PLANS:
+                continue
+            current = config.SUBS_PLANS[pid]
+            for field in ("bytes", "days", "devices", "keys"):
+                if field in value:
+                    try:
+                        want = int(value[field] or 0)
+                    except (TypeError, ValueError):
+                        continue
+                    if want != int(current.get(field, 0) or 0):
+                        blocked.append(pid)
+                        break
+        if blocked:
+            self._send(*_json({"ok": False,
+                               "error": "используемый тариф нельзя изменить: %s"
+                                        % ", ".join(sorted(set(blocked)))}, 409))
+            return
         changed = 0
         for k, v in plans.items():
             if not isinstance(v, dict):

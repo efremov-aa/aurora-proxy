@@ -1085,68 +1085,121 @@ def reset_settings():
 
 # --- тарифы: переопределение из data/plans.json (редактор тарифов в UI) ---
 _SUBS_PLANS_LOCK = threading.RLock()
+_PLAN_FIELDS = ("name", "price", "bytes", "days", "devices", "keys")
+_PLAN_LIST_FIELDS = ("features", "features_no")
+_PLAN_NAME_MAX = 40
+_PLAN_LIST_MAX = 100
+_PLAN_ITEM_MAX = 80
+_PLANS_GOOD = None
 
 
-def save_plans():
-    """Сохраняет текущие SUBS_PLANS в data/plans.json (атомарно)."""
+def _plan_id(value):
+    if not isinstance(value, str) or not value or len(value) > 40:
+        return False
+    for ch in value:
+        if not (("a" <= ch <= "z") or ("0" <= ch <= "9") or ch in "_-"):
+            return False
+    return True
+
+
+def normalize_plan(plan_id, value, base=None):
+    """Строгая нормализация тарифа (контракт головного сервера)."""
+    if not _plan_id(plan_id):
+        raise ValueError("invalid plan id")
+    if not isinstance(value, dict):
+        raise ValueError("invalid plan record")
+    merged = dict(base or {})
+    merged.update(value)
+    if any(field not in merged for field in _PLAN_FIELDS):
+        raise ValueError("missing plan fields")
+    name = merged.get("name")
+    if not isinstance(name, str) or not 1 <= len(name.strip()) <= _PLAN_NAME_MAX:
+        raise ValueError("invalid plan name")
+    out = {"name": name.strip()}
+    for field in ("price", "bytes", "days"):
+        if not _is_nonnegative_int(merged.get(field)):
+            raise ValueError("invalid plan field %s" % field)
+        out[field] = int(merged[field])
+    for field in ("devices", "keys"):
+        if not _is_nonnegative_int(merged.get(field)) or int(merged[field]) < 1:
+            raise ValueError("invalid plan field %s" % field)
+        out[field] = int(merged[field])
+    for field in _PLAN_LIST_FIELDS:
+        if field not in merged:
+            continue
+        items = merged.get(field)
+        if not isinstance(items, list) or len(items) > _PLAN_LIST_MAX:
+            raise ValueError("invalid plan field %s" % field)
+        clean = []
+        for item in items:
+            if not isinstance(item, str) or not 1 <= len(item) <= _PLAN_ITEM_MAX:
+                raise ValueError("invalid plan field %s" % field)
+            clean.append(item)
+        out[field] = clean
+    return out
+
+
+def _plans_snapshot():
+    return dict((key, dict(value)) for key, value in SUBS_PLANS.items()
+                if isinstance(value, dict))
+
+
+def save_plans(plans=None):
+    """Сохраняет тарифы в data/plans.json (атомарно, шифрование AURORA2)."""
     with _SUBS_PLANS_LOCK:
+        source = SUBS_PLANS if plans is None else plans
+        if not isinstance(source, dict) or not source:
+            raise ValueError("no plans")
+        payload = {}
+        for key, value in source.items():
+            payload[key] = normalize_plan(key, value, base=SUBS_PLANS.get(key))
+        if plans is not None:
+            SUBS_PLANS.update(payload)
         try:
             import crypt
-            data = json.dumps(SUBS_PLANS, indent=2, ensure_ascii=False).encode("utf-8")
-            crypt._atomic_write(SUBS_PLANS_FILE, data)
+            crypt.save_json(SUBS_PLANS_FILE, payload)
         except Exception as e:
             log("plans: не удалось сохранить: %s" % e)
-
-
-def _valid_plan_id(value):
-    return (isinstance(value, str) and 1 <= len(value) <= 40
-            and all(ch.isascii() and (ch.isalnum() or ch in "_-") for ch in value))
+            return False
+        return True
 
 
 def _validate_plans(raw):
     if not isinstance(raw, dict):
         raise ValueError("root is not an object")
     valid = {}
-    need = ("name", "price", "bytes", "days", "devices", "keys")
     for key, value in raw.items():
-        if not _valid_plan_id(key):
-            raise ValueError("invalid plan id")
-        if not isinstance(value, dict) or any(name not in value for name in need):
-            raise ValueError("invalid plan record")
-        if not isinstance(value["name"], str) or not value["name"].strip():
-            raise ValueError("invalid plan name")
-        for name in ("price", "bytes", "days", "devices", "keys"):
-            if not _is_nonnegative_int(value[name]):
-                raise ValueError("invalid plan field %s" % name)
-        if value["devices"] < 1 or value["keys"] < 1:
-            raise ValueError("invalid plan limits")
-        for name in ("features", "features_no"):
-            if name in value and (not isinstance(value[name], list)
-                                  or any(not isinstance(x, str) for x in value[name])):
-                raise ValueError("invalid plan features")
-        base = dict(SUBS_PLANS.get(key, {}))
-        base.update(value)
-        valid[key] = base
+        valid[key] = normalize_plan(key, value, base=SUBS_PLANS.get(key))
     return valid
 
 
 def _load_plans_override():
     """Переопределение тарифов из data/plans.json (валидные планы перезаписывают)."""
+    global _PLANS_GOOD
     try:
-        with open(SUBS_PLANS_FILE, "r", encoding="utf-8") as f:
-            raw = json.load(f)
-    except FileNotFoundError:
+        import crypt
+        raw = crypt.load_bytes(SUBS_PLANS_FILE)
+    except (OSError, TypeError, ValueError) as e:
+        _storage_failure(SUBS_PLANS_FILE, str(e))
+        raw = None
+    if raw is None:
         return
-    except (OSError, ValueError) as e:
-        _storage_failure(SUBS_PLANS_FILE, str(e))
     try:
-        valid = _validate_plans(raw)
-    except (TypeError, ValueError) as e:
+        valid = _validate_plans(json.loads(raw.decode("utf-8")))
+    except (TypeError, ValueError, UnicodeDecodeError) as e:
         _storage_failure(SUBS_PLANS_FILE, str(e))
+        valid = None
     with _SUBS_PLANS_LOCK:
         if valid:
             SUBS_PLANS.update(valid)
+            _PLANS_GOOD = _plans_snapshot()
             log("plans: тарифы переопределены из data/plans.json (%d)" % len(valid))
+        elif _PLANS_GOOD:
+            SUBS_PLANS.clear()
+            SUBS_PLANS.update(_PLANS_GOOD)
+            log("plans: восстановлены последние корректные тарифы")
+    if SUBS_PLAN_DEFAULT not in SUBS_PLANS:
+        raise ValueError("default plan is missing")
 
 
 # --- меш: общий ключ подписи приглашений/политики с головным сервером ---

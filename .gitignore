@@ -14,3 +14,14 @@ windows/installer/output/
 windows/nssm/nssm.exe
 *.bak_mojibake
 AUDIT_FIX_TRACKER.md
+
+# Мастер-ключ шифрования и его lock (создаются в корне при запуске вне data/).
+.aurora_key
+.aurora_key.lock
+*.aurora_key
+
+# Артефакты тестов прав доступа / хранилищ.
+store.json
+perm-target.json
+perm-dir/
+*.perm-*.json

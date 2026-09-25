@@ -651,44 +651,46 @@ def apply_sub_clients():
     (мастер + все активные подписочные uuid) и рестартует xray.
     ТОЛЬКО правка clients — routing/outbounds не трогаются (безопасно вживую).
     Возвращает (ok: bool, msg: str)."""
-    if not (config.vless_public().get("enabled") and config.vless_public().get("uuid")):
+    vln = config.vless_public()
+    if not (vln.get("enabled") and vln.get("uuid")):
         return False, "внешний inbound не настроен"
-    clients = [{
-        "id": config.vless_public()["uuid"],
-        "flow": config.vless_public().get("flow", "xtls-rprx-vision"),
-    }]
+    flow = vln.get("flow", "xtls-rprx-vision")
+    clients = [{"id": vln["uuid"], "flow": flow}]
     try:
         for cuuid in subs.build_client_list():
-            clients.append({
-                "id": cuuid,
-                "email": cuuid,
-                "flow": config.vless_public().get("flow", "xtls-rprx-vision"),
-            })
+            clients.append({"id": cuuid, "email": cuuid, "flow": flow})
     except Exception as e:
         config.log("core: subscription clients failed: %s" % e)
-        return False, "subscription clients failed"
+        return False, "clients unavailable"
     with _cross_process_lock():
         with XRAY_CONFIG_LOCK:
-            cfg = _read_config()
-            if not cfg:
+            previous = _read_config()
+            if not previous:
                 return False, "нет конфига"
-            if "policy" not in cfg:
-                cfg["policy"] = {"levels": {"0": {"statsUserUplink": True,
-                                                  "statsUserDownlink": True}}}
-            done = False
-            for inbound in cfg.get("inbounds", []):
+            cfg, _target = _authoritative_config(previous, get_vless_now())
+            target = None
+            for inbound in cfg.get("inbounds", []) or []:
                 if inbound.get("tag") == "vless-in":
-                    inbound.setdefault("settings", {})["clients"] = clients
-                    done = True
+                    target = inbound
                     break
-            if not done:
+            if target is None:
                 return False, "vless-in не найден в xray.json"
+            if target.setdefault("settings", {}).get("clients") == clients:
+                return True, "clients %d" % len(clients)
+            target["settings"]["clients"] = clients
+            level = cfg.setdefault("policy", {}).setdefault("levels", {}).setdefault("0", {})
+            level["statsUserUplink"] = True
+            level["statsUserDownlink"] = True
+            if not _xray_config_valid(cfg):
+                return False, "config preflight failed"
             if not _write_config(cfg):
                 return False, "write fail"
+            expected = _config_fingerprint(cfg)
         if not _restart_xray():
+            _restore_config_cas(expected, previous)
             return False, "restart fail"
-        config.log("core: vless-in clients обновлены (%d всего)" % len(clients))
-        return True, "clients %d" % len(clients)
+    config.log("core: vless-in clients обновлены (%d всего)" % len(clients))
+    return True, "clients %d" % len(clients)
 
 
 def set_active_tag(tag):

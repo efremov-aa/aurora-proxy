@@ -4,6 +4,7 @@
 # (REST реально перезапускает inbound), и клиент может подключаться извне.
 
 import copy
+import hmac
 import json
 import os
 import re
@@ -20,6 +21,7 @@ SUBS_FILE = config.SUBS_FILE
 BILLING_FILE = os.path.join(os.path.dirname(SUBS_FILE), "billing.json")
 
 _LOCK = threading.RLock()
+_USAGE_LOCK = threading.Lock()
 _SUBS = []
 _BILLING = {"version": 1, "payments": [], "traffic": {"months": {}}}
 
@@ -400,13 +402,19 @@ def count():
         return len(_SUBS)
 
 
-def find(uid):
-    """Подписка по uid или None."""
-    with _LOCK:
-        for s in _SUBS:
-            if s.get("uid") == uid:
-                return copy.deepcopy(s)
+def _find_locked(uid):
+    """Живая запись подписки по uid (только под _LOCK, для изменяющих операций)."""
+    for s in _SUBS:
+        if s.get("uid") == uid:
+            return s
     return None
+
+
+def find(uid):
+    """Подписка по uid или None (копия)."""
+    with _LOCK:
+        found = _find_locked(uid)
+        return copy.deepcopy(found) if found is not None else None
 
 
 def _gen_token():
@@ -416,6 +424,55 @@ def _gen_token():
 
 def _gen_uuid():
     return str(_uuid.uuid4())
+
+
+def _ts(value):
+    ts = _int(value, 0)
+    if not ts:
+        return "\u221e"
+    try:
+        return time.strftime("%d.%m.%Y", time.localtime(ts))
+    except (ValueError, OSError):
+        return str(ts)
+
+
+def require_plan(plan):
+    p = plan_info(plan)
+    if not p:
+        raise ValueError("unknown subscription plan")
+    return p
+
+
+def _start_new_period(sub, now, expires):
+    sub["used_bytes"] = 0
+    sub["usage_snapshot"] = {}
+    sub["usage_tracking"] = False
+    sub["period_started"] = now
+    sub["period_ends"] = expires
+
+
+def _normalize_compat(rows):
+    for s in rows:
+        if not isinstance(s, dict):
+            continue
+        p = plan_info(s.get("plan"))
+        if not _int(s.get("limit_keys"), 0):
+            s["limit_keys"] = max(1, _int(p.get("keys"), 1))
+        if s.get("plan_next_starts") is None:
+            duration = _int(s.get("next_duration"), 0)
+            if s.get("plan_next"):
+                if duration:
+                    s["plan_next_starts"] = max(0, _int(s.get("expires_next"), 0) - duration)
+                else:
+                    s["plan_next_starts"] = max(0, _int(s.get("expires"), 0))
+            else:
+                s["plan_next_starts"] = 0
+        if not _int(s.get("period_started"), 0):
+            s["period_started"] = _int(s.get("created"), 0)
+        if not _int(s.get("period_ends"), 0):
+            s["period_ends"] = _int(s.get("expires"), 0)
+        s["usage_tracking"] = bool(s.get("usage_tracking", False))
+    return rows
 
 
 def plan_info(plan):
@@ -431,12 +488,14 @@ def _int(value, default=0):
 
 
 def _active_key_limit(sub):
-    p = plan_info(sub.get("plan"))
+    p = plan_info(sub.get("plan")) if isinstance(sub, dict) else {}
     plan_keys = max(1, _int(p.get("keys"), 1))
-    devices = _int(sub.get("limit_devices"), plan_keys)
-    if devices <= 0:
-        devices = plan_keys
-    return min(plan_keys, devices)
+    limit = _int(sub.get("limit_keys"), 0) if isinstance(sub, dict) else 0
+    if limit <= 0:
+        limit = _int(sub.get("limit_devices"), plan_keys) if isinstance(sub, dict) else plan_keys
+    if limit <= 0:
+        limit = plan_keys
+    return limit
 
 
 def _quota_exceeded(sub):
@@ -470,49 +529,46 @@ def make_key(device_id=""):
 
 
 def create(name, plan=None, remark=""):
-    """Создаёт подписку с указанным тарифом и ключами. Возвращает подписку."""
     plan = plan or config.SUBS_PLAN_DEFAULT
-    p = plan_info(plan)
-    if not p:
-        raise ValueError("unknown subscription plan")
-    days = p.get("days", 0)
-    expires = _now() + days * 86400 if days else 0
-    sub = {
-        "uid": _uid(),
-        "name": str(name or "").strip() or "Клиент %d" % (int(time.time()) % 10000),
-        "plan": plan,
-        "remark": str(remark or "").strip(),
-        "token": _gen_token(),
-        "created": _now(),
-        "expires": expires,          # unix ts, 0 = бессрочно
-        "limit_bytes": p.get("bytes", 0),
-        "limit_devices": p.get("devices", 0),
-        "enabled": True,
-        "plan_next": None,       # отложенная смена тарифа (после окончания текущего)
-        "expires_next": 0,       # срок отложенного тарифа, unix ts
-        "next_duration": 0,      # длительность отложенного тарифа, секунды
-        "used_bytes": 0,         # кэш фактического трафика клиента (из xray API)
-        "usage_snapshot": {},
-        "usage_tracking": False,
-        "keys": [make_key() for _ in range(max(1, p.get("keys", 1)))],
-    }
+    p = require_plan(plan)
+    now = _now()
+    days = _int(p.get("days"), 0)
+    expires = now + days * 86400 if days else 0
+    keys = [make_key() for _ in range(max(1, _int(p.get("keys"), 1)))]
     with _LOCK:
+        sub = {
+            "uid": _uid(),
+            "name": str(name or "").strip()[:64] or ("Клиент %d" % (now % 10000)),
+            "plan": plan,
+            "remark": str(remark or "")[:200],
+            "token": _gen_token(),
+            "created": now,
+            "enabled": True,
+            "expires": expires,
+            "limit_bytes": _int(p.get("bytes"), 0),
+            "limit_devices": max(1, _int(p.get("devices"), 1)),
+            "limit_keys": max(1, _int(p.get("keys"), 1)),
+            "plan_next": None,
+            "expires_next": 0,
+            "plan_next_starts": 0,
+            "used_bytes": 0,
+            "usage_snapshot": {},
+            "usage_tracking": True,
+            "period_started": now,
+            "period_ends": expires,
+            "keys": keys,
+        }
         _SUBS.append(sub)
         _save()
-    config.log("subs: создана подписка %s (%s, ключей %d)" % (
-        sub["name"], plan, len(sub["keys"])))
-    return copy.deepcopy(sub)
+        config.log("subs: создана подписка %s по тарифу %s" % (sub["uid"], plan))
+        return copy.deepcopy(sub)
 
 
-def _purchase_impl(uid=None, name=None, plan=None, remark="", amount=None,
-                   idempotency_key=None):
+def _purchase_impl(uid=None, name=None, plan=None, remark="", amount=None, idempotency_key=None):
     plan = plan or config.SUBS_PLAN_DEFAULT
-    p = plan_info(plan)
-    if not p:
-        raise ValueError("unknown subscription plan")
-    days = p.get("days", 0)
-    add = days * 86400
+    p = require_plan(plan)
     now = _now()
+    add = _int(p.get("days"), 0) * 86400
     key = str(idempotency_key or "").strip()[:128]
     plan_snapshot = copy.deepcopy(p)
     payment_amount = _payment_amount(amount, p.get("price", 0))
@@ -521,89 +577,83 @@ def _purchase_impl(uid=None, name=None, plan=None, remark="", amount=None,
         if prior:
             if prior.get("plan") != plan or uid and prior.get("uid") != uid:
                 raise ValueError("idempotency key already used")
-            target = next((s for s in _SUBS
-                           if s.get("uid") == prior.get("uid")), None)
-            if target is None:
+            known = find(prior.get("uid", ""))
+            if known is None:
                 return None, "error", "подписка не найдена", _public_payment(prior)
-            return copy.deepcopy(target), "duplicate", "повторная оплата проигнорирована", _public_payment(prior)
-
-        sub = None
-        if uid:
-            for s in _SUBS:
-                if s.get("uid") == uid:
-                    sub = s
+            return copy.deepcopy(known), "duplicate", "повторная оплата проигнорирована", _public_payment(prior)
+        target = _find_locked(uid) if uid else None
+        if target is None and name:
+            wanted = str(name).strip().lower()
+            for item in _SUBS:
+                if str(item.get("name", "")).strip().lower() == wanted:
+                    target = item
                     break
-            if sub is None:
-                return None, "error", "подписка не найдена", {}
-        else:
-            nm = str(name or "").strip()
-            for s in _SUBS:
-                if nm and s.get("name", "").strip().lower() == nm.lower():
-                    sub = s
-                    break
-
-        if sub is None:
-            sub = create(nm or None, plan=plan, remark=remark)
-            coverage_start = now
-            coverage_end = int(sub.get("expires", 0) or 0)
+        created = target is None
+        if created:
+            target = _find_locked(create(name, plan, remark).get("uid"))
+        cur_plan = target.get("plan")
+        cur_exp = _int(target.get("expires"), 0)
+        nxt_plan = target.get("plan_next")
+        nxt_start = _int(target.get("plan_next_starts"), 0)
+        if nxt_plan and plan not in (cur_plan, nxt_plan):
+            return None, "conflict", "очередь уже содержит тариф %s" % nxt_plan, {}
+        coverage_start = now
+        coverage_end = _int(target.get("expires"), 0)
+        operation = "renewed"
+        if created:
             operation = "created"
-            status, msg = "created", "подписка создана по тарифу %s" % plan
+            status = "created"
+            msg = "подписка создана по тарифу %s" % plan
+        elif plan == nxt_plan:
+            if cur_exp == 0:
+                return None, "error", "отложенный тариф нельзя продлить при бессрочной текущей подписке", {}
+            start = max(nxt_start or cur_exp, now)
+            target["plan_next_starts"] = start
+            target["expires_next"] = 0 if not add else start + add
+            coverage_start = start
+            coverage_end = _int(target["expires_next"], 0)
+            operation = "queued_renewal"
+            status = "renewed"
+            msg = "отложенный %s продлен до %s" % (plan, _ts(target["expires_next"]))
+        elif cur_plan == plan and (cur_exp == 0 or cur_exp >= now):
+            new_exp = 0 if cur_exp == 0 else (cur_exp + add if add else 0)
+            target["expires"] = new_exp
+            target["period_ends"] = new_exp
+            if nxt_plan:
+                target["plan_next_starts"] = new_exp
+                target["expires_next"] = 0 if not add else new_exp + add
+            coverage_start = cur_exp or now
+            coverage_end = new_exp
+            status = "renewed"
+            msg = "время %s суммировано" % plan
+        elif cur_plan == plan:
+            new_exp = now + add if add else 0
+            _start_new_period(target, now, new_exp)
+            target["expires"] = new_exp
+            if nxt_plan:
+                target["plan_next_starts"] = new_exp
+                target["expires_next"] = 0 if not add else new_exp + add
+            coverage_start = now
+            coverage_end = new_exp
+            status = "renewed"
+            msg = "%s продлен с текущего момента" % plan
+        elif cur_exp == 0:
+            return None, "error", "бессрочную подписку нельзя поставить в очередь другого тарифа", {}
         else:
-            cur_plan = sub.get("plan")
-            cur_exp = int(sub.get("expires", 0) or 0)
-            nxt_plan = sub.get("plan_next")
-            nxt_exp = int(sub.get("expires_next", 0) or 0)
-            nxt_duration = _int(sub.get("next_duration"), 0)
-
-            if plan == nxt_plan:
-                queue_base = nxt_exp or (max(cur_exp, now) if cur_exp else now)
-                if nxt_duration <= 0 and nxt_exp:
-                    nxt_duration = max(0, nxt_exp - queue_base)
-                nxt_duration += add
-                sub["next_duration"] = nxt_duration
-                sub["expires_next"] = queue_base + nxt_duration
-                coverage_start = queue_base
-                coverage_end = sub["expires_next"]
-                operation = "queued_renewal"
-                status, msg = "renewed", "отложенный %s продлен до %s" % (plan, sub["expires_next"])
-            elif cur_plan == plan and (cur_exp == 0 or cur_exp >= now):
-                coverage_start = cur_exp or now
-                if cur_exp:
-                    sub["expires"] = cur_exp + add
-                    if nxt_plan and nxt_duration > 0:
-                        sub["expires_next"] = sub["expires"] + nxt_duration
-                    elif nxt_plan and nxt_exp:
-                        sub["expires_next"] = nxt_exp + add
-                        sub["next_duration"] = max(0, nxt_exp - cur_exp)
-                coverage_end = int(sub.get("expires_next", 0) or sub.get("expires", 0) or 0)
-                operation = "renewed"
-                status, msg = "renewed", "время %s суммировано" % plan
-            elif cur_plan == plan:
-                sub["expires"] = now + add
-                if nxt_plan and nxt_duration <= 0 and nxt_exp:
-                    nxt_duration = max(0, nxt_exp - cur_exp)
-                if nxt_plan and nxt_duration > 0:
-                    sub["expires_next"] = sub["expires"] + nxt_duration
-                    sub["next_duration"] = nxt_duration
-                coverage_start = now
-                coverage_end = int(sub.get("expires", 0) or 0)
-                operation = "renewed"
-                status, msg = "renewed", "%s продлен с текущего момента" % plan
-            else:
-                base_start = max(nxt_exp, cur_exp, now) if (nxt_exp or cur_exp) else now
-                sub["plan_next"] = plan
-                sub["next_duration"] = add
-                sub["expires_next"] = base_start + add
-                coverage_start = base_start
-                coverage_end = sub["expires_next"]
-                operation = "queued"
-                status, msg = "queued", "%s вступит после окончания %s" % (plan, cur_plan or "текущего")
-            _save()
-        receipt = _append_payment_locked(
-            sub, plan, plan_snapshot, payment_amount, operation,
-            coverage_start, coverage_end, key)
-        config.log("subs: оплата %s -> %s (%s)" % (sub.get("name"), status, msg))
-        return copy.deepcopy(sub), status, msg, receipt
+            start = max(cur_exp, now)
+            target["plan_next"] = plan
+            target["plan_next_starts"] = start
+            target["expires_next"] = 0 if not add else start + add
+            coverage_start = start
+            coverage_end = _int(target["expires_next"], 0)
+            operation = "queued"
+            status = "queued"
+            msg = "%s вступит после окончания %s" % (plan, cur_plan or "текущего")
+        _save()
+        receipt = _append_payment_locked(target, plan, plan_snapshot, payment_amount,
+                                         operation, coverage_start, coverage_end, key)
+        config.log("subs: %s (%s)" % (status, plan))
+        return copy.deepcopy(target), status, msg, receipt
 
 
 def purchase(uid=None, name=None, plan=None, remark="", amount=None,
@@ -619,31 +669,39 @@ def purchase_with_receipt(uid=None, name=None, plan=None, remark="", amount=None
 
 
 def _tick():
-    """Активация отложенных тарифов: когда срок текущего истёк (expires <= now),
-    plan_next переводится в активный план (expires/limit пересчитываются)."""
     now = _now()
     changed = False
     access_changed = False
     with _LOCK:
+        _normalize_compat(_SUBS)
         for s in _SUBS:
             before = access_status(s, now)
             pn = s.get("plan_next")
-            if pn:
-                exp = int(s.get("expires", 0) or 0)
-                if exp and exp > now:
-                    continue
-                p = plan_info(pn)
-                days = p.get("days", 0)
-                nxt = int(s.get("expires_next", 0) or 0)
-                s["plan"] = pn
-                s["plan_next"] = None
-                s["expires"] = nxt or (now + days * 86400 if days else 0)
-                s["expires_next"] = 0
-                s["next_duration"] = 0
-                s["limit_bytes"] = p.get("bytes", 0)
-                s["limit_devices"] = p.get("devices", 0)
-                config.log("subs: %s переведена на тариф %s" % (s.get("name"), pn))
-                changed = True
+            if not pn:
+                continue
+            exp = _int(s.get("expires"), 0)
+            nxt_start = _int(s.get("plan_next_starts"), 0)
+            if not exp or exp > now or nxt_start > now:
+                continue
+            try:
+                p = require_plan(pn)
+            except ValueError:
+                config.log("subs: неизвестный отложенный тариф %s" % pn)
+                continue
+            nxt = _int(s.get("expires_next"), 0)
+            days = _int(p.get("days"), 0)
+            s["plan"] = pn
+            s["plan_next"] = None
+            s["plan_next_starts"] = 0
+            s["expires"] = nxt or (now + days * 86400 if days else 0)
+            s["expires_next"] = 0
+            s["limit_bytes"] = _int(p.get("bytes"), 0)
+            s["limit_devices"] = max(1, _int(p.get("devices"), 1))
+            s["limit_keys"] = max(1, _int(p.get("keys"), 1))
+            _start_new_period(s, now, s["expires"])
+            s["usage_tracking"] = False
+            config.log("subs: %s переведена на тариф %s" % (s.get("uid"), pn))
+            changed = True
             if before != access_status(s, now):
                 access_changed = True
     if changed or access_changed:
@@ -653,86 +711,81 @@ def _tick():
 
 
 def refresh_usage():
-    """Собирает фактический трафик клиентов из xray API (statsquery) и
-    обновляет накопительный used_bytes и месячный billing traffic."""
     if not _XRAY_BIN:
-        return
-    cmd = [_XRAY_BIN, "api", "statsquery",
-           "--server=127.0.0.1:%d" % config.XRAY_API_PORT,
-           "--pattern=user>>>", "--reset=false"]
+        return False
+    if not _USAGE_LOCK.acquire(blocking=False):
+        return False
     try:
-        r = subprocess.run(cmd, capture_output=True, timeout=15,
-                           creationflags=config.HIDE_FLAG)
-        if getattr(r, "returncode", 0) != 0:
-            return
-        raw = (r.stdout or b"").decode("utf-8", errors="replace")
-    except Exception:
-        return
-    if not raw.strip():
-        return
-    used = {}
-    cur = None
-    for line in raw.splitlines():
-        ls = line.strip()
-        if ls.startswith("name:"):
-            nm = ls.split(":", 1)[1].strip()
-            if "user>>>" in nm:
-                parts = nm.split(">>>")
-                cur = parts[1] if len(parts) >= 2 else None
-            else:
-                cur = None
-        elif cur and ls.startswith("value:"):
-            try:
-                value = int(ls.split(":", 1)[1].strip())
-                if value >= 0:
-                    used[cur] = used.get(cur, 0) + value
-            except ValueError:
-                pass
-    if not used:
-        return
-    changed = False
-    traffic_delta = 0
-    month = _billing_month()
-    with _LOCK:
-        for s in _SUBS:
-            snapshot = s.get("usage_snapshot")
-            if not isinstance(snapshot, dict):
-                snapshot = {}
-            tracking = bool(s.get("usage_tracking", False))
-            delta_total = 0
-            for k in s.get("keys", []):
-                kid = str(k.get("id", "") or "")
-                if kid not in used:
-                    continue
-                current = used[kid]
-                previous = snapshot.get(kid)
-                if not tracking:
-                    delta = 0
-                elif previous is None:
-                    delta = current
-                else:
-                    previous = max(0, _int(previous, 0))
-                    delta = current - previous if current >= previous else current
-                snapshot[kid] = current
-                delta_total += max(0, delta)
-            if s.get("usage_snapshot") != snapshot:
-                s["usage_snapshot"] = snapshot
+        cmd = [_XRAY_BIN, "api", "statsquery",
+               "--server=127.0.0.1:%d" % int(config.XRAY_API_PORT),
+               "--pattern=user>>>", "--reset=false"]
+        try:
+            proc = subprocess.run(cmd, capture_output=True, timeout=15)
+        except (OSError, subprocess.SubprocessError):
+            return False
+        if int(getattr(proc, "returncode", 1)) != 0:
+            return False
+        used = {}
+        cur = None
+        for raw in (getattr(proc, "stdout", b"") or b"").decode("utf-8", "replace").splitlines():
+            line = raw.strip()
+            if not line:
+                continue
+            low = line.lower()
+            if low.startswith("name:"):
+                name = line.split(":", 1)[1].strip()
+                cur = name.split("user>>>", 1)[1].strip() if "user>>>" in name else None
+            elif low.startswith("value:") and cur:
+                digits = "".join(ch for ch in line.split(":", 1)[1] if ch.isdigit())
+                if digits:
+                    used[cur] = used.get(cur, 0) + int(digits)
+        if not used:
+            return False
+        changed = False
+        traffic_delta = 0
+        month = _billing_month()
+        with _LOCK:
+            for s in _SUBS:
+                snapshot = s.get("usage_snapshot") or {}
+                tracking = bool(s.get("usage_tracking", False))
+                delta_total = 0
+                next_snapshot = {}
+                for key_row in s.get("keys") or []:
+                    if not isinstance(key_row, dict):
+                        continue
+                    kid = str(key_row.get("id", ""))
+                    if not kid or kid not in used:
+                        continue
+                    current = used[kid]
+                    previous = snapshot.get(kid)
+                    if not tracking:
+                        delta = 0
+                    elif previous is None:
+                        delta = current
+                    else:
+                        delta = current - previous if current >= previous else current
+                    next_snapshot[kid] = current
+                    delta_total += max(0, delta)
+                if next_snapshot:
+                    s["usage_snapshot"] = next_snapshot
+                    s["usage_tracking"] = True
+                    changed = True
+                if delta_total:
+                    s["used_bytes"] = _int(s.get("used_bytes"), 0) + delta_total
+                    traffic_delta += delta_total
+                    changed = True
+            if traffic_delta:
+                traffic = _BILLING.setdefault("traffic", {"months": {}})
+                months = traffic.setdefault("months", {})
+                months[month] = _int(months.get(month), 0) + traffic_delta
                 changed = True
-            if not tracking:
-                s["usage_tracking"] = True
-                changed = True
-            if delta_total:
-                s["used_bytes"] = max(0, _int(s.get("used_bytes"), 0)) + delta_total
-                traffic_delta += delta_total
-                changed = True
-        if traffic_delta:
-            months = _BILLING.setdefault("traffic", {}).setdefault("months", {})
-            months[month] = max(0, _int(months.get(month), 0)) + traffic_delta
-            _save_billing_locked()
+            if changed:
+                _save()
         if changed:
-            _save()
-    if changed:
-        _reconcile_clients()
+            _reconcile_clients()
+        return changed
+    finally:
+        _USAGE_LOCK.release()
 
 
 def start_background():
@@ -747,78 +800,73 @@ def start_background():
 
 
 def _bg_loop():
+    next_usage = 0.0
     while True:
-        time.sleep(60)
+        current = time.time()
         try:
             _tick()
         except Exception:
             pass
-        try:
-            refresh_usage()
-        except Exception:
-            pass
+        if current >= next_usage:
+            next_usage = current + 60
+            try:
+                refresh_usage()
+            except Exception:
+                pass
+        time.sleep(5)
 
 
-def update(uid, name=None, plan=None, enabled=None, limit_bytes=None,
-           limit_devices=None, expires=None, remark=None):
-    """Обновление полей подписки. Возвращает подписку или None."""
+def update(uid, name=None, plan=None, enabled=None, limit_bytes=None, limit_devices=None,
+           limit_keys=None, expires=None, remark=None):
+    if plan is not None:
+        raise ValueError("смена тарифа только через purchase")
     with _LOCK:
-        for s in _SUBS:
-            if s.get("uid") != uid:
-                continue
-            if name is not None:
-                s["name"] = str(name).strip() or s["name"]
-            if plan is not None:
-                p = plan_info(plan)
-                if not p:
-                    return None
-                s["plan"] = plan
-                s["limit_bytes"] = p.get("bytes", 0)
-                s["limit_devices"] = p.get("devices", 0)
-            if enabled is not None:
-                s["enabled"] = bool(enabled)
-            if limit_bytes is not None:
-                s["limit_bytes"] = int(limit_bytes or 0)
-            if limit_devices is not None:
-                s["limit_devices"] = int(limit_devices or 0)
-            if expires is not None:
-                s["expires"] = int(expires or 0)
-            if remark is not None:
-                s["remark"] = str(remark or "").strip()
-            _save()
-            return dict(s)
-    return None
+        s = _find_locked(uid)
+        if s is None:
+            return None
+        if name is not None:
+            s["name"] = str(name).strip()[:64]
+        if enabled is not None:
+            if not isinstance(enabled, bool):
+                raise ValueError("enabled must be boolean")
+            s["enabled"] = enabled
+        if limit_bytes is not None:
+            s["limit_bytes"] = max(0, _int(limit_bytes, 0))
+        if limit_devices is not None:
+            s["limit_devices"] = max(1, _int(limit_devices, 1))
+        if limit_keys is not None:
+            s["limit_keys"] = max(1, _int(limit_keys, 1))
+        if expires is not None:
+            s["expires"] = max(0, _int(expires, 0))
+        if remark is not None:
+            s["remark"] = str(remark)[:200]
+        _save()
+        return dict(s)
 
 
 def add_key(uid, remark="", device_id=""):
-    """Добавляет ключ в подписку. Возвращает (new_key, sub) или (None, None)."""
     with _LOCK:
-        for s in _SUBS:
-            if s.get("uid") != uid:
-                continue
-            keys = s.get("keys", [])
-            if not isinstance(keys, list):
-                raise ValueError("subscription has invalid keys")
-            if _quota_exceeded(s):
-                return None, dict(s)
-            devices = set()
-            for key in keys:
-                if not isinstance(key, dict):
-                    raise ValueError("subscription has invalid key record")
-                devices.add(str(key.get("device_id") or key.get("id") or ""))
-            device = str(device_id or "").strip()[:64]
-            if device and device in devices:
-                return None, dict(s)
-            cap = _active_key_limit(s)
-            if len(keys) >= cap or len(devices) >= cap:
-                return None, dict(s)
-            k = make_key(device_id=device)
-            k["remark"] = str(remark or "").strip()
-            keys.append(k)
-            s["keys"] = keys
-            _save()
-            return dict(k), dict(s)
-    return None, None
+        s = _find_locked(uid)
+        if s is None:
+            return None, None
+        state = access_state(s)
+        if not state["ok"]:
+            raise PermissionError(state["reason"])
+        keys = s.get("keys") or []
+        did = str(device_id or "")[:64]
+        if did:
+            for k in keys:
+                if isinstance(k, dict) and str(k.get("device_id", "")) == did:
+                    return None, dict(s)
+        if len(keys) >= _active_key_limit(s):
+            return None, None
+        fresh = make_key(did)
+        fresh["remark"] = str(remark or "")[:80]
+        keys.append(fresh)
+        s["keys"] = keys
+        _save()
+        _reconcile_clients()
+        return dict(fresh), dict(s)
 
 
 def remove_key(uid, key_id):
@@ -848,24 +896,68 @@ def delete(uid):
     return False
 
 
-def access_status(sub, now=None):
+def access_state(sub, now=None):
+    ts = _now() if now is None else now
     if not isinstance(sub, dict):
-        return "invalid"
-    if not sub.get("enabled", True):
-        return "disabled"
-    if _expired(sub, now):
-        return "expired"
-    if _quota_exceeded(sub):
-        return "quota"
-    return "ok"
+        return {"ok": False, "reason": "invalid", "status": 403, "detail": "",
+                "keys": [], "used_bytes": 0, "limit_bytes": 0}
+    limit = _int(sub.get("limit_bytes"), 0)
+    used = _int(sub.get("used_bytes"), 0)
+    revoked = set(str(x) for x in (sub.get("revoked_key_ids") or []))
+    unassigned = set(str(x) for x in (sub.get("unassigned_key_ids") or []))
+    keys = []
+    for k in sub.get("keys") or []:
+        if not isinstance(k, dict):
+            continue
+        kid = str(k.get("id", ""))
+        if not kid or kid in revoked or kid in unassigned:
+            continue
+        keys.append(kid)
+    cap = _active_key_limit(sub)
+    if cap > 0:
+        keys = keys[:cap]
+    base = {"keys": keys, "used_bytes": used, "limit_bytes": limit, "detail": ""}
+    if sub.get("enabled", True) is not True:
+        base.update({"ok": False, "reason": "disabled", "status": 403})
+        return base
+    blocked = _int(sub.get("blocked_until"), 0)
+    if blocked > ts:
+        base.update({"ok": False, "reason": "suspended", "status": 403,
+                     "detail": str(sub.get("block_reason", ""))[:200]})
+        return base
+    if not plan_info(sub.get("plan")):
+        base.update({"ok": False, "reason": "invalid", "status": 403})
+        return base
+    if _expired(sub, ts):
+        base.update({"ok": False, "reason": "expired", "status": 410})
+        return base
+    if limit and used >= limit:
+        base.update({"ok": False, "reason": "traffic_exhausted", "status": 429})
+        return base
+    base.update({"ok": True, "reason": "active", "status": 200})
+    return base
+
+
+def access_reason(sub, now=None):
+    return access_state(sub, now)["reason"]
+
+
+def access_status(sub, now=None):
+    state = access_state(sub, now)
+    if state["ok"]:
+        return "ok"
+    return {"expired": "expired", "traffic_exhausted": "quota",
+            "disabled": "disabled", "suspended": "disabled"}.get(state["reason"], "invalid")
 
 
 def by_token_status(token):
-    clean = _clean_id(token or "")
-    with _LOCK:
-        for s in _SUBS:
-            if s.get("token") and _clean_id(s["token"]) == clean:
-                return dict(s), access_status(s)
+    clean = str(token or "").strip()
+    if not clean or len(clean) > 256 or not clean.isascii():
+        return None, "missing"
+    for s in list(_SUBS):
+        stored = str(s.get("token", "") or "")
+        if stored and hmac.compare_digest(stored, clean):
+            return dict(s), access_status(s)
     return None, "missing"
 
 
@@ -955,7 +1047,7 @@ def build_client_list():
             exp = int(s.get("expires", 0) or 0)
         except (TypeError, ValueError) as e:
             raise ValueError("subscription record %d has invalid expiry" % idx) from e
-        if access_status(s, now) != "ok":
+        if not access_state(s, now)["ok"]:
             continue
         keys = s.get("keys", [])
         if keys is None:
