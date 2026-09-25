@@ -47,6 +47,8 @@
       'sec.on': 'включён', 'sec.off': 'выключен', 'sec.access': 'LAN-only: ', 'sec.da': 'да', 'sec.no': 'нет', 'sec.blk': 'блок',
       'sec.rat': 'вкл', 'sec.rat-off': 'выкл',
       'log.empty': 'лог пуст', 'rec.empty': 'восстановлений не было',
+      'log.err': 'лог недоступен:',
+      'rec.err': 'журнал недоступен:',
       't.err': 'Сервер недоступен', 't.err-gen': 'Ошибка', 't.action-ok': 'Готово 🐾',
       'inv.need': 'Вставьте invite-код меша', 'inv.bad': 'invite не похож на aurora://invite — проверьте код',
       'inv.add-ok': 'Узел добавлен в меш 🕸️', 'inv.add-err': 'Не удалось подключиться', 'inv.leave-none': 'Нет узлов для отключения',
@@ -77,6 +79,8 @@
       'ru.partial': 'частично', 'ru.hint': 'Доступность российских ресурсов напрямую с сервера (без VPN). Если сегмент работает — RU-сайты открываются без прокси.', 'ru.ok': 'Доступно', 'ru.bad': 'Проблемы', 'ru.med': 'Медиана', 'ru.ts': 'Проверено',
       'ru.check-now': 'Проверить сейчас', 'th.domain': 'Домен', 'th.time': 'Время',
       'tgws.head': 'Telegram WS-прокси', 'tgws.proc': 'Процесс', 'tgws.secret': 'Секрет', 'tgws.restart': 'Рестарт TG-WS',
+      'tgws.link': 'Ссылка для клиента',
+      'tgws.copy': 'Копировать',
       'mj.head': 'Подключение к меш-сети', 'mj.p': 'Ваш прокси может быть частью приватной меш-сети Aurora. Это даёт доступ к эксклюзивным локациям других участников, автоматический обход блокировок и резервные маршруты.',
       'mj.invite-ph': 'Вставьте invite-код меша (например: aurora-home-a1b2c3d4)', 'mj.join': 'Подключиться', 'mj.st': 'Статус меша', 'mj.name': 'Имя меша', 'mj.role': 'Роль',
       'mj.nodes': 'Узлов доступно', 'mj.ping': 'Пинг до хаба', 'mj.enc': 'Шифрование', 'mj.what': 'Что даёт меш',
@@ -87,6 +91,12 @@
       'sp.head': 'Тарифные планы VPN', 'sp.hint': 'Тарифные планы VPN — для тех, у кого серый IP: нужен обход блокировок. Оплата и продление — через Telegram-бота, тариф подключается сразу.', 'sp.loading': 'загрузка тарифов…', 'sp.comp': 'Состав тарифов', 'th.func': 'Функция', 'th.val': 'Значение',
       'sf.instant': '+ оплата в Telegram-боте, активация мгновенно',
       'sb.head': 'Оплата и продление', 'sb.hint': 'Активный план, срок действия и история платежей. Продление — в один клик.', 'sb.plan': 'Текущий план', 'sb.until': 'Активен до', 'sb.buy': 'Оплатить в Telegram', 'btn.buy-tg': '💬 Купить в Telegram', 'sb.hist': 'История платежей', 'sb.active': 'Активных', 'sb.income': 'Доход за месяц', 'sb.traffic-month': 'Трафик за месяц',
+      'sb.form': 'Записать оплату или продление',
+      'sb.ph-uid': 'uid клиента',
+      'sb.ph-name': 'Имя нового клиента',
+      'sb.submit': 'Записать оплату',
+      'sb.need': 'Укажите клиента (uid) или имя нового',
+      'sb.ok': 'Оплата записана',
       'th.date': 'Дата', 'th.desc': 'Описание', 'th.sum': 'Сумма',
       'upd.apply': 'Обновить сейчас', 'upd.auto': 'Автообновление', 'upd.auto-hint': 'Обновление производится из GitHub-релизов. Бинарник скачивается, проверяется, заменяется атомарно — прокси перезапускается за пару секунд.',
       'upd.src': 'Источник обновлений', 'th.param': 'Параметр', 'upd.repo': 'Репозиторий', 'upd.sig': 'Проверка подписи', 'upd.rollback': 'Откат при сбое',
@@ -136,6 +146,8 @@
       'sec.on': 'enabled', 'sec.off': 'disabled', 'sec.access': 'LAN-only: ', 'sec.da': 'yes', 'sec.no': 'no', 'sec.blk': 'block',
       'sec.rat': 'on', 'sec.rat-off': 'off',
       'log.empty': 'log is empty', 'rec.empty': 'no recoveries',
+      'log.err': 'log unavailable:',
+      'rec.err': 'journal unavailable:',
       't.err': 'Server unavailable', 't.err-gen': 'Error', 't.action-ok': 'Done 🐾',
       'inv.need': 'Paste the mesh invite code', 'inv.bad': 'invite does not look like aurora://invite — check the code',
       'inv.add-ok': 'Node added to mesh 🕸️', 'inv.add-err': 'Could not connect', 'inv.leave-none': 'No nodes to disconnect',
@@ -166,6 +178,8 @@
       'ru.partial': 'partial', 'ru.hint': 'Availability of Russian resources directly from the server (without VPN). If the segment works — RU sites open without proxy.', 'ru.ok': 'Available', 'ru.bad': 'Issues', 'ru.med': 'Median', 'ru.ts': 'Checked',
       'ru.check-now': 'Check now', 'th.domain': 'Domain', 'th.time': 'Time',
       'tgws.head': 'Telegram WS-proxy', 'tgws.proc': 'Process', 'tgws.secret': 'Secret', 'tgws.restart': 'Restart TG-WS',
+      'tgws.link': 'Client link',
+      'tgws.copy': 'Copy',
       'mj.head': 'Join mesh network', 'mj.p': 'Your proxy can be part of the private Aurora mesh network. It gives access to exclusive locations of other members, automatic blocking bypass and backup routes.',
       'mj.invite-ph': 'Paste mesh invite code (e.g.: aurora-home-a1b2c3d4)', 'mj.join': 'Connect', 'mj.st': 'Mesh status', 'mj.name': 'Mesh name', 'mj.role': 'Role',
       'mj.nodes': 'Nodes available', 'mj.ping': 'Ping to hub', 'mj.enc': 'Encryption', 'mj.what': 'What mesh gives',
@@ -176,6 +190,12 @@
       'sp.head': 'VPN plans', 'sp.hint': 'VPN plans for those with a grey IP who need to bypass blocking. Payment and renewal go through the Telegram bot, the plan is applied instantly.', 'sp.loading': 'loading plans…', 'sp.comp': 'Plan contents', 'th.func': 'Feature', 'th.val': 'Value',
       'sf.instant': '+ paid via the Telegram bot, instant activation',
       'sb.head': 'Billing and renewal', 'sb.hint': 'Active plan, validity and payment history. Renewal — in one click.', 'sb.plan': 'Current plan', 'sb.until': 'Active until', 'sb.buy': 'Pay via Telegram', 'btn.buy-tg': '💬 Buy via Telegram', 'sb.hist': 'Payment history',
+      'sb.form': 'Record payment or renewal',
+      'sb.ph-uid': 'client uid',
+      'sb.ph-name': 'New client name',
+      'sb.submit': 'Record payment',
+      'sb.need': 'Enter a client uid or a new client name',
+      'sb.ok': 'Payment recorded',
       'th.date': 'Date', 'th.desc': 'Description', 'th.sum': 'Amount',
       'upd.apply': 'Update now', 'upd.auto': 'Auto-update', 'upd.auto-hint': 'Update is performed from GitHub releases. Binary is downloaded, verified, replaced atomically — proxy restarts in a couple of seconds.',
       'upd.src': 'Update source', 'th.param': 'Parameter', 'upd.repo': 'Repository', 'upd.sig': 'Signature check', 'upd.rollback': 'Rollback on failure',
@@ -225,6 +245,8 @@
       'sec.on': 'activado', 'sec.off': 'desactivado', 'sec.access': 'Solo LAN: ', 'sec.da': 'sí', 'sec.no': 'no', 'sec.blk': 'bloqueo',
       'sec.rat': 'on', 'sec.rat-off': 'off',
       'log.empty': 'registro vacío', 'rec.empty': 'no hubo recuperaciones',
+      'log.err': 'registro no disponible:',
+      'rec.err': 'journal no disponible:',
       't.err': 'Servidor no disponible', 't.err-gen': 'Error', 't.action-ok': 'Hecho 🐾',
       'inv.need': 'Pegue el código de invitación', 'inv.bad': 'invitación no parece aurora://invite — revise el código',
       'inv.add-ok': 'Nodo añadido a mesh 🕸️', 'inv.add-err': 'No se pudo conectar', 'inv.leave-none': 'No hay nodos para desconectar',
@@ -255,6 +277,8 @@
       'ru.partial': 'parcial', 'ru.hint': 'Disponibilidad de recursos rusos directamente desde el servidor (sin VPN). Si el segmento funciona — los sitios RU abren sin proxy.', 'ru.ok': 'Disponible', 'ru.bad': 'Problemas', 'ru.med': 'Mediana', 'ru.ts': 'Comprobado',
       'ru.check-now': 'Comprobar ahora', 'th.domain': 'Dominio', 'th.time': 'Tiempo',
       'tgws.head': 'Proxy WS de Telegram', 'tgws.proc': 'Proceso', 'tgws.secret': 'Secreto', 'tgws.restart': 'Reiniciar TG-WS',
+      'tgws.link': 'Enlace para el cliente',
+      'tgws.copy': 'Copiar',
       'mj.head': 'Conectar a la red mesh', 'mj.p': 'Tu proxy puede ser parte de la red mesh privada Aurora. Da acceso a ubicaciones exclusivas de otros miembros, bypass automático de bloqueos y rutas de respaldo.',
       'mj.invite-ph': 'Pega el código de invite del mesh (p. ej.: aurora-home-a1b2c3d4)', 'mj.join': 'Conectar', 'mj.st': 'Estado del mesh', 'mj.name': 'Nombre del mesh', 'mj.role': 'Rol',
       'mj.nodes': 'Nodos disponibles', 'mj.ping': 'Ping al hub', 'mj.enc': 'Cifrado', 'mj.what': 'Qué da el mesh',
@@ -265,6 +289,12 @@
       'sp.head': 'Planes VPN', 'sp.hint': 'Planes VPN para quien tiene IP gris y necesita saltar el bloqueo. El pago y la renovación se hacen en el bot de Telegram, el plan se activa al instante.', 'sp.loading': 'cargando planes…', 'sp.comp': 'Contenido del plan', 'th.func': 'Función', 'th.val': 'Valor',
       'sf.instant': '+ pago en el bot de Telegram, activación inmediata',
       'sb.head': 'Pago y renovación', 'sb.hint': 'Plan activo, vigencia e historial de pagos. Renovación con un clic.', 'sb.plan': 'Plan actual', 'sb.until': 'Válido hasta', 'sb.buy': 'Pagar por Telegram', 'btn.buy-tg': '💬 Comprar en Telegram', 'sb.hist': 'Historial de pagos',
+      'sb.form': 'Registrar pago o renovación',
+      'sb.ph-uid': 'uid del cliente',
+      'sb.ph-name': 'Nombre del nuevo cliente',
+      'sb.submit': 'Registrar pago',
+      'sb.need': 'Indique el uid del cliente o un nombre nuevo',
+      'sb.ok': 'Pago registrado',
       'th.date': 'Fecha', 'th.desc': 'Descripción', 'th.sum': 'Importe',
       'upd.apply': 'Actualizar ahora', 'upd.auto': 'Auto-actualización', 'upd.auto-hint': 'La actualización se realiza desde los lanzamientos de GitHub. El binario se descarga, verifica y reemplaza atómicamente — el proxy se reinicia en un par de segundos.',
       'upd.src': 'Fuente de actualización', 'th.param': 'Parámetro', 'upd.repo': 'Repositorio', 'upd.sig': 'Verificación de firma', 'upd.rollback': 'Reversión en fallo',
@@ -314,6 +344,8 @@
       'sec.on': 'aktiviert', 'sec.off': 'deaktiviert', 'sec.access': 'Nur LAN: ', 'sec.da': 'ja', 'sec.no': 'nein', 'sec.blk': 'Block',
       'sec.rat': 'an', 'sec.rat-off': 'aus',
       'log.empty': 'Log ist leer', 'rec.empty': 'keine Wiederherstellungen',
+      'log.err': 'Log nicht verfügbar:',
+      'rec.err': 'Journal nicht verfügbar:',
       't.err': 'Server nicht verfügbar', 't.err-gen': 'Fehler', 't.action-ok': 'Fertig 🐾',
       'inv.need': 'Mesh-Einladungscode einfügen', 'inv.bad': 'Einladung sieht nicht nach aurora://invite aus — Code prüfen',
       'inv.add-ok': 'Knoten zum Mesh hinzugefügt 🕸️', 'inv.add-err': 'Verbinden fehlgeschlagen', 'inv.leave-none': 'Keine Knoten zum Trennen',
@@ -344,6 +376,8 @@
       'ru.partial': 'teilweise', 'ru.hint': 'Verfügbarkeit russischer Ressourcen direkt vom Server (ohne VPN). Wenn das Segment funktioniert — RU-Seiten öffnen sich ohne Proxy.', 'ru.ok': 'Verfügbar', 'ru.bad': 'Probleme', 'ru.med': 'Median', 'ru.ts': 'Geprüft',
       'ru.check-now': 'Jetzt prüfen', 'th.domain': 'Domain', 'th.time': 'Zeit',
       'tgws.head': 'Telegram-WS-Proxy', 'tgws.proc': 'Prozess', 'tgws.secret': 'Geheimnis', 'tgws.restart': 'TG-WS neu starten',
+      'tgws.link': 'Link für den Client',
+      'tgws.copy': 'Kopieren',
       'mj.head': 'Mesh-Netzwerk beitreten', 'mj.p': 'Dein Proxy kann Teil des privaten Aurora-Mesh sein. Das gibt Zugang zu exklusiven Standorten anderer Teilnehmer, automatische Umgehung von Sperren und Backup-Routen.',
       'mj.invite-ph': 'Mesh-Invite-Code einfügen (z. B.: aurora-home-a1b2c3d4)', 'mj.join': 'Verbinden', 'mj.st': 'Mesh-Status', 'mj.name': 'Mesh-Name', 'mj.role': 'Rolle',
       'mj.nodes': 'Knoten verfügbar', 'mj.ping': 'Ping zum Hub', 'mj.enc': 'Verschlüsselung', 'mj.what': 'Was das Mesh bringt',
@@ -354,6 +388,12 @@
       'sp.head': 'VPN-Tarife', 'sp.hint': 'VPN-Tarife für alle mit grauer IP, die Sperren umgehen müssen. Zahlung und Verlängerung laufen über den Telegram-Bot, der Tarif startet sofort.', 'sp.loading': 'Tarife laden…', 'sp.comp': 'Tarifinhalt', 'th.func': 'Funktion', 'th.val': 'Wert',
       'sf.instant': '+ Bezahlung per Telegram-Bot, sofortige Aktivierung',
       'sb.head': 'Zahlung und Verlängerung', 'sb.hint': 'Aktiver Tarif, Laufzeit und Zahlungshistorie. Verlängerung mit einem Klick.', 'sb.plan': 'Aktueller Tarif', 'sb.until': 'Gültig bis', 'sb.buy': 'Per Telegram bezahlen', 'btn.buy-tg': '💬 Per Telegram kaufen', 'sb.hist': 'Zahlungshistorie',
+      'sb.form': 'Zahlung oder Verlängerung erfassen',
+      'sb.ph-uid': 'Kunden-uid',
+      'sb.ph-name': 'Name des neuen Kunden',
+      'sb.submit': 'Zahlung erfassen',
+      'sb.need': 'Kunden-uid oder neuen Namen angeben',
+      'sb.ok': 'Zahlung erfasst',
       'th.date': 'Datum', 'th.desc': 'Beschreibung', 'th.sum': 'Betrag',
       'upd.apply': 'Jetzt aktualisieren', 'upd.auto': 'Auto-Update', 'upd.auto-hint': 'Das Update kommt aus den GitHub-Releases. Der Binär wird heruntergeladen, verifiziert, atomar ersetzt — der Proxy startet in wenigen Sekunden neu.',
       'upd.src': 'Update-Quelle', 'th.param': 'Parameter', 'upd.repo': 'Repository', 'upd.sig': 'Signaturprüfung', 'upd.rollback': 'Rollback bei Fehler',
@@ -403,6 +443,8 @@
       'sec.on': 'activé', 'sec.off': 'désactivé', 'sec.access': 'LAN uniquement : ', 'sec.da': 'oui', 'sec.no': 'non', 'sec.blk': 'blocage',
       'sec.rat': 'on', 'sec.rat-off': 'off',
       'log.empty': 'journal vide', 'rec.empty': 'aucune récupération',
+      'log.err': 'journal indisponible :',
+      'rec.err': 'journal indisponible :',
       't.err': 'Serveur indisponible', 't.err-gen': 'Erreur', 't.action-ok': 'Terminé 🐾',
       'inv.need': 'Collez le code d\'invitation mesh', 'inv.bad': 'l\'invitation ne ressemble pas à aurora://invite — vérifiez le code',
       'inv.add-ok': 'Nœud ajouté au mesh 🕸️', 'inv.add-err': 'Connexion impossible', 'inv.leave-none': 'Aucun nœud à déconnecter',
@@ -433,6 +475,8 @@
       'ru.partial': 'partiel', 'ru.hint': 'Disponibilité des ressources russes directement depuis le serveur (sans VPN). Si le segment fonctionne — les sites RU s\'ouvrent sans proxy.', 'ru.ok': 'Disponible', 'ru.bad': 'Problèmes', 'ru.med': 'Médiane', 'ru.ts': 'Vérifié',
       'ru.check-now': 'Vérifier maintenant', 'th.domain': 'Domaine', 'th.time': 'Temps',
       'tgws.head': 'Proxy WS Telegram', 'tgws.proc': 'Processus', 'tgws.secret': 'Secret', 'tgws.restart': 'Redémarrer TG-WS',
+      'tgws.link': 'Lien pour le client',
+      'tgws.copy': 'Copier',
       'mj.head': 'Rejoindre le réseau mesh', 'mj.p': 'Votre proxy peut faire partie du réseau mesh privé Aurora. Cela donne accès à des localisations exclusives d\'autres membres, au contournement automatique des blocages et à des routes de secours.',
       'mj.invite-ph': 'Collez le code invite du mesh (ex. : aurora-home-a1b2c3d4)', 'mj.join': 'Connecter', 'mj.st': 'État du mesh', 'mj.name': 'Nom du mesh', 'mj.role': 'Rôle',
       'mj.nodes': 'Nœuds disponibles', 'mj.ping': 'Ping vers le hub', 'mj.enc': 'Chiffrement', 'mj.what': 'Ce que le mesh apporte',
@@ -443,6 +487,12 @@
       'sp.head': 'Forfaits VPN', 'sp.hint': 'Forfaits VPN pour les IP grises qui doivent contourner le blocage. Paiement et renouvellement passent par le bot Telegram, le forfait est actif aussitôt.', 'sp.loading': 'chargement des forfaits…', 'sp.comp': 'Contenu du forfait', 'th.func': 'Fonction', 'th.val': 'Valeur',
       'sf.instant': '+ paiement dans le bot Telegram, activation immédiate',
       'sb.head': 'Paiement et prolongation', 'sb.hint': 'Forfait actif, validité et historique des paiements. Prolongation en un clic.', 'sb.plan': 'Forfait actuel', 'sb.until': 'Valable jusqu\'au', 'sb.buy': 'Payer via Telegram', 'btn.buy-tg': '💬 Acheter via Telegram', 'sb.hist': 'Historique des paiements',
+      'sb.form': 'Enregistrer un paiement ou un renouvellement',
+      'sb.ph-uid': 'uid du client',
+      'sb.ph-name': 'Nom du nouveau client',
+      'sb.submit': 'Enregistrer le paiement',
+      'sb.need': 'Indiquez un uid client ou un nouveau nom',
+      'sb.ok': 'Paiement enregistré',
       'th.date': 'Date', 'th.desc': 'Description', 'th.sum': 'Montant',
       'upd.apply': 'Mettre à jour maintenant', 'upd.auto': 'Mise à jour auto', 'upd.auto-hint': 'La mise à jour provient des releases GitHub. Le binaire est téléchargé, vérifié, remplacé atomiquement — le proxy redémarre en quelques secondes.',
       'upd.src': 'Source de mise à jour', 'th.param': 'Paramètre', 'upd.repo': 'Dépôt', 'upd.sig': 'Vérification de signature', 'upd.rollback': 'Restauration en cas d\'échec',
@@ -492,6 +542,8 @@
       'sec.on': 'açık', 'sec.off': 'kapalı', 'sec.access': 'Yalnızca LAN: ', 'sec.da': 'evet', 'sec.no': 'hayır', 'sec.blk': 'engelle',
       'sec.rat': 'açık', 'sec.rat-off': 'kapalı',
       'log.empty': 'günlük boş', 'rec.empty': 'kurtarma yok',
+      'log.err': 'günlük yok:',
+      'rec.err': 'kurtarma günlüğü yok:',
       't.err': 'Sunucu kullanılamıyor', 't.err-gen': 'Hata', 't.action-ok': 'Tamam 🐾',
       'inv.need': 'Mesh davet kodunu yapıştırın', 'inv.bad': 'davet aurora://invite gibi görünmüyor — kodu kontrol edin',
       'inv.add-ok': 'Düğüm mesha eklendi 🕸️', 'inv.add-err': 'Bağlanılamadı', 'inv.leave-none': 'Ayrılacak düğüm yok',
@@ -522,6 +574,8 @@
       'ru.partial': 'kısmen', 'ru.hint': 'Rus kaynaklarının sunucudan doğrudan (VPN\'siz) erişilebilirliği. Segment çalışıyorsa — RU siteleri proxiesiz açılır.', 'ru.ok': 'Erişilebilir', 'ru.bad': 'Sorunlar', 'ru.med': 'Medyan', 'ru.ts': 'Kontrol edildi',
       'ru.check-now': 'Şimdi kontrol et', 'th.domain': 'Alan adı', 'th.time': 'Süre',
       'tgws.head': 'Telegram WS-proxy', 'tgws.proc': 'İşlem', 'tgws.secret': 'Sır', 'tgws.restart': 'TG-WS\'yi yeniden başlat',
+      'tgws.link': 'İstemci bağlantısı',
+      'tgws.copy': 'Kopyala',
       'mj.head': 'Mesh ağına bağlan', 'mj.p': 'Proxy\'nuz özel Aurora mesh ağının parçası olabilir. Bu, diğer katılımcıların özel konumlarına erişim, otomatik engel atlatma ve yedek rotalar sağlar.',
       'mj.invite-ph': 'Mesh invite kodunu yapıştır (örn.: aurora-home-a1b2c3d4)', 'mj.join': 'Bağlan', 'mj.st': 'Mesh durumu', 'mj.name': 'Mesh adı', 'mj.role': 'Rol',
       'mj.nodes': 'Erişilebilir düğüm', 'mj.ping': 'Hub pingi', 'mj.enc': 'Şifreleme', 'mj.what': 'Mesh ne sağlar',
@@ -532,6 +586,12 @@
       'sp.head': 'VPN planları', 'sp.hint': 'Gri IP nedeniyle engellenmeleri aşması gerekenler için VPN planları. Ödeme ve yenileme Telegram botunda yapılır, plan anında açılır.', 'sp.loading': 'tarifeler yükleniyor…', 'sp.comp': 'Tarife içeriği', 'th.func': 'İşlev', 'th.val': 'Değer',
       'sf.instant': '+ Telegram botunda ödeme, anında etkinleşir',
       'sb.head': 'Ödeme ve uzatma', 'sb.hint': 'Aktif tarife, süre ve ödeme geçmişi. Tek tıkla uzatma.', 'sb.plan': 'Mevcut tarife', 'sb.until': 'Geçerlilik', 'sb.buy': 'Telegram ile öde', 'btn.buy-tg': '💬 Telegram\'dan satın al', 'sb.hist': 'Ödeme geçmişi',
+      'sb.form': 'Ödeme veya yenileme kaydı',
+      'sb.ph-uid': 'istemci uid',
+      'sb.ph-name': 'Yeni istemci adı',
+      'sb.submit': 'Ödemeyi kaydet',
+      'sb.need': 'İstemci uid veya yeni ad girin',
+      'sb.ok': 'Ödeme kaydedildi',
       'th.date': 'Tarih', 'th.desc': 'Açıklama', 'th.sum': 'Tutar',
       'upd.apply': 'Şimdi güncelle', 'upd.auto': 'Otomatik güncelleme', 'upd.auto-hint': 'Güncelleme GitHub sürümlerinden yapılır. İkili indirilir, doğrulanır, atomik değiştirilir — proxy birkaç saniyede yeniden başlar.',
       'upd.src': 'Güncelleme kaynağı', 'th.param': 'Parametre', 'upd.repo': 'Depo', 'upd.sig': 'İmza kontrolü', 'upd.rollback': 'Hata durumunda geri dönüş',
@@ -581,6 +641,8 @@
       'sec.on': 'habilitado', 'sec.off': 'desabilitado', 'sec.access': 'Somente LAN: ', 'sec.da': 'sim', 'sec.no': 'não', 'sec.blk': 'bloquear',
       'sec.rat': 'on', 'sec.rat-off': 'off',
       'log.empty': 'log vazio', 'rec.empty': 'sem recuperações',
+      'log.err': 'log indisponível:',
+      'rec.err': 'journal indisponível:',
       't.err': 'Servidor indisponível', 't.err-gen': 'Erro', 't.action-ok': 'Pronto 🐾',
       'inv.need': 'Cole o código de convite do mesh', 'inv.bad': 'convite não parece aurora://invite — verifique o código',
       'inv.add-ok': 'Nó adicionado ao mesh 🕸️', 'inv.add-err': 'Não foi possível conectar', 'inv.leave-none': 'Nenhum nó para desconectar',
@@ -611,6 +673,8 @@
       'ru.partial': 'parcial', 'ru.hint': 'Disponibilidade de recursos russos diretamente do servidor (sem VPN). Se o segmento funciona — os sites RU abrem sem proxy.', 'ru.ok': 'Disponível', 'ru.bad': 'Problemas', 'ru.med': 'Mediana', 'ru.ts': 'Verificado',
       'ru.check-now': 'Verificar agora', 'th.domain': 'Domínio', 'th.time': 'Tempo',
       'tgws.head': 'Proxy WS do Telegram', 'tgws.proc': 'Processo', 'tgws.secret': 'Segredo', 'tgws.restart': 'Reiniciar TG-WS',
+      'tgws.link': 'Ligação para o cliente',
+      'tgws.copy': 'Copiar',
       'mj.head': 'Entrar na rede mesh', 'mj.p': 'Seu proxy pode fazer parte da rede mesh privada Aurora. Isso dá acesso a localizações exclusivas de outros membros, desvio automático de bloqueios e rotas de reserva.',
       'mj.invite-ph': 'Cole o código invite do mesh (ex.: aurora-home-a1b2c3d4)', 'mj.join': 'Conectar', 'mj.st': 'Estado do mesh', 'mj.name': 'Nome do mesh', 'mj.role': 'Papel',
       'mj.nodes': 'Nós disponíveis', 'mj.ping': 'Ping ao hub', 'mj.enc': 'Criptografia', 'mj.what': 'O que o mesh dá',
@@ -621,6 +685,12 @@
       'sp.head': 'Planos VPN', 'sp.hint': 'Planos VPN para quem tem IP cinza e precisa contornar bloqueios. Pagamento e renovação são feitos no bot do Telegram, o plano é ativado na hora.', 'sp.loading': 'carregando planos…', 'sp.comp': 'Conteúdo do plano', 'th.func': 'Função', 'th.val': 'Valor',
       'sf.instant': '+ pagamento no bot do Telegram, ativação na hora',
       'sb.head': 'Pagamento e renovação', 'sb.hint': 'Plano ativo, validade e histórico de pagamentos. Renovação em um clique.', 'sb.plan': 'Plano atual', 'sb.until': 'Válido até', 'sb.buy': 'Pagar via Telegram', 'btn.buy-tg': '💬 Comprar via Telegram', 'sb.hist': 'Histórico de pagamentos',
+      'sb.form': 'Registar pagamento ou renovação',
+      'sb.ph-uid': 'uid do cliente',
+      'sb.ph-name': 'Nome do novo cliente',
+      'sb.submit': 'Registar pagamento',
+      'sb.need': 'Indique o uid do cliente ou um novo nome',
+      'sb.ok': 'Pagamento registado',
       'th.date': 'Data', 'th.desc': 'Descrição', 'th.sum': 'Valor',
       'upd.apply': 'Atualizar agora', 'upd.auto': 'Auto-atualização', 'upd.auto-hint': 'A atualização vem dos releases do GitHub. O binário é baixado, verificado, substituído atomicamente — o proxy reinicia em alguns segundos.',
       'upd.src': 'Origem da atualização', 'th.param': 'Parâmetro', 'upd.repo': 'Repositório', 'upd.sig': 'Verificação de assinatura', 'upd.rollback': 'Reversão em falha',
@@ -670,6 +740,8 @@
       'sec.on': '已启用', 'sec.off': '已禁用', 'sec.access': '仅局域网：', 'sec.da': '是', 'sec.no': '否', 'sec.blk': '阻止',
       'sec.rat': '开', 'sec.rat-off': '关',
       'log.empty': '日志为空', 'rec.empty': '无恢复记录',
+      'log.err': '日志不可用：',
+      'rec.err': '日志不可用：',
       't.err': '服务器不可用', 't.err-gen': '错误', 't.action-ok': '完成 🐾',
       'inv.need': '粘贴 mesh 邀请码', 'inv.bad': '邀请不像 aurora://invite — 请检查代码',
       'inv.add-ok': '节点已加入 mesh 🕸️', 'inv.add-err': '连接失败', 'inv.leave-none': '没有要断开的节点',
@@ -700,6 +772,8 @@
       'ru.partial': '部分', 'ru.hint': '从服务器直连访问俄罗斯资源（不带 VPN）。如果网段正常 — RU 网站无需代理即可打开。', 'ru.ok': '可用', 'ru.bad': '问题', 'ru.med': '中位数', 'ru.ts': '已检查',
       'ru.check-now': '立即检查', 'th.domain': '域名', 'th.time': '时间',
       'tgws.head': 'Telegram WS 代理', 'tgws.proc': '进程', 'tgws.secret': '密钥', 'tgws.restart': '重启 TG-WS',
+      'tgws.link': '客户端链接',
+      'tgws.copy': '复制',
       'mj.head': '加入 Mesh 网络', 'mj.p': '你的代理可以成为私有 Aurora Mesh 网络的一部分。这提供其他成员专属位置、自动绕过封锁和备用路由。',
       'mj.invite-ph': '粘贴 Mesh 邀请码（例如：aurora-home-a1b2c3d4）', 'mj.join': '连接', 'mj.st': 'Mesh 状态', 'mj.name': 'Mesh 名称', 'mj.role': '角色',
       'mj.nodes': '可用节点', 'mj.ping': '到中心的延迟', 'mj.enc': '加密', 'mj.what': 'Mesh 带来什么',
@@ -710,6 +784,12 @@
       'sp.head': 'VPN 套餐', 'sp.hint': '面向需要绕过封锁的灰 IP 用户。付款与续费在 Telegram 机器人中完成，套餐立即开通。', 'sp.loading': '加载中…', 'sp.comp': '套餐内容', 'th.func': '功能', 'th.val': '数值',
       'sf.instant': '+ 通过 Telegram 机器人付款，即时开通',
       'sb.head': '支付与续费', 'sb.hint': '当前套餐、有效期和支付记录。一键续费。', 'sb.plan': '当前套餐', 'sb.until': '有效至', 'sb.buy': '通过 Telegram 支付', 'btn.buy-tg': '💬 通过 Telegram 购买', 'sb.hist': '支付记录',
+      'sb.form': '登记付款或续费',
+      'sb.ph-uid': '客户 uid',
+      'sb.ph-name': '新客户名称',
+      'sb.submit': '登记付款',
+      'sb.need': '请填写客户 uid 或新客户名称',
+      'sb.ok': '付款已登记',
       'th.date': '日期', 'th.desc': '描述', 'th.sum': '金额',
       'upd.apply': '立即更新', 'upd.auto': '自动更新', 'upd.auto-hint': '更新来自 GitHub 发布版。二进制下载、验证、原子替换 — 代理几秒后重启。',
       'upd.src': '更新来源', 'th.param': '参数', 'upd.repo': '仓库', 'upd.sig': '签名验证', 'upd.rollback': '失败时回滚',
@@ -759,6 +839,8 @@
       'sec.on': 'مفعّل', 'sec.off': 'معطّل', 'sec.access': 'LAN فقط: ', 'sec.da': 'نعم', 'sec.no': 'لا', 'sec.blk': 'حظر',
       'sec.rat': 'تفعيل', 'sec.rat-off': 'تعطيل',
       'log.empty': 'السجل فارغ', 'rec.empty': 'لا توجد عمليات استعادة',
+      'log.err': 'السجل غير متاح:',
+      'rec.err': 'السجل غير متاح:',
       't.err': 'الخادم غير متاح', 't.err-gen': 'خطأ', 't.action-ok': 'تم 🐾',
       'inv.need': 'الصق رمز دعوة الشبكة', 'inv.bad': 'الدعوة لا تشبه aurora://invite — تحقق من الرمز',
       'inv.add-ok': 'تمت إضافة العقدة إلى الشبكة 🕸️', 'inv.add-err': 'تعذر الاتصال', 'inv.leave-none': 'لا توجد عقد لفصلها',
@@ -789,6 +871,8 @@
       'ru.partial': 'جزئي', 'ru.hint': 'توفر الموارد الروسية مباشرة من الخادم (بدون VPN). إذا كان القطاع يعمل — تفتح مواقع RU بدون بروكسي.', 'ru.ok': 'متاح', 'ru.bad': 'مشاكل', 'ru.med': 'الوسيط', 'ru.ts': 'تم التحقق',
       'ru.check-now': 'تحقق الآن', 'th.domain': 'النطاق', 'th.time': 'الوقت',
       'tgws.head': 'بروكسي WS لتليجرام', 'tgws.proc': 'العملية', 'tgws.secret': 'السر', 'tgws.restart': 'إعادة تشغيل TG-WS',
+      'tgws.link': 'رابط العميل',
+      'tgws.copy': 'نسخ',
       'mj.head': 'الانضمام لشبكة mesh', 'mj.p': 'يمكن لبروكسيك أن يكون جزءاً من شبكة Aurora mesh الخاصة. يمنح ذلك الوصول إلى مواقع حصرية لأعضاء آخرين، وتجاوز الحجب تلقائياً وطرق احتياطية.',
       'mj.invite-ph': 'الصق رمز دعوة mesh (مثال: aurora-home-a1b2c3d4)', 'mj.join': 'اتصال', 'mj.st': 'حالة mesh', 'mj.name': 'اسم mesh', 'mj.role': 'الدور',
       'mj.nodes': 'العقد المتاحة', 'mj.ping': 'البنغ إلى المحور', 'mj.enc': 'التشفير', 'mj.what': 'ماذا يقدم mesh',
@@ -799,6 +883,12 @@
       'sp.head': 'خطط VPN', 'sp.hint': 'خطط VPN لمن لديه IP رمادي ويحتاج إلى تجاوز الحظر. الدفع والتجديد عبر بوت تيليجرام، ويُفعَّل الخطة فورًا.', 'sp.loading': 'جارٍ تحميل الخطط…', 'sp.comp': 'محتوى الخطة', 'th.func': 'الوظيفة', 'th.val': 'القيمة',
       'sf.instant': '+ الدفع عبر بوت تيليجرام، تفعيل فوري',
       'sb.head': 'الدفع والتجديد', 'sb.hint': 'الخطة النشطة وصلاحيتها وسجل الدفعات. التجديد بنقرة واحدة.', 'sb.plan': 'الخطة الحالية', 'sb.until': 'صالحة حتى', 'sb.buy': 'الدفع عبر Telegram', 'btn.buy-tg': '💬 الشراء عبر Telegram', 'sb.hist': 'سجل الدفعات',
+      'sb.form': 'تسجيل الدفع أو التجديد',
+      'sb.ph-uid': 'معرّف العميل',
+      'sb.ph-name': 'اسم العميل الجديد',
+      'sb.submit': 'تسجيل الدفع',
+      'sb.need': 'أدخل معرّف العميل أو اسمًا جديدًا',
+      'sb.ok': 'تم تسجيل الدفع',
       'th.date': 'التاريخ', 'th.desc': 'الوصف', 'th.sum': 'المبلغ',
       'upd.apply': 'تحديث الآن', 'upd.auto': 'تحديث تلقائي', 'upd.auto-hint': 'يتم التحديث من إصدارات GitHub. يُنزل الملف، يُتحقق منه، يُستبدل ذرياً — يعاد تشغيل البروكسي خلال ثوانٍ.',
       'upd.src': 'مصدر التحديث', 'th.param': 'المعامل', 'upd.repo': 'المستودع', 'upd.sig': 'التحقق من التوقيع', 'upd.rollback': 'تراجع عند الفشل',
@@ -848,6 +938,8 @@
       'sec.on': 'सक्षम', 'sec.off': 'अक्षम', 'sec.access': 'केवल LAN: ', 'sec.da': 'हाँ', 'sec.no': 'नहीं', 'sec.blk': 'ब्लॉक',
       'sec.rat': 'चालू', 'sec.rat-off': 'बंद',
       'log.empty': 'लॉग खाली है', 'rec.empty': 'कोई पुनर्प्राप्ति नहीं',
+      'log.err': 'लॉग उपलब्ध नहीं:',
+      'rec.err': 'लॉग उपलब्ध नहीं:',
       't.err': 'सर्वर अनुपलब्ध', 't.err-gen': 'त्रुटि', 't.action-ok': 'हो गया 🐾',
       'inv.need': 'मेश निमंत्रण कोड चिपकाएँ', 'inv.bad': 'निमंत्रण aurora://invite नहीं लगता — कोड जाँचें',
       'inv.add-ok': 'नोड मेश में जोड़ा गया 🕸️', 'inv.add-err': 'कनेक्ट नहीं हो सका', 'inv.leave-none': 'डिस्कनेक्ट करने के लिए कोई नोड नहीं',
@@ -878,6 +970,8 @@
       'ru.partial': 'आंशिक', 'ru.hint': 'रूसी संसाधनों की सीधी उपलब्धता सर्वर से (VPN के बिना)। यदि सेगमेंट काम करता है — RU साइटें प्रॉक्सी के बिना खुलती हैं।', 'ru.ok': 'उपलब्ध', 'ru.bad': 'समस्याएँ', 'ru.med': 'माध्य', 'ru.ts': 'जाँचा गया',
       'ru.check-now': 'अभी जाँचें', 'th.domain': 'डोमेन', 'th.time': 'समय',
       'tgws.head': 'Telegram WS-प्रॉक्सी', 'tgws.proc': 'प्रक्रिया', 'tgws.secret': 'गुप्त', 'tgws.restart': 'TG-WS पुनः आरंभ',
+      'tgws.link': 'क्लाइंट लिंक',
+      'tgws.copy': 'कॉपी',
       'mj.head': 'Mesh नेटवर्क से जुड़ें', 'mj.p': 'आपका प्रॉक्सी निजी Aurora mesh नेटवर्क का हिस्सा हो सकता है। यह अन्य सदस्यों के विशेष स्थानों, स्वचालित ब्लॉक-बायपास और बैकअप रूट्स तक पहुँच देता है।',
       'mj.invite-ph': 'Mesh इन्वाइट कोड पेस्ट करें (जैसे: aurora-home-a1b2c3d4)', 'mj.join': 'कनेक्ट', 'mj.st': 'Mesh स्थिति', 'mj.name': 'Mesh नाम', 'mj.role': 'भूमिका',
       'mj.nodes': 'उपलब्ध नोड', 'mj.ping': 'हब तक ping', 'mj.enc': 'एन्क्रिप्शन', 'mj.what': 'Mesh क्या देता है',
@@ -888,6 +982,12 @@
       'sp.head': 'VPN प्लान', 'sp.hint': 'ग्रे IP वालों के लिए VPN प्लान — ब्लॉक हटाने के लिए। भुगतान और नवीनीकरण Telegram बॉट में, प्लान तुरंत सक्रिय।', 'sp.loading': 'प्लान लोड हो रहे…', 'sp.comp': 'प्लान सामग्री', 'th.func': 'सुविधा', 'th.val': 'मान',
       'sf.instant': '+ टेलीग्राम बॉट में भुगतान, तुरंत सक्रिय',
       'sb.head': 'भुगतान और नवीनीकरण', 'sb.hint': 'सक्रिय प्लान, अवधि और भुगतान इतिहास। एक क्लिक में नवीनीकरण।', 'sb.plan': 'वर्तमान प्लान', 'sb.until': 'मान्य तक', 'sb.buy': 'Telegram से भुगतान', 'btn.buy-tg': '💬 Telegram से खरीदें', 'sb.hist': 'भुगतान इतिहास',
+      'sb.form': 'भुगतान या नवीनीकरण दर्ज करें',
+      'sb.ph-uid': 'क्लाइंट uid',
+      'sb.ph-name': 'नए क्लाइंट का नाम',
+      'sb.submit': 'भुगतान दर्ज करें',
+      'sb.need': 'क्लाइंट uid या नया नाम दर्ज करें',
+      'sb.ok': 'भुगतान दर्ज हो गया',
       'th.date': 'दिनांक', 'th.desc': 'विवरण', 'th.sum': 'राशि',
       'upd.apply': 'अभी अपडेट करें', 'upd.auto': 'ऑटो-अपडेट', 'upd.auto-hint': 'अपडेट GitHub रिलीज़ से होता है। बाइनरी डाउनलोड, सत्यापित, परमाणु रूप से बदली जाती है — प्रॉक्सी कुछ सेकंड में पुनः आरंभ हो जाता है।',
       'upd.src': 'अपडेट स्रोत', 'th.param': 'पैरामीटर', 'upd.repo': 'रिपॉज़िटरी', 'upd.sig': 'हस्ताक्षर जाँच', 'upd.rollback': 'विफलता पर रोलबैक',
@@ -1232,8 +1332,10 @@
       $('du-cur').textContent = j.current || '—';
       $('du-new').textContent = j.latest || '—';
       $('du-msg').textContent = msgText;
-      $('dash-update').style.display = avail ? '' : 'none';
-      $('side-upd').style.display = avail ? '' : 'none';
+      // Карточка обновления видна всегда: кнопка «Обновить сейчас» нужна и когда
+      // новой версии ещё нет (проверить и поставить), и когда она уже вышла.
+      $('dash-update').style.display = '';
+      $('side-upd').style.display = '';
       var updTag = $('tag-upd');
       if (updTag) { updTag.style.display = avail ? '' : 'none'; }
       $('upd-cur').textContent = j.current || '—';
@@ -1255,11 +1357,21 @@
       var arr = j.versions || [];
       var box = $('ver-list');
       if (!box) return;
+      var cur = j.current || '';
+      var upd = (V.UPD && (V.UPD.latest || V.UPD.update)) ? (V.UPD.latest || '') : '';
       box.innerHTML = arr.map(function (x) {
-        return '<div class="ver-item" style="padding:10px 18px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center;font-size:13px">' +
-          '<span class="badge">v' + esc(x.v || '') + '</span>' +
-          '<b style="flex:1">' + esc(x.name || '') + '</b>' +
-          '<span class="muted mono" style="font-size:12px">' + esc(x.date || '') + '</span></div>';
+        var notes = x.desc || '';
+        return '<div class="ver-item" style="padding:10px 18px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:flex-start;font-size:13px">'
+          + '<span class="badge' + (x.v === cur ? ' on' : '') + '">v' + esc(x.v || '') + '</span>'
+          + '<div style="flex:1;min-width:0">'
+          + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+          + '<b>' + esc(x.name || '') + '</b>'
+          + (x.v === cur ? '<span class="chip st-act">' + _t('plans.current') + '</span>' : '')
+          + (x.v === upd && x.v !== cur ? '<span class="badge gold">' + _t('upd.avail') + '</span>' : '')
+          + '<span class="muted mono" style="font-size:12px">' + esc(x.date || '') + '</span>'
+          + '</div>'
+          + (notes ? '<div class="muted" style="font-size:12px;margin-top:3px">' + esc(notes) + '</div>' : '')
+          + '</div></div>';
       }).join('') || '<div class="empty" style="padding:18px;color:var(--muted);font-size:13px">' + _t('log.empty') + '</div>';
     });
   }
@@ -1395,6 +1507,8 @@
       j = j || {};
       V.SUBS = j;
       renderPlans(j);
+      renderPlanCompare(j);
+      renderExtras(j);
       renderBilling(j);
       renderPlanWidget(j);
       if (j.error) {
@@ -1406,6 +1520,7 @@
         V.STATS = s && !s.error ? s : { error: (s && s.error) || 'stats' };
         renderBilling(j);
         renderPlanWidget(j);
+        renderPayForm(j);
       });
       var d = document.querySelector('#subs-count');
       if (d && j.total !== undefined) d.textContent = j.total;
@@ -1446,6 +1561,115 @@
         + '</div>';
     });
     grid.innerHTML = h;
+  }
+  /* Состав тарифов: таблица «функция → значение по каждому тарифу» */
+  function renderPlanCompare(j) {
+    var body = $('cmp-rows');
+    if (!body) return;
+    var table = body.parentNode && body.parentNode.parentNode;
+    var head = table ? table.querySelector('thead tr') : null;
+    var pl = (j && j.plans) || {};
+    var def = (j && j.default) || 'free';
+    var ids = Object.keys(pl);
+    var order = { free: 0, basic: 1, prem: 2, premium: 2 };
+    ids.sort(function (a, b) { return (order[a] != null ? order[a] : 9) - (order[b] != null ? order[b] : 9); });
+    if (!ids.length) {
+      body.innerHTML = '<tr><td colspan="2"><div class="empty"><span class="ic">💎</span>' + _t('plans.na') + '</div></td></tr>';
+      return;
+    }
+    var l1 = 'Функция';
+    if (head && head.children[0]) l1 = (head.children[0].textContent || '').trim() || l1;
+    if (head) {
+      head.innerHTML = '<th>' + esc(l1) + '</th>' + ids.map(function (id) {
+        var p = pl[id] || {};
+        return '<th>' + esc(p.name || id)
+          + (id === def ? ' <span class="chip st-act">' + _t('plans.current') + '</span>' : '') + '</th>';
+      }).join('');
+    }
+    var rows = [];
+    rows.push({ k: _t('plans.per-mo'), get: function (p) { return p.price != null ? (p.price === 0 ? _t('plans.free') : fmtNum(p.price) + ' ₽') : '—'; } });
+    rows.push({ k: _t('plans.traffic'), get: function (p) { return p.bytes !== undefined ? bytesPlan(p.bytes) : '—'; } });
+    rows.push({ k: _t('plans.devices'), get: function (p) { return p.devices != null ? String(p.devices) : '—'; } });
+    rows.push({ k: _t('plans.keys'), get: function (p) { return p.keys != null ? String(p.keys) : '—'; } });
+    var allFeat = [];
+    ids.forEach(function (id) { (pl[id].features || []).forEach(function (f) { if (allFeat.indexOf(f) < 0) allFeat.push(f); }); });
+    allFeat.forEach(function (f) { rows.push({ k: f, get: function (p) { return (p.features || []).indexOf(f) >= 0 ? '✓' : '✕'; } }); });
+    var allNo = [];
+    ids.forEach(function (id) { (pl[id].features_no || []).forEach(function (f) { if (allNo.indexOf(f) < 0) allNo.push(f); }); });
+    allNo.forEach(function (f) { rows.push({ k: f, get: function (p) { return (p.features_no || []).indexOf(f) >= 0 ? '✕' : '✓'; } }); });
+    body.innerHTML = rows.map(function (r) {
+      return '<tr><td class="muted">' + esc(r.k) + '</td>' + ids.map(function (id) {
+        var v = r.get(pl[id] || {});
+        if (v === '✓') return '<td class="mono"><span class="chip st-ok">✓</span></td>';
+        if (v === '✕') return '<td class="mono"><span class="muted">✕</span></td>';
+        return '<td class="mono">' + esc(v) + '</td>';
+      }).join('') + '</tr>';
+    }).join('');
+  }
+  /* Дополнительные возможности Aurora: витрина из config.SUBS_EXTRAS */
+  function renderExtras(j) {
+    var box = $('feat-list');
+    if (!box) return;
+    var ex = (j && j.extras) || {};
+    var ids = Object.keys(ex);
+    if (!ids.length) {
+      box.innerHTML = '<div class="empty"><span class="ic">🎁</span>' + _t('feat.admin') + '</div>';
+      return;
+    }
+    box.innerHTML = ids.map(function (id) {
+      var e = ex[id] || {};
+      var price = e.price != null ? (e.price === 0 ? _t('plans.free') : fmtNum(e.price) + ' ₽') : '—';
+      return '<div class="feature">'
+        + '<div class="f-ic">✨</div>'
+        + '<div class="f-body">'
+        + '<div class="f-name">' + esc(e.name || id) + '</div>'
+        + (e.note ? '<div class="f-desc">' + esc(e.note) + '</div>' : '')
+        + '<button class="btn small" style="margin-top:8px" data-act="feature-buy" data-feature-id="' + esc(id) + '">' + _t('btn.buy-tg') + '</button>'
+        + '</div>'
+        + '<div class="f-price">' + esc(price) + (e.unit ? '<br><small>' + esc(e.unit) + '</small>' : '') + '</div>'
+        + '</div>';
+    }).join('');
+  }
+  /* Оплата и продление: форма владельца (контракт мастер-панели) */
+  function renderPayForm(j) {
+    var uidBox = $('pay-uid');
+    if (!uidBox || uidBox.dataset.filled) return;
+    uidBox.dataset.filled = '1';
+    var sel = $('pay-plan');
+    var pl = (j && j.plans) || {};
+    var ids = Object.keys(pl).sort();
+    if (sel) {
+      sel.innerHTML = ids.map(function (id) {
+        var p = pl[id] || {};
+        return '<option value="' + esc(id) + '">' + esc(p.name || id) + '</option>';
+      }).join('') || '<option value="free">free</option>';
+    }
+    var list = $('pay-clients');
+    if (list) {
+      var subs = (j && j.subs) || [];
+      list.innerHTML = subs.map(function (s) {
+        return '<option value="' + esc(s.uid || '') + '">' + esc((s.name || s.uid || '—') + ' · ' + (s.plan || '')) + '</option>';
+      }).join('');
+      /* Выбор клиента из списка подставляет uid в поле — платить проще */
+      list.onchange = function () {
+        var u = $('pay-uid');
+        if (u && list.value) u.value = list.value;
+      };
+    }
+  }
+  function payFormSubmit() {
+    var uid = ($('pay-uid') && $('pay-uid').value || '').trim();
+    var name = ($('pay-name') && $('pay-name').value || '').trim();
+    var plan = $('pay-plan') ? $('pay-plan').value : 'free';
+    if (!uid && !name) { toast(_t('sb.need')); return; }
+    postJSON('/api/subs/purchase', { uid: uid || undefined, name: name || undefined, plan: plan }, authHdr()).then(function (r) {
+      if (r && r.error) { toast(r.error); return; }
+      toast((r && r.msg) || _t('sb.ok'));
+      var u = $('pay-uid'); var n = $('pay-name');
+      if (u) { u.value = ''; delete u.dataset.filled; }
+      if (n) n.value = '';
+      loadSubs();
+    }).catch(function (e) { toast(String((e && e.message) || e)); });
   }
   function renderPlanWidget(j) {
     var cur = j.default || 'free';
@@ -1495,14 +1719,42 @@
       $('tg-on').className = 'badge ' + (j.running ? 'ok' : 'off');
       $('tg-port').textContent = j.port != null ? j.port : '–';
       $('tg-sec').textContent = j.secret_ok ? '✓' : '–';
+      /* Ссылка и секрет показываем текстом: QR один, а добавить клиента проще копированием */
+      var lb = $('tg-link');
+      if (lb) lb.value = j.link || '';
+      var sb2 = $('tg-secret');
+      if (sb2) sb2.textContent = j.secret || (j.secret_ok ? '••••••••' : '–');
       var q = $('tg-qr');
       q.innerHTML = '';
       if (j.link) {
         if (typeof qrcode !== 'undefined') { var c = document.createElement('canvas'); c.width = 150; c.height = 150; q.appendChild(c); try { qrcode.toCanvas(c, j.link); } catch (e) { q.innerHTML = '<div class="qr-ph">' + _t('c.qr-na') + '</div>'; } }
         else { q.innerHTML = '<div class="qr-ph">' + _t('c.qr-na-off') + '</div>'; }
+      } else {
+        q.innerHTML = '<div class="qr-ph">' + (j.running ? _t('c.qr-na') : _t('c.qr-na-off')) + '</div>';
       }
+    }).catch(function (e) {
+      var q2 = $('tg-qr');
+      if (q2) q2.innerHTML = '<div class="qr-ph">' + esc(String((e && e.message) || e)) + '</div>';
     });
   }
+  /* Копирование tg://-ссылки и секрета */
+  function tgCopy(which) {
+    var src = which === 'secret' ? $('tg-secret') : $('tg-link');
+    var val = src ? ((which === 'secret' ? src.textContent : src.value) || '') : '';
+    if (!val) { toast(_t('copy.link-na')); return; }
+    var done = function () { toast(_t('copy.link-ok')); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(val).then(done).catch(function () { legacyCopy(val, done); });
+    } else { legacyCopy(val, done); }
+  }
+  function legacyCopy(val, done) {
+    var ta = document.createElement('textarea');
+    ta.value = val; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) { toast(_t('copy.link-na')); }
+    document.body.removeChild(ta);
+  }
+  window.tgCopy = tgCopy;
 
   /* ================= SETTINGS ================= */
   function loadSettings() {
@@ -1555,6 +1807,11 @@
       box.innerHTML = lines.map(function (l) { return esc(l); }).join('\n') || _t('log.empty');
       box.scrollTop = box.scrollHeight;
       $('log-count').textContent = lines.length;
+    }).catch(function (e) {
+      /* Не молчим: при 403/401 показываем причину, иначе счётчик вечно «0» */
+      var box = $('log');
+      if (box) box.innerHTML = '<span class="muted">' + esc(_t('log.err') + ' ' + String((e && e.message) || e)) + '</span>';
+      $('log-count').textContent = '—';
     });
     getJSON('/api/recovery/log').then(function (j) {
       j = j || {};
@@ -1563,6 +1820,10 @@
       box.innerHTML = lines.map(function (l) { return esc(l); }).join('\n') || _t('rec.empty');
       box.scrollTop = box.scrollHeight;
       $('rclog-count').textContent = lines.length;
+    }).catch(function (e) {
+      var box = $('rclog');
+      if (box) box.innerHTML = '<span class="muted">' + esc(_t('rec.err') + ' ' + String((e && e.message) || e)) + '</span>';
+      $('rclog-count').textContent = '—';
     });
   }
 
@@ -2023,6 +2284,9 @@
     'sec-2fa-on': function () { window.secTwofaEnable(); },
     'sec-2fa-off': function () { window.secTwofaDisable(); },
     'sec-rotate': function () { window.secRotate(); },
+    'feature-buy': function (t) { window.buyFeature(t.getAttribute('data-feature-id') || ''); },
+    'subs-pay': function () { window.payFormSubmit(); },
+    'tg-copy': function (t) { window.tgCopy(t.getAttribute('data-copy') || 'link'); },
     'log-load': function () { window.loadLog(); }
   };
   function actTarget(ev) {
@@ -2130,6 +2394,9 @@
     } catch (e) { }
     initTabMeta();
     applyLang();
+    /* Заголовок вкладки рисуем сами: после F5 активна первая .tab.show из HTML,
+       а #tb-name оставался сырым текстом до перевода — название «проскакивало» */
+    navTo(CFG.tab || 'status', true);
     bindActions();
     loadState();
     var subsTask = loadSubs();

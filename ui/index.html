@@ -326,6 +326,16 @@
             <button class="btn" data-act="tgws-restart">🔄 <span data-i18n="tgws.restart">Рестарт TG-WS</span></button>
           </div>
           <div class="qr-box" id="tg-qr"></div>
+          <h3 style="font-size:13px;font-weight:800;margin:14px 0 8px"><span data-i18n="tgws.link">Ссылка для клиента</span></h3>
+          <div class="cmd-row" style="margin-top:0">
+            <input type="text" id="tg-link" readonly autocomplete="off" placeholder="tg://proxy?...">
+            <button class="btn small" data-act="tg-copy" data-copy="link">📋 <span data-i18n="tgws.copy">Копировать</span></button>
+          </div>
+          <h3 style="font-size:13px;font-weight:800;margin:14px 0 8px"><span data-i18n="tgws.secret">Секрет</span></h3>
+          <div class="cmd-row" style="margin-top:0">
+            <input type="text" id="tg-secret" readonly autocomplete="off" class="mono" placeholder="—">
+            <button class="btn small" data-act="tg-copy" data-copy="secret">📋 <span data-i18n="tgws.copy">Копировать</span></button>
+          </div>
         </div>
       </section>
 
@@ -514,6 +524,18 @@
           </div>
           <div class="actions" style="margin-top:0">
             <button class="btn gold" data-act="plan-buy">💳 <span data-i18n="sb.buy">Оплатить в Telegram</span></button>
+          </div>
+          <h3 style="font-size:13px;font-weight:800;margin:14px 0 8px"><span data-i18n="sb.form">Записать оплату или продление</span></h3>
+          <div class="cmd-row" style="margin-top:0">
+            <select id="pay-clients" style="flex:1;min-width:170px"></select>
+            <input type="text" id="pay-uid" autocomplete="off" placeholder="uid клиента" data-i18n-placeholder="sb.ph-uid">
+          </div>
+          <div class="cmd-row" style="margin-top:8px">
+            <input type="text" id="pay-name" autocomplete="off" placeholder="Имя нового клиента" data-i18n-placeholder="sb.ph-name">
+            <select id="pay-plan" style="flex:1;min-width:170px"></select>
+          </div>
+          <div class="actions tight">
+            <button class="btn" data-act="subs-pay">🐾 <span data-i18n="sb.submit">Записать оплату</span></button>
           </div>
           <h3 style="font-size:13px;font-weight:800;margin:14px 0 8px"><span data-i18n="sb.hist">История платежей</span></h3>
           <div class="tbl-wrap">

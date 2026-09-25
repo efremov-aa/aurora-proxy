@@ -186,13 +186,18 @@ def tgws_link():
     })
 
 
-def status():
-    return {
+def status(include_secret=False):
+    data = {
         "running": running(),
         "port_open": port_open(),
+        "port": config.TGWS_PORT,
         "secret_ok": bool(_get_secret()),
         "link": tgws_link(),
     }
+    # Секрет отдаём только доверенному клиенту (панель владельца из LAN/loopback).
+    if include_secret:
+        data["secret"] = _get_secret() or ""
+    return data
 
 
 def refresh_status():

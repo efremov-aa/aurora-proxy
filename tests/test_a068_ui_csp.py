@@ -12,7 +12,7 @@ EXPECTED_ACTS = {
     "ru-toggle-fail", "tgws-restart", "mesh-join", "mesh-leave",
     "mesh-regen", "mesh-refresh", "mesh-policy-save", "settings-save",
     "invite-copy", "sec-login", "sec-logout", "sec-2fa-on", "sec-2fa-off",
-    "sec-rotate", "log-load",
+    "sec-rotate", "log-load", "feature-buy", "subs-pay", "tg-copy",
 }
 
 HTML_ACTIONS = {
@@ -22,9 +22,11 @@ HTML_ACTIONS = {
     "mesh-join", "mesh-leave", "mesh-regen", "mesh-refresh",
     "mesh-policy-save", "settings-save", "invite-copy", "sec-login",
     "sec-logout", "sec-2fa-on", "sec-2fa-off", "sec-rotate", "log-load",
+    "subs-pay", "tg-copy",
 }
 
-DYNAMIC_ACTIONS = {"key-activate", "plan-buy", "nav"}
+# key-activate и feature-buy рисуются самим app.js, в разметке их нет
+DYNAMIC_ACTIONS = {"key-activate", "plan-buy", "nav", "feature-buy"}
 
 CSP_REQUIRED = (
     "default-src 'self'",
@@ -70,7 +72,7 @@ def html_contract(path):
     assert all(re.search(r'src\s*=\s*"/(qr|app)\.js"', tag) for tag in scripts), (path, scripts)
     acts = set(re.findall(r'data-act="([^"]+)"', text))
     assert acts == HTML_ACTIONS, (path, sorted(acts ^ HTML_ACTIONS))
-    assert EXPECTED_ACTS - HTML_ACTIONS == {"key-activate"}, path
+    assert EXPECTED_ACTS - HTML_ACTIONS == {"key-activate", "feature-buy"}, path
     for tab in ("update", "mesh-topo", "mesh-routes", "shop-plans",
                 "shop-features", "keys", "logs", "rusegment"):
         assert 'data-act="nav" data-tab="%s"' % tab in text, (path, tab)

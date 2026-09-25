@@ -302,8 +302,14 @@ def _token_matches(value, expected):
 def _admin_ok(self):
     if _token_matches(self.headers.get("X-Auth", ""), _UI_TOKEN):
         return True
-    return security.enabled() and security.check(
-        self.headers, self.client_address[0])
+    if security.enabled() and security.check(
+            self.headers, self.client_address[0]):
+        return True
+    # Владелец в своей LAN-сети: панель закрыта только снаружи (lan_only),
+    # поэтому из LAN доступ к кнопкам (обновить/проверить/оплатить) разрешён.
+    if config.get("lan_only", False) and _host_in_lan(self.client_address[0]):
+        return True
+    return False
 
 def _read_auth_ok(self):
     if _is_local(self):
@@ -321,8 +327,13 @@ def _trusted_read(self):
         return True
     if _panel_token_ok(self):
         return True
-    return security.enabled() and security.check(
-        self.headers, self.client_address[0])
+    if security.enabled() and security.check(
+            self.headers, self.client_address[0]):
+        return True
+    # Владелец в LAN: логи, recovery и ссылка TG-WS доступны из своей сети.
+    if config.get("lan_only", False) and _host_in_lan(self.client_address[0]):
+        return True
+    return False
 
 
 def _valid_peer_host(value):
@@ -932,10 +943,11 @@ class Handler(BaseHTTPRequestHandler):
             self._send(*_json(recovery.status()))
             return
         if path == "/api/tgws/status":
-            status = tgws.status()
+            status = tgws.status(include_secret=trusted)
             if not trusted:
                 status = dict(status)
                 status.pop("link", None)
+                status.pop("secret", None)
                 status["secret_ok"] = False
             self._send(*_json(status))
             return
@@ -946,21 +958,24 @@ class Handler(BaseHTTPRequestHandler):
             self._send(*_json(_project_update_status(trusted)))
             return
         if path == "/api/versions":
-            # история версий для вкладки «Версии»
-            self._send(*_json({"ok": True, "versions": [
-                {"v": v, "name": nm, "date": d}
-                for v, nm, d in config.VERSION_HISTORY]}))
+            # история версий для вкладки «Версии»: без дублей, с описанием
+            self._send(*_json({"ok": True, "versions": _versions_list(),
+                               "current": config.VERSION}))
             return
         if path == "/api/subs/list":
             self._send(*_json(_subs_list(include_secrets=trusted)))
             return
         if path == "/api/subs/plans":
             self._send(*_json({"ok": True, "plans": config.SUBS_PLANS,
-                               "default": config.SUBS_PLAN_DEFAULT}))
+                               "default": config.SUBS_PLAN_DEFAULT,
+                               "extras": config.SUBS_EXTRAS,
+                               "buy_url": config.BUY_URL}))
             return
         if path == "/api/plans":
             self._send(*_json({"ok": True, "plans": config.SUBS_PLANS,
-                               "default": config.SUBS_PLAN_DEFAULT}))
+                               "default": config.SUBS_PLAN_DEFAULT,
+                               "extras": config.SUBS_EXTRAS,
+                               "buy_url": config.BUY_URL}))
             return
         if path == "/api/stats":
             self._send(*_json(_stats(include_secrets=trusted)))
@@ -1803,6 +1818,26 @@ class Handler(BaseHTTPRequestHandler):
 
 
 # --- данные для новых вкладок UI (тарифы/статистика/маршруты/настройки/безопасность) ---
+def _versions_list():
+    """История версий для панели: без дублей, с описанием (VERSION_NOTES)."""
+    notes = getattr(config, "VERSION_NOTES", {}) or {}
+    out = []
+    seen = set()
+    for item in config.VERSION_HISTORY or ():
+        try:
+            version, name, date = item[0], item[1], item[2]
+        except (TypeError, IndexError):
+            continue
+        version = str(version or "").strip()
+        if not version or version in seen:
+            continue
+        seen.add(version)
+        out.append({"v": version, "name": str(name or version),
+                    "date": str(date or ""),
+                    "desc": str(notes.get(version, "") or "")})
+    return out
+
+
 def _stats(include_secrets=True):
     now = int(time.time())
     week_ago = now - 7 * 86400
