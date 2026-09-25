@@ -9,8 +9,9 @@ import time
 
 import config
 
-SECRET_FILE = os.path.join(config.BASE_DIR, "data", "tg_secret.txt")
+SECRET_FILE = os.path.join(config.DATA_DIR, "tg_secret.txt")
 RUN_SCRIPT = os.path.join(config.BASE_DIR, "run_tgws.sh")
+_SECRET_LOCK = threading.RLock()
 
 
 def resource_path(rel):
@@ -22,21 +23,45 @@ def resource_path(rel):
 
 def _get_secret():
     """Секрет из data/tg_secret.txt или генерация нового."""
-    try:
-        with open(SECRET_FILE, "r", encoding="utf-8") as f:
-            s = f.read().strip()
-        if s:
-            return s
-    except OSError:
-        pass
-    import secrets
-    s = secrets.token_hex(16)
-    try:
-        with open(SECRET_FILE, "w", encoding="utf-8") as f:
-            f.write(s)
-    except OSError:
-        pass
-    return s
+    with _SECRET_LOCK:
+        import crypt
+        missing = object()
+        try:
+            raw = crypt.load_bytes(SECRET_FILE, default=missing)
+        except crypt.StorageError as e:
+            config.quarantine_file(SECRET_FILE)
+            raise config.StorageDataError("tg_secret.txt: %s" % e) from e
+        if raw is missing:
+            import secrets
+            value = secrets.token_hex(16)
+            os.makedirs(os.path.dirname(SECRET_FILE) or ".", exist_ok=True)
+            try:
+                crypt.save_bytes(SECRET_FILE, value.encode("ascii"), exclusive=True)
+            except FileExistsError:
+                try:
+                    raw = crypt.load_bytes(SECRET_FILE)
+                    value = raw.decode("utf-8").strip()
+                except (crypt.StorageError, UnicodeError, AttributeError) as e:
+                    config.quarantine_file(SECRET_FILE)
+                    raise config.StorageDataError("tg_secret.txt: %s" % e) from e
+            except (crypt.StorageError, OSError) as e:
+                config.quarantine_file(SECRET_FILE)
+                raise config.StorageDataError("tg_secret.txt: %s" % e) from e
+            return value
+        try:
+            value = raw.decode("utf-8").strip()
+        except UnicodeError as e:
+            config.quarantine_file(SECRET_FILE)
+            raise config.StorageDataError("tg_secret.txt: %s" % e) from e
+        if not value or len(value) > 256:
+            config.quarantine_file(SECRET_FILE)
+            raise config.StorageDataError("tg_secret.txt: invalid secret")
+        try:
+            crypt.save_bytes(SECRET_FILE, value.encode("utf-8"))
+        except (crypt.StorageError, OSError) as e:
+            config.quarantine_file(SECRET_FILE)
+            raise config.StorageDataError("tg_secret.txt: %s" % e) from e
+        return value
 
 
 def port_open(timeout=1):
@@ -86,14 +111,52 @@ def restart():
             if getattr(sys, "frozen", False):
                 tgb = resource_path("bin/tg-ws-proxy.exe")
                 cmd = [tgb, "--host", "0.0.0.0",
-                       "--port", str(config.TGWS_PORT), "--secret", secret]
+                       "--port", str(config.TGWS_PORT), "--secret-fd", "0"]
             else:
                 cmd = [sys.executable, "-m", "proxy.tg_ws_proxy",
                        "--host", "0.0.0.0", "--port", str(config.TGWS_PORT),
-                       "--secret", secret]
-            subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                             creationflags=config.HIDE_FLAG)
-            return True
+                       "--secret-fd", "0"]
+            proc = subprocess.Popen(
+                cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=config.HIDE_FLAG,
+            )
+            try:
+                proc.stdin.write((secret + "\n").encode("ascii"))
+                proc.stdin.close()
+            except (BrokenPipeError, OSError, ValueError):
+                try:
+                    proc.stdin.close()
+                except OSError:
+                    pass
+                if proc.poll() is None:
+                    proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except Exception:
+                    if proc.poll() is None:
+                        proc.kill()
+                return False
+            end = time.time() + 15
+            while time.time() < end:
+                if proc.poll() is not None:
+                    return False
+                if port_open():
+                    return True
+                time.sleep(1)
+            if proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except Exception:
+                    proc.kill()
+                    try:
+                        proc.wait(timeout=5)
+                    except Exception:
+                        pass
+            return False
         except Exception:
             return False
     try:
@@ -110,24 +173,17 @@ def restart():
 
 
 def tgws_link():
-    """Ссылка tg://proxy?... для QR.
-
-    host: явный env AURORA_TGWS_HOST, иначе внутренний IP ПК (config.VM_HOST).
-    Публичный IP — только явный фолбэк, если локальный не найден.
-    """
+    """Ссылка tg://proxy?... для QR."""
+    import urllib.parse
     secret = _get_secret()
-    if not secret:
+    host = config.external_link_host()
+    if not secret or not host:
         return ""
-    host = (os.environ.get("AURORA_TGWS_HOST", "") or "").strip()
-    if not host:
-        vm = config.VM_HOST if hasattr(config, "VM_HOST") else ""
-        if vm and not str(vm).startswith("127."):
-            host = str(vm)
-        elif hasattr(config, "get_public_ip"):
-            host = config.get_public_ip() or ""
-    if not host:
-        host = "127.0.0.1"
-    return "tg://proxy?server=%s&port=%d&secret=%s" % (host, config.TGWS_PORT, secret)
+    return "tg://proxy?%s" % urllib.parse.urlencode({
+        "server": config._format_link_host(host),
+        "port": config.TGWS_PORT,
+        "secret": secret,
+    })
 
 
 def status():

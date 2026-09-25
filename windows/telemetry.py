@@ -9,6 +9,22 @@ import time
 import config
 
 _POLL_LOCK = threading.Lock()
+_SERVICE_LOCK = threading.Lock()
+_SERVICE_LAST_UP = {}
+_SERVICE_LAST_DOWN = {}
+_SERVICE_UP = {}
+_SERVICE_DOWN = {}
+
+
+def _service_ports():
+    ports = {config.XRAY_PORT, config.TGWS_PORT}
+    try:
+        vless_port = int(getattr(config, "VLESS_PUBLIC", {}).get("port", 8443))
+    except (TypeError, ValueError):
+        vless_port = 0
+    if 1 <= vless_port <= 65535:
+        ports.add(vless_port)
+    return ports
 
 
 def _hex_to_ip(raw):
@@ -29,7 +45,7 @@ def _collect_conns_nt():
     """(total, {client_ip: count}) через netstat -ano (Windows)."""
     total = 0
     by_ip = {}
-    ports = {config.XRAY_PORT, config.TGWS_PORT}
+    ports = _service_ports()
     try:
         out = subprocess.run(["netstat", "-ano"], capture_output=True, text=True,
                              timeout=10, creationflags=config.HIDE_FLAG).stdout
@@ -39,26 +55,24 @@ def _collect_conns_nt():
         parts = ln.split()
         if len(parts) < 4:
             continue
-        if parts[1] not in ("TCP", "TCP6"):
+        if parts[0] not in ("TCP", "TCP6"):
             continue
         if parts[3] != "ESTABLISHED":
             continue
-        l = parts[2].rsplit(":", 1)
-        r = parts[3].rsplit(":", 1) if False else (parts[2], "")
-        # netstat: [Local Address, Foreign Address, State, PID]
-        local = parts[2].strip("[]")
-        foreign = parts[3].strip("[]")
-        if ":" not in foreign:
+        local = parts[1]
+        foreign = parts[2]
+        if ":" not in local or ":" not in foreign:
             continue
-        f_host, f_port = foreign.rsplit(":", 1)
+        local_host, local_port_raw = local.rsplit(":", 1)
+        foreign_host, _ = foreign.rsplit(":", 1)
         try:
-            l_port = int(local.rsplit(":", 1)[1]) if ":" in local else 0
+            local_port = int(local_port_raw)
         except ValueError:
             continue
-        if l_port not in ports:
-            continue  # исходящее xray->VLESS
-        ip = f_host.replace("::ffff:", "")
-        if ip in ("127.0.0.1", "::1", "0.0.0.0"):
+        if local_port not in ports:
+            continue
+        ip = foreign_host.strip("[]").replace("::ffff:", "")
+        if ip in ("127.0.0.1", "::1", "0.0.0.0", "::"):
             continue
         total += 1
         by_ip[ip] = by_ip.get(ip, 0) + 1
@@ -125,48 +139,81 @@ def _addr_port(body):
     return res
 
 
-def _collect_sock_stats():
-    """Трафик per-device через ss -in (bytes_sent/bytes_received к peer IP).
+def _parse_ss_block(block, ports):
+    body = " ".join(block)
+    addrs = _addr_port(body)
+    if len(addrs) < 2:
+        return None
+    local = next(((ip, port) for ip, port in addrs if port in ports), None)
+    if local is None:
+        return None
+    peer = next(((ip, port) for ip, port in reversed(addrs)
+                 if (ip, port) != local), None)
+    if peer is None:
+        return None
+    sent = re.search(r"bytes_sent:(\d+)", body)
+    received = re.search(r"bytes_received:(\d+)", body)
+    if not sent and not received:
+        return None
+    ip = peer[0]
+    if ip.startswith("127.") or ip in ("0.0.0.0", "::"):
+        return None
+    return ip, int(sent.group(1)) if sent else 0, int(received.group(1)) if received else 0
 
-    В блоке ss первый адрес — Local (наш сервер:порт), последний — Peer (клиент).
-    Раньше брался первый адрес -> весь трафик копился на сервер, у клиентов 0.
-    Считаем только соединения клиентов с нашими портами (local port in ports):
-    исходящие xray->VLESS имеют эфемерный локальный порт и сюда не попадают."""
+
+def _collect_sock_stats():
+    """Трафик per-device через ss -in (bytes_sent/bytes_received к peer IP)."""
     if os.name == "nt":
-        return {}, {}  # трафик per-device на Windows недоступен
+        return {}, {}
     up = {}
     down = {}
-    ports = {config.XRAY_PORT, config.TGWS_PORT}
+    ports = _service_ports()
     try:
         out = subprocess.run(["ss", "-in", "state", "established"],
                              capture_output=True, text=True, timeout=10).stdout
     except Exception:
         return up, down
-    cur_block = []
+    block = []
     for line in out.splitlines():
         if not line.strip():
+            if block:
+                item = _parse_ss_block(block, ports)
+                if item:
+                    ip, sent, received = item
+                    down[ip] = down.get(ip, 0) + sent
+                    up[ip] = up.get(ip, 0) + received
+                block = []
             continue
-        # ss: продолжение блока идёт с TAB, заголовок соединения — с 'tcp'
-        if not line[:1].isspace():  # начало нового соединения
-            cur_block = []
-        cur_block.append(line)
-        body = " ".join(cur_block)
-        addrs = _addr_port(body)
-        mb = re.search(r"bytes_sent:(\d+)", body)
-        mr = re.search(r"bytes_received:(\d+)", body)
-        if len(addrs) < 2 or not (mb or mr):
-            continue
-        l_port = addrs[0][1]
-        if l_port not in ports:
-            continue  # исходящее xray->VLESS или служебное
-        ip = addrs[-1][0]  # peer (клиент)
-        if ip.startswith("127.") or ip == "0.0.0.0":
-            continue
-        if mb:
-            down[ip] = down.get(ip, 0) + int(mb.group(1))
-        if mr:
-            up[ip] = up.get(ip, 0) + int(mr.group(1))
+        if not line[:1].isspace() and block:
+            item = _parse_ss_block(block, ports)
+            if item:
+                ip, sent, received = item
+                down[ip] = down.get(ip, 0) + sent
+                up[ip] = up.get(ip, 0) + received
+            block = []
+        block.append(line)
+    if block:
+        item = _parse_ss_block(block, ports)
+        if item:
+            ip, sent, received = item
+            down[ip] = down.get(ip, 0) + sent
+            up[ip] = up.get(ip, 0) + received
     return up, down
+
+
+def _traffic_deltas(current_up, current_down):
+    delta_up = {}
+    delta_down = {}
+    with _SERVICE_LOCK:
+        for ip, value in current_up.items():
+            previous = _SERVICE_LAST_UP.get(ip, 0)
+            delta_up[ip] = value - previous if value >= previous else value
+            _SERVICE_LAST_UP[ip] = value
+        for ip, value in current_down.items():
+            previous = _SERVICE_LAST_DOWN.get(ip, 0)
+            delta_down[ip] = value - previous if value >= previous else value
+            _SERVICE_LAST_DOWN[ip] = value
+    return delta_up, delta_down
 
 
 def poll(loop=True):
@@ -175,17 +222,25 @@ def poll(loop=True):
     while True:
         try:
             total, by_ip = _collect_conns()
-            up, down = _collect_sock_stats()
+            current_up, current_down = _collect_sock_stats()
+            delta_up, delta_down = _traffic_deltas(current_up, current_down)
+            with _SERVICE_LOCK:
+                for ip, value in delta_up.items():
+                    _SERVICE_UP[ip] = _SERVICE_UP.get(ip, 0) + value
+                for ip, value in delta_down.items():
+                    _SERVICE_DOWN[ip] = _SERVICE_DOWN.get(ip, 0) + value
+                cumulative_up = dict(_SERVICE_UP)
+                cumulative_down = dict(_SERVICE_DOWN)
             devices = {}
             names = DEVICE_NAMES
             for ip, cnt in by_ip.items():
                 d = devices.setdefault(ip, {"ip": ip, "name": names.get(ip, ""), "conns": 0,
                                             "upload": 0, "download": 0})
                 d["conns"] = cnt
-                d["upload"] = up.get(ip, 0)
-                d["download"] = down.get(ip, 0)
-            total_up = sum(up.values())
-            total_down = sum(down.values())
+                d["upload"] = cumulative_up.get(ip, 0)
+                d["download"] = cumulative_down.get(ip, 0)
+            total_up = sum(cumulative_up.values())
+            total_down = sum(cumulative_down.values())
             config.update_state(conns=total, devices=devices, up=total_up, down=total_down)
         except Exception:
             pass

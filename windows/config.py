@@ -1,23 +1,32 @@
 # Aurora v1.0 — конфигурация ядра.
 # Всё, что меняется между деплоями: пути, порты, источники ключей, режимы.
 
+import base64
+from contextlib import contextmanager
+import binascii
+import ipaddress
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
 import time
+import urllib.parse
+import urllib.request
+import uuid
 
 # Windows: флаг CREATE_NO_WINDOW скрывает окна консоли дочерних процессов
 # (xray run/keytest/statsquery/netstat/netsh/taskkill/tg-ws-proxy и т.п.).
 HIDE_FLAG = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
 
-VERSION = "1.9.0"
-VERSION_NAME = "Кот-правозащитник"
+VERSION = "1.9.1"
+VERSION_NAME = "Кот-крепость"
 APP_NAME = "Aurora"
 
 # История версий для вкладки «Версии» (v, имя, дата).
 VERSION_HISTORY = (
+    ("1.9.1", "Кот-крепость", "25.09.2026"),
     ("1.9.0", "Кот-правозащитник", "24.09.2026"),
     ("1.8.0", "Кот-именитый", "24.09.2026"),
     ("1.7.0", "Кот-дипломат", "24.09.2026"),
@@ -79,10 +88,19 @@ Aurora — персональный VPN/прокси-сервер. Устано�
 
 _BOOT_TS = time.time()   # время старта процесса (для /api/settings.uptime)
 
+# --- периметр plaintext-файлов Xray/keytest (A-072) ---
+# Формат xray.json/keytest-конфигов менять нельзя (требование xray), поэтому
+# секреты в них защищаются правами доступа: POSIX 0600 (файл) / 0700 (каталог),
+# Windows DACL — владелец + SYSTEM + Administrators, наследование отключено.
+PLAINTEXT_FILE_MODE = 0o600
+PLAINTEXT_DIR_MODE = 0o700
+
 # --- авто-обновление (GitHub Releases) ---
 # Обязательное: публичная сборка всегда обновляется с этого репо.
 # Локальное отключение/обход НЕ предусмотрен (управляется только политикой релизов).
 UPDATE_REPO = "efremov-aa/aurora-proxy"
+# Пиннированный Ed25519-ключ подписи релизов (fail-closed: без ключа обновление не ставится)
+UPDATE_PUBKEY = "6159031f0fd9ab6c5074f9bef99f5ac125df75e05bdeaa772860236fb85e3371"
 UPDATE_CHECK_INTERVAL = 15 * 60  # проверка признаков обновления каждые 15 минут
 
 # --- пути (относительно корня проекта) ---
@@ -154,10 +172,11 @@ def _detect_local_ip():
 
 def _fetch_public_ip():
     """Публичный IP через ipify (без прокси)."""
-    import urllib.request
     try:
-        with urllib.request.urlopen("https://api.ipify.org?format=json", timeout=5) as r:
-            return json.loads(r.read().decode("utf-8")).get("ip", "")
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open("http://api.ipify.org?format=json", timeout=5) as r:
+            value = json.loads(r.read().decode("utf-8")).get("ip", "")
+        return str(ipaddress.ip_address(str(value)))
     except Exception:
         return ""
 
@@ -191,6 +210,16 @@ def refresh_public_ip_async():
 VM_HOST = os.environ.get("AURORA_HOST", "") or _detect_local_ip()  # адрес сервера для внешних ссылок/QR
 WHITE_IP = os.environ.get("AURORA_WHITE_IP", "")      # белый IP провайдера — фильтр «не выход VPN»
 
+
+def get_direct_ip(force=False):
+    configured = str(WHITE_IP or "").strip()
+    if configured:
+        try:
+            return str(ipaddress.ip_address(configured))
+        except ValueError:
+            return ""
+    return get_public_ip()
+
 # --- источники github-ключей ---
 # Репо barry-far/V2ray-Config: файлы регенерируются workflow main.yml каждые 15 минут.
 GITHUB_SOURCES = ["https://raw.githubusercontent.com/barry-far/V2ray-config/main/Splitted-By-Protocol/vless.txt"]
@@ -219,6 +248,8 @@ RU_DOMAINS_SOURCES = [
 
 # Кэш загруженного списка (TTL 900с; при сбое = пустой, работает фолбэк).
 RU_DOMAINS_TTL_S = 900
+MAX_RU_SOURCE_BYTES = 4 * 1024 * 1024
+MAX_RU_SOURCE_LINES = 200000
 RU_DOMAINS_LOCK = threading.Lock()
 RU_DOMAINS_CACHE = {"list": [], "ts": 0.0}
 
@@ -233,9 +264,177 @@ VPN_KEYS_N = 4            # сколько ключей попадает в xray
 # На Windows/публичной сборке ключи генерируются автоматически при первом старте
 # (см. ensure_vless()): uuid + пара x25519 через `xray x25519`, сохраняются в data/vless_public.json.
 # Вручную можно переопределить через env AURORA_VLESS_* (см. README/.env.example).
+def _parse_port(value):
+    if type(value) is int:
+        return value if 1 <= value <= 65535 else None
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    if not value.isdigit():
+        return None
+    value = int(value)
+    return value if 1 <= value <= 65535 else None
+
+
+def canonical_uuid(value):
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = uuid.UUID(value.strip())
+    except (ValueError, AttributeError):
+        return None
+    if parsed.int == 0:
+        return None
+    return str(parsed)
+
+
+def _valid_x25519(value):
+    if not isinstance(value, str) or len(value) != 43:
+        return False
+    if any(ch not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_" for ch in value):
+        return False
+    try:
+        raw = base64.urlsafe_b64decode(value + "=")
+    except (ValueError, binascii.Error):
+        return False
+    if len(raw) != 32:
+        return False
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii") == value
+
+
+def _valid_short_id(value):
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    if not value:
+        return ""
+    if len(value) > 16 or len(value) % 2 or any(ch not in "0123456789abcdefABCDEF" for ch in value):
+        return None
+    return value.lower()
+
+
+def _valid_sni(value):
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    if not value or any(ch in value for ch in "/?#@,; \t\r\n"):
+        return None
+    try:
+        value = value.rstrip(".").encode("idna").decode("ascii").lower()
+    except UnicodeError:
+        return None
+    if not value or len(value) > 253 or "*" in value:
+        return None
+    if not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+", value):
+        return None
+    return value
+
+
+METADATA_HOSTS = frozenset((
+    "169.254.169.254", "100.100.100.200", "168.63.129.16", "fd00:ec2::254",
+))
+
+
+def _read_setup_token():
+    value = os.environ.get("AURORA_SETUP_TOKEN", "").strip()
+    if len(value) < 16 or len(value) > 256:
+        return ""
+    if any(ch.isspace() or ord(ch) < 33 or ord(ch) > 126 for ch in value):
+        return ""
+    return value
+
+
+SETUP_TOKEN = _read_setup_token()
+
+
+def _private_links_allowed():
+    return os.environ.get("AURORA_ALLOW_PRIVATE_LINK", "").lower() in ("1", "true", "yes", "on")
+
+
+def _valid_public_host(value):
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    if not value or any(ch in value for ch in "/?#@,; \t\r\n"):
+        return None
+    if value.startswith("[") and value.endswith("]"):
+        value = value[1:-1]
+    elif "[" in value or "]" in value:
+        return None
+    try:
+        address = ipaddress.ip_address(value)
+    except ValueError:
+        try:
+            value = value.rstrip(".").encode("idna").decode("ascii").lower()
+        except UnicodeError:
+            return None
+        if not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+", value):
+            return None
+        if value == "localhost" or value.endswith(".local") or value.endswith(".internal"):
+            return None
+        return value
+    if str(address) in METADATA_HOSTS:
+        return None
+    if not address.is_global:
+        private_ok = _private_links_allowed() and address.is_private and not address.is_loopback and not address.is_link_local and not address.is_unspecified and not address.is_multicast
+        if not private_ok:
+            return None
+    return str(address)
+
+
+def external_link_host(raw=None):
+    for name in ("AURORA_VLESS_HOST", "AURORA_HOST"):
+        if name in os.environ:
+            return _valid_public_host(os.environ.get(name, "")) or ""
+    if raw is None:
+        raw = VLESS_PUBLIC
+    if isinstance(raw, dict):
+        host = _valid_public_host(raw.get("host", ""))
+        if host:
+            return host
+    get_public_ip = globals().get("get_public_ip")
+    if callable(get_public_ip):
+        return _valid_public_host(get_public_ip() or "") or ""
+    return ""
+
+
+def _format_link_host(host):
+    if not host:
+        return ""
+    try:
+        if ipaddress.ip_address(host).version == 6:
+            return "[%s]" % host
+    except ValueError:
+        pass
+    return host
+
+
+def vless_public(raw=None):
+    if raw is None:
+        raw = VLESS_PUBLIC
+    if not isinstance(raw, dict):
+        return {"enabled": False}
+    enabled = raw.get("enabled") is True
+    port = _parse_port(raw.get("port", 8443))
+    out = {
+        "enabled": enabled,
+        "port": port if port is not None else 0,
+        "host": external_link_host(raw),
+        "uuid": canonical_uuid(raw.get("uuid")),
+        "private_key": raw.get("private_key") if _valid_x25519(raw.get("private_key")) else "",
+        "public_key": raw.get("public_key") if _valid_x25519(raw.get("public_key")) else "",
+        "short_id": _valid_short_id(raw.get("short_id", "")),
+        "sni": _valid_sni(raw.get("sni", "www.microsoft.com")),
+        "flow": raw.get("flow") if raw.get("flow") == "xtls-rprx-vision" else None,
+    }
+    if not enabled or port is None or not out["uuid"] or not out["private_key"] or not out["public_key"] or out["short_id"] is None or not out["sni"] or not out["flow"]:
+        out["enabled"] = False
+    return out
+
+
 VLESS_PUBLIC = {
     "enabled": os.environ.get("AURORA_VLESS_ENABLED", "true").lower() != "false",
-    "port": int(os.environ.get("AURORA_VLESS_PORT", "8443")),
+    "port": _parse_port(os.environ.get("AURORA_VLESS_PORT", "8443")) or 0,
     "host": os.environ.get("AURORA_VLESS_HOST", "127.0.0.1"),
     "uuid": os.environ.get("AURORA_VLESS_UUID", ""),
     "private_key": os.environ.get("AURORA_VLESS_PRIVATE_KEY", ""),
@@ -246,6 +445,65 @@ VLESS_PUBLIC = {
 }
 
 _VLESS_FILE = os.path.join(DATA_DIR, "vless_public.json")
+
+_VLESS_FILE_LOCK = threading.RLock()
+_VLESS_FILE_STATE = {"handle": None, "depth": 0}
+
+
+@contextmanager
+def _vless_file_lock():
+    with _VLESS_FILE_LOCK:
+        if _VLESS_FILE_STATE["depth"] == 0:
+            os.makedirs(DATA_DIR, exist_ok=True)
+            path = os.path.join(DATA_DIR, ".vless-public.lock")
+            handle = open(path, "a+", encoding="utf-8")
+            try:
+                if os.name == "nt":
+                    import msvcrt
+                    handle.seek(0, os.SEEK_END)
+                    if handle.tell() == 0:
+                        handle.write("0")
+                        handle.flush()
+                    deadline = time.monotonic() + 120.0
+                    while True:
+                        try:
+                            handle.seek(0)
+                            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                            break
+                        except OSError:
+                            if time.monotonic() >= deadline:
+                                raise TimeoutError("vless public lock timeout")
+                            time.sleep(0.05)
+                else:
+                    import fcntl
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+                    import crypt
+
+                    crypt.restrict_file(path)
+            except Exception:
+                handle.close()
+                raise
+            _VLESS_FILE_STATE["handle"] = handle
+            _VLESS_FILE_STATE["depth"] = 1
+        else:
+            _VLESS_FILE_STATE["depth"] += 1
+        try:
+            yield
+        finally:
+            _VLESS_FILE_STATE["depth"] -= 1
+            if _VLESS_FILE_STATE["depth"] == 0:
+                handle = _VLESS_FILE_STATE["handle"]
+                try:
+                    if os.name == "nt":
+                        import msvcrt
+                        handle.seek(0)
+                        msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+                    else:
+                        import fcntl
+                        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+                finally:
+                    handle.close()
+                    _VLESS_FILE_STATE["handle"] = None
 
 
 def _gen_vless_material():
@@ -273,56 +531,75 @@ def _gen_vless_material():
     return str(_uuid.uuid4()), priv, pub
 
 
+def _vless_storage_failure(reason):
+    quarantine_file(_VLESS_FILE)
+    raise StorageDataError("vless_public.json: %s" % reason)
+
+
 def ensure_vless():
     """Авто-включение внешнего VLESS: env -> сохранённый -> автогенерация. Возвращает VLESS_PUBLIC."""
     global VLESS_PUBLIC
-    if VLESS_PUBLIC.get("enabled") and VLESS_PUBLIC.get("uuid") and VLESS_PUBLIC.get("private_key"):
+    import crypt
+    missing = object()
+    env_names = (
+        "AURORA_VLESS_ENABLED", "AURORA_VLESS_PORT", "AURORA_VLESS_HOST",
+        "AURORA_VLESS_UUID", "AURORA_VLESS_PRIVATE_KEY", "AURORA_VLESS_PUBLIC_KEY",
+        "AURORA_VLESS_SHORT_ID", "AURORA_VLESS_SNI", "AURORA_VLESS_FLOW",
+    )
+    if any(name in os.environ for name in env_names):
+        normalized = vless_public(dict(VLESS_PUBLIC))
+        VLESS_PUBLIC = normalized
         return VLESS_PUBLIC
-    saved = {}
-    try:
-        with open(_VLESS_FILE, "r", encoding="utf-8") as f:
-            saved = json.load(f)
-    except (OSError, ValueError):
-        saved = {}
-    if saved.get("uuid") and saved.get("private_key") and saved.get("public_key"):
-        VLESS_PUBLIC = {
+    with _vless_file_lock():
+        try:
+            saved = crypt.load_json(_VLESS_FILE, default=missing)
+        except crypt.StorageError as e:
+            _vless_storage_failure(str(e))
+        if saved is not missing:
+            if not isinstance(saved, dict):
+                _vless_storage_failure("root is not an object")
+            enabled = saved.get("enabled", True)
+            if type(enabled) is not bool:
+                _vless_storage_failure("enabled is invalid")
+            candidate = dict(saved)
+            candidate["enabled"] = True
+            normalized = vless_public(candidate)
+            if (not normalized["uuid"] or not normalized["private_key"]
+                    or not normalized["public_key"] or normalized["port"] == 0
+                    or normalized["short_id"] is None or not normalized["sni"]
+                    or normalized["flow"] != "xtls-rprx-vision"):
+                _vless_storage_failure("secret fields are invalid")
+            try:
+                crypt.save_json(_VLESS_FILE, dict(normalized, enabled=enabled))
+            except (crypt.StorageError, OSError) as e:
+                _vless_storage_failure(str(e))
+            VLESS_PUBLIC = dict(normalized, enabled=enabled)
+            return VLESS_PUBLIC
+        made = _gen_vless_material()
+        if not made:
+            VLESS_PUBLIC = vless_public(dict(VLESS_PUBLIC))
+            log("vless: xray недоступен, внешний VLESS не сгенерирован")
+            return VLESS_PUBLIC
+        _uuid, priv, pub = made
+        candidate = dict(VLESS_PUBLIC)
+        candidate.update({
             "enabled": True,
-            "port": int(saved.get("port", VLESS_PUBLIC.get("port", 8443))),
-            "host": saved.get("host", VLESS_PUBLIC.get("host", "127.0.0.1")),
-            "uuid": saved["uuid"],
-            "private_key": saved["private_key"],
-            "public_key": saved["public_key"],
-            "short_id": saved.get("short_id", ""),
-            "sni": saved.get("sni", VLESS_PUBLIC.get("sni", "www.microsoft.com")),
-            "flow": saved.get("flow", VLESS_PUBLIC.get("flow", "xtls-rprx-vision")),
-        }
+            "uuid": _uuid,
+            "private_key": priv,
+            "public_key": pub,
+            "short_id": "",
+        })
+        normalized = vless_public(candidate)
+        if not normalized["enabled"]:
+            log("vless: xray вернул некорректные ключи")
+            return normalized
+        try:
+            crypt.save_json(_VLESS_FILE, normalized)
+        except (crypt.StorageError, OSError) as e:
+            _vless_storage_failure(str(e))
+        VLESS_PUBLIC = normalized
+        log("vless: внешний VLESS сгенерирован (%s:%d)" % (VLESS_PUBLIC["host"], VLESS_PUBLIC["port"]))
         return VLESS_PUBLIC
-    made = _gen_vless_material()
-    if not made:
-        log("vless: xray недоступен, внешний VLESS не сгенерирован")
-        return VLESS_PUBLIC
-    _uuid, priv, pub = made
-    VLESS_PUBLIC = {
-        "enabled": True,
-        "port": VLESS_PUBLIC.get("port", 8443),
-        "host": VLESS_PUBLIC.get("host", "127.0.0.1"),
-        "uuid": _uuid,
-        "private_key": priv,
-        "public_key": pub,
-        "short_id": "",
-        "sni": VLESS_PUBLIC.get("sni", "www.microsoft.com"),
-        "flow": VLESS_PUBLIC.get("flow", "xtls-rprx-vision"),
-    }
-    try:
-        with open(_VLESS_FILE + ".tmp", "w", encoding="utf-8") as f:
-            json.dump(VLESS_PUBLIC, f, indent=2)
-        os.replace(_VLESS_FILE + ".tmp", _VLESS_FILE)
-    except OSError:
-        pass
-    log("vless: внешний VLESS сгенерирован (%s:%d)" % (VLESS_PUBLIC["host"], VLESS_PUBLIC["port"]))
-    return VLESS_PUBLIC
-
-
 def open_firewall(ports=None):
     """Windows: netsh правила для наших портов (best-effort, ошибки игнорируются).
 
@@ -333,8 +610,11 @@ def open_firewall(ports=None):
     import subprocess
     _ports = list(ports) if ports else [
         UI_PORT, XRAY_PORT, XRAY_API_PORT, TGWS_PORT,
-        int(VLESS_PUBLIC.get("port", 8443)),
     ]
+    if not ports:
+        vless_port = _parse_port(VLESS_PUBLIC.get("port", 8443))
+        if vless_port:
+            _ports.append(vless_port)
     seen = {}
     ordered = []
     for p in _ports:
@@ -387,8 +667,14 @@ _SETTINGS_DEFAULTS = {
     # --- v1.8.0: гологоловной сервер (master) / авто-джойн / замок тестового сервера ---
     "master_addr": "",           # URL головного сервера (напр. http://10.1.136.56:5053)
     "master_token": "",          # секрет регистрации у головного (выдаёт головной)
+    "mesh_own_secret": "",       # секрет собственного mesh-узла
     "auto_join": False,          # при старте регистрироваться в меше головного (авто-джуin)
     "master_only": False,        # замок: подключиться/использовать может только головной
+    "setup_complete": False,    # первый запуск public-сервера завершён
+    "ui_port": UI_PORT,
+    "xray_port": XRAY_PORT,
+    "xray_api_port": XRAY_API_PORT,
+    "tgws_port": TGWS_PORT,
     # --- windows: белый список (белый IP + кастомные домены на direct) ---
     "white_ip": "",          # белый IP провайдера (переопределяет env AURORA_WHITE_IP)
     "bypass_domains": [],    # кастомный белый список доменов, идущих на direct (в дополнение к RU-байпасу)
@@ -410,6 +696,38 @@ STATE = {
     "rusegment": {"running": False, "results": [], "ts": 0},
 }
 STATE_LOCK = threading.Lock()
+
+
+class StorageDataError(ValueError):
+    pass
+
+
+def quarantine_file(path):
+    source = os.path.abspath(path)
+    if not os.path.isfile(source):
+        return False
+    index = 0
+    while True:
+        candidate = source + ".corrupt" if index == 0 else "%s.corrupt.%d" % (source, index)
+        try:
+            with open(source, "rb") as src:
+                data = src.read()
+            with open(candidate, "xb") as dst:
+                dst.write(data)
+                dst.flush()
+                os.fsync(dst.fileno())
+            try:
+                import crypt
+
+                crypt.restrict_file(candidate)
+            except OSError:
+                pass
+            return True
+        except FileExistsError:
+            index += 1
+        except OSError:
+            return False
+
 
 LOG_LOCK = threading.Lock()
 
@@ -461,7 +779,18 @@ def _fetch_ru_sources():
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "Aurora/1.0"})
             with urllib.request.urlopen(req, timeout=20) as r:
-                body = r.read().decode("utf-8", errors="replace")
+                raw_length = r.headers.get("Content-Length")
+                if raw_length is not None:
+                    if not str(raw_length).isdigit():
+                        raise ValueError("invalid content length")
+                    if int(raw_length) > MAX_RU_SOURCE_BYTES:
+                        raise ValueError("ru source too large")
+                data = r.read(MAX_RU_SOURCE_BYTES + 1)
+                if len(data) > MAX_RU_SOURCE_BYTES:
+                    raise ValueError("ru source too large")
+                body = data.decode("utf-8")
+                if len(body.splitlines()) > MAX_RU_SOURCE_LINES:
+                    raise ValueError("too many ru source lines")
             for ln in body.splitlines():
                 d = _normalize_ru_line(ln)
                 if d and d not in seen:
@@ -614,41 +943,139 @@ def _ts():
     return datetime.datetime.now().strftime("%H:%M:%S")
 
 
+def _is_nonnegative_int(value):
+    return type(value) is int and value >= 0
+
+
+def _validate_ports(data):
+    ports = {}
+    for key in ("ui_port", "xray_port", "xray_api_port", "tgws_port"):
+        value = data.get(key, _SETTINGS_DEFAULTS[key])
+        if type(value) is not int or value < 1 or value > 65535:
+            return None
+        ports[key] = value
+    values = list(ports.values())
+    if any(values.count(value) > 1 for value in values):
+        return None
+    return ports
+
+
+def _validate_settings(raw):
+    if not isinstance(raw, dict):
+        raise ValueError("root is not an object")
+    bool_keys = (
+        "vpn_mode", "auto_recovery", "auto_refresh", "lan_only",
+        "block_scanners", "rate_limit", "twofa", "show_mesh", "show_subs",
+        "mesh_master", "auto_join", "master_only", "setup_complete",
+    )
+    string_keys = (
+        "continue_text", "ui_token", "server_name", "mesh_id", "mesh_token",
+        "ui_pin", "segment_title", "segment_custom", "master_addr",
+        "master_token", "mesh_own_secret", "white_ip",
+    )
+    list_keys = ("segment_regions", "bypass_domains")
+    for key in bool_keys:
+        if key in raw and type(raw[key]) is not bool:
+            raise ValueError("%s is not a boolean" % key)
+    for key in string_keys:
+        if key in raw and not isinstance(raw[key], str):
+            raise ValueError("%s is not a string" % key)
+    for key in list_keys:
+        if key in raw and (not isinstance(raw[key], list)
+                           or any(not isinstance(x, str) for x in raw[key])):
+            raise ValueError("%s is not a string list" % key)
+    if "policy_rev_accepted" in raw and not _is_nonnegative_int(raw["policy_rev_accepted"]):
+        raise ValueError("policy_rev_accepted is not a nonnegative integer")
+    if raw.get("ui_pin") and not re.fullmatch(r"[0-9]{6}", raw["ui_pin"]):
+        raise ValueError("ui_pin must be six ASCII digits")
+    if raw.get("ui_token") and not 12 <= len(raw["ui_token"]) <= 256:
+        raise ValueError("ui_token length is invalid")
+    merged = dict(_SETTINGS_DEFAULTS)
+    merged.update({k: raw[k] for k in raw if k in _SETTINGS_DEFAULTS})
+    if _validate_ports(merged) is None:
+        raise ValueError("ports are invalid")
+    return merged
+
+
+def _storage_failure(path, reason):
+    quarantine_file(path)
+    raise StorageDataError("%s: %s" % (os.path.basename(path), reason))
+
+
 # --- настройки ---
+def _apply_port_overrides(settings):
+    global UI_PORT, XRAY_PORT, XRAY_API_PORT, TGWS_PORT
+    ports = _validate_ports(settings)
+    if ports is None:
+        return False
+    UI_PORT = ports["ui_port"]
+    XRAY_PORT = ports["xray_port"]
+    XRAY_API_PORT = ports["xray_api_port"]
+    TGWS_PORT = ports["tgws_port"]
+    return True
+
+
 def load_settings():
     """Читает data/settings.json (выживают только известные ключи)."""
     global _settings, WHITE_IP
-    try:
-        with open(_SETTINGS_FILE, "r", encoding="utf-8") as f:
-            raw = json.load(f)
-        merged = dict(_SETTINGS_DEFAULTS)
-        merged.update({k: raw[k] for k in raw if k in _SETTINGS_DEFAULTS})
+    with _LOCK:
+        import crypt
+        missing = object()
+        try:
+            raw = crypt.load_json(_SETTINGS_FILE, default=missing)
+        except crypt.StorageError as e:
+            _storage_failure(_SETTINGS_FILE, str(e))
+        if raw is missing:
+            _settings = dict(_SETTINGS_DEFAULTS)
+            if not _apply_port_overrides(_settings):
+                raise ValueError("ports are invalid")
+            WHITE_IP = _SETTINGS_DEFAULTS.get("white_ip", "")
+            return
+        try:
+            merged = _validate_settings(raw)
+        except (TypeError, ValueError) as e:
+            _storage_failure(_SETTINGS_FILE, str(e))
+        try:
+            crypt.save_json(_SETTINGS_FILE, merged)
+        except (crypt.StorageError, OSError) as e:
+            _storage_failure(_SETTINGS_FILE, str(e))
+        if not _apply_port_overrides(merged):
+            raise ValueError("ports are invalid")
         _settings = merged
-        if merged.get("white_ip"):
-            WHITE_IP = merged["white_ip"].strip()
-    except (OSError, ValueError):
-        _settings = dict(_SETTINGS_DEFAULTS)
+        WHITE_IP = str(merged.get("white_ip") or "").strip()
+
+
+def _persist_settings(value):
+    import crypt
+    crypt.save_json(_SETTINGS_FILE, value)
 
 
 def save_settings():
     """Атомарно пишет настройки в data/settings.json."""
-    tmp = _SETTINGS_FILE + ".tmp"
     with _LOCK:
         try:
-            with open(tmp, "w", encoding="utf-8") as f:
-                json.dump(_settings, f, indent=2, ensure_ascii=False)
-            os.replace(tmp, _SETTINGS_FILE)
-        except OSError as e:
+            _persist_settings(_settings)
+        except (crypt.StorageError, OSError) as e:
             log("settings: не удалось сохранить: %s" % e)
+            return False
+    return True
 
 
 def reset_settings():
     """Сброс настроек к значениям по умолчанию (кнопка «Сбросить всё»)."""
     global _settings
     with _LOCK:
-        _settings = dict(_SETTINGS_DEFAULTS)
-    save_settings()
+        candidate = dict(_SETTINGS_DEFAULTS)
+        try:
+            _persist_settings(candidate)
+        except (crypt.StorageError, OSError) as e:
+            log("settings: не удалось сохранить: %s" % e)
+            return False
+        _settings.clear()
+        _settings.update(candidate)
+        WHITE_IP = str(candidate.get("white_ip", "") or "").strip()
     log("settings: сброшены к значениям по умолчанию")
+    return True
 
 
 # --- тарифы: переопределение из data/plans.json (редактор тарифов в UI) ---
@@ -658,46 +1085,128 @@ _SUBS_PLANS_LOCK = threading.RLock()
 def save_plans():
     """Сохраняет текущие SUBS_PLANS в data/plans.json (атомарно)."""
     with _SUBS_PLANS_LOCK:
-        tmp = SUBS_PLANS_FILE + ".tmp"
         try:
-            with open(tmp, "w", encoding="utf-8") as f:
-                json.dump(SUBS_PLANS, f, indent=2, ensure_ascii=False)
-            os.replace(tmp, SUBS_PLANS_FILE)
-        except OSError as e:
+            import crypt
+            data = json.dumps(SUBS_PLANS, indent=2, ensure_ascii=False).encode("utf-8")
+            crypt._atomic_write(SUBS_PLANS_FILE, data)
+        except Exception as e:
             log("plans: не удалось сохранить: %s" % e)
+
+
+def _valid_plan_id(value):
+    return (isinstance(value, str) and 1 <= len(value) <= 40
+            and all(ch.isascii() and (ch.isalnum() or ch in "_-") for ch in value))
+
+
+def _validate_plans(raw):
+    if not isinstance(raw, dict):
+        raise ValueError("root is not an object")
+    valid = {}
+    need = ("name", "price", "bytes", "days", "devices", "keys")
+    for key, value in raw.items():
+        if not _valid_plan_id(key):
+            raise ValueError("invalid plan id")
+        if not isinstance(value, dict) or any(name not in value for name in need):
+            raise ValueError("invalid plan record")
+        if not isinstance(value["name"], str) or not value["name"].strip():
+            raise ValueError("invalid plan name")
+        for name in ("price", "bytes", "days", "devices", "keys"):
+            if not _is_nonnegative_int(value[name]):
+                raise ValueError("invalid plan field %s" % name)
+        if value["devices"] < 1 or value["keys"] < 1:
+            raise ValueError("invalid plan limits")
+        for name in ("features", "features_no"):
+            if name in value and (not isinstance(value[name], list)
+                                  or any(not isinstance(x, str) for x in value[name])):
+                raise ValueError("invalid plan features")
+        base = dict(SUBS_PLANS.get(key, {}))
+        base.update(value)
+        valid[key] = base
+    return valid
 
 
 def _load_plans_override():
     """Переопределение тарифов из data/plans.json (валидные планы перезаписывают)."""
     try:
-        if not os.path.exists(SUBS_PLANS_FILE):
-            return
         with open(SUBS_PLANS_FILE, "r", encoding="utf-8") as f:
             raw = json.load(f)
-        valid = {}
-        need = ("name", "price", "bytes", "days", "devices", "keys")
-        for k, v in raw.items():
-            if isinstance(v, dict) and all(x in v for x in need):
-                # мержим с дефолтом: features/features_no не обязательны в json,
-                # но сохраняем, если заданы (иначе описание тарифа теряется)
-                base = dict(SUBS_PLANS.get(k, {}))
-                base.update(v)
-                valid[k] = base
+    except FileNotFoundError:
+        return
+    except (OSError, ValueError) as e:
+        _storage_failure(SUBS_PLANS_FILE, str(e))
+    try:
+        valid = _validate_plans(raw)
+    except (TypeError, ValueError) as e:
+        _storage_failure(SUBS_PLANS_FILE, str(e))
+    with _SUBS_PLANS_LOCK:
         if valid:
             SUBS_PLANS.update(valid)
             log("plans: тарифы переопределены из data/plans.json (%d)" % len(valid))
-    except (OSError, ValueError) as e:
-        log("plans: не читается plans.json: %s" % e)
+
+
+# --- меш: общий ключ подписи приглашений/политики с головным сервером ---
+MESH_POLICY_TTL_S = 120
+
+
+def _read_mesh_policy_key():
+    value = (os.environ.get("AURORA_MESH_POLICY_KEY") or "").strip()
+    return value if len(value.encode("utf-8")) >= 32 else ""
+
+
+def _read_mesh_master_id():
+    value = (os.environ.get("AURORA_MESH_MASTER_ID") or "").strip()
+    if not value or len(value) > 64:
+        return ""
+    for ch in value:
+        if not (ch.isalnum() or ch in "._-"):
+            return ""
+    return value
+
+
+MESH_POLICY_KEY = _read_mesh_policy_key()
+MESH_MASTER_ID = _read_mesh_master_id()
+
+
+def mesh_policy_key():
+    return MESH_POLICY_KEY
+
+
+def mesh_master_id():
+    return MESH_MASTER_ID
 
 
 def get(key, default=None):
     return _settings.get(key, default)
 
 
+def set_many(values, strict=True):
+    global WHITE_IP
+    import crypt
+    if not isinstance(values, dict):
+        return False
+    with _LOCK:
+        candidate = dict(_settings)
+        candidate.update(values)
+        if strict:
+            try:
+                candidate = _validate_settings(candidate)
+            except (TypeError, ValueError) as e:
+                log("settings: невалидное значение: %s" % e)
+                return False
+        try:
+            _persist_settings(candidate)
+        except (crypt.StorageError, OSError) as e:
+            log("settings: не удалось сохранить: %s" % e)
+            return False
+        _settings.clear()
+        _settings.update(candidate)
+        if "white_ip" in values:
+            WHITE_IP = str(candidate.get("white_ip", "") or "").strip()
+    return True
+
+
 def set(key, value):
-    with _LOCK:                  # защита от RuntimeError при параллельном save_settings
-        _settings[key] = value
-    save_settings()
+    return set_many({key: value}, strict=key in _SETTINGS_DEFAULTS)
 
 
 def update_state_sub(key, **kw):

@@ -30,6 +30,7 @@ if errorlevel 1 (
 "%NSSM%" set Aurora Description "Aurora Proxy (VLESS Reality + TG WS). Panel :8890, xray :8899, api :8897, tg-ws :443."
 "%NSSM%" set Aurora Start SERVICE_AUTO_START
 "%NSSM%" set Aurora AppEnvironmentExtra AURORA_DATA_DIR=%DATA%
+"%NSSM%" set Aurora AppEnvironmentExtra XRAY_MANAGE=proc
 "%NSSM%" set Aurora AppStdout "%DATA%\service.log"
 "%NSSM%" set Aurora AppStderr "%DATA%\service.log"
 "%NSSM%" set Aurora AppRotateFiles 1

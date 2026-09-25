@@ -1,18 +1,24 @@
 ; Aurora Proxy - Inno Setup 7 installer for the Windows bundle
 ; SrcDir is passed on the command line:
-;   ISCC.exe /DSrcDir=C:\path\to\dist\Aurora install.iss
+;   ISCC.exe /DSrcDir=C:\path\to\dist\Aurora /DAuroraVersion=1.9.1 /DAuroraVersionName=Кот-правозащитник install.iss
 
 #ifndef SrcDir
   #define SrcDir "..\..\..\Temp\opencode\aurora_build\dist\Aurora"
+#endif
+#ifndef AuroraVersion
+  #define AuroraVersion "1.9.1"
+#endif
+#ifndef AuroraVersionName
+  #define AuroraVersionName "Кот-крепость"
 #endif
 
 [Setup]
 AppId={{3C5F2A91-7E4D-4B88-9A6B-1D0E5F2B7A44}
 AppName=Aurora Proxy
-AppVersion=1.6.0
-AppVerName=Aurora Proxy 1.6.0
+AppVersion={#AuroraVersion}
+AppVerName=Aurora Proxy {#AuroraVersion} {#AuroraVersionName}
 AppPublisher=efremov-aa
-VersionInfoVersion=1.6.0
+VersionInfoVersion={#AuroraVersion}
 DefaultDirName={autopf}\Aurora
 DefaultGroupName=Aurora Proxy
 DisableProgramGroupPage=yes
@@ -20,7 +26,7 @@ UninstallDisplayIcon={app}\Aurora.exe
 PrivilegesRequired=admin
 ArchitecturesInstallIn64BitMode=x64
 OutputDir=output
-OutputBaseFilename=Aurora-Setup-1.6.0
+OutputBaseFilename=Aurora-Setup-{#AuroraVersion}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern

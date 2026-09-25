@@ -1,18 +1,25 @@
 # Aurora v1.0 — источники ключей: github-списки, парс vless://, live-проверка.
 # Проверка не трогает рабочий xray: temp-конфиг на отдельном порту + реальный egress.
 
+import base64
+import ipaddress
 import os
+import re
 import socket
 import threading
 import time
 import urllib.parse
 import urllib.request
+import uuid
 
 import config
+import crypt
 import pool
 
-KEYTEST_PORT = 19876  # temp-xray для пробы ключей (отдельный, не мешает основному)
+KEYTEST_PORT = 19876  # temp-xray
 UA = "Aurora/1.0"
+MAX_SOURCE_BYTES = 4 * 1024 * 1024
+MAX_SOURCE_LINES = 100000
 
 
 # ---- comm для док-бара: 'done' живёт TTL секунд, затем авто-возврат в idle.
@@ -29,11 +36,23 @@ def _comm_done(msg, ttl=10):
 
 # --- загрузка списков ---
 def fetch_source(url, timeout=30):
-    """Скачивает список ключей по URL; возвращает текст или None."""
+    """Скачать список VLESS-ключей."""
     req = urllib.request.Request(url, headers={"User-Agent": UA})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
-            return r.read().decode("utf-8", errors="replace")
+            raw_length = r.headers.get("Content-Length")
+            if raw_length is not None:
+                if not str(raw_length).isdigit():
+                    raise ValueError("invalid content length")
+                if int(raw_length) > MAX_SOURCE_BYTES:
+                    raise ValueError("source too large")
+            data = r.read(MAX_SOURCE_BYTES + 1)
+            if len(data) > MAX_SOURCE_BYTES:
+                raise ValueError("source too large")
+            text = data.decode("utf-8")
+            if len(text.splitlines()) > MAX_SOURCE_LINES:
+                raise ValueError("too many source lines")
+            return text
     except Exception as e:
         config.log("source: fetch %s: %s" % (url, e))
         return None
@@ -49,32 +68,67 @@ def parse_vless_list(text):
     return out
 
 
+def _safe_key_host(value):
+    return pool._host_name_allowed(value)
+
+
+def _query_values(query):
+    try:
+        values = urllib.parse.parse_qs(
+            query, keep_blank_values=True, strict_parsing=True)
+    except (TypeError, ValueError):
+        return None
+    if not values or any(len(items) != 1 for items in values.values()):
+        return None
+    return values
+
+
 def _key_from_uri(uri):
     """Разбирает vless-uri в dict-ключ или None. Reality-поля из query."""
     try:
-        p = urllib.parse.urlparse(uri)
-        if p.scheme != "vless" or not p.hostname:
+        raw = str(uri or "").strip()
+        if not raw or len(raw) > 8192 or any(ord(ch) < 32 for ch in raw):
             return None
-        q = urllib.parse.parse_qs(p.query)
+        p = urllib.parse.urlparse(raw)
+        if p.scheme != "vless" or not p.hostname or p.password is not None:
+            return None
+        if p.path not in ("", "/") or not p.username:
+            return None
+        host = p.hostname.rstrip(".").lower()
+        if not _safe_key_host(host):
+            return None
+        port = p.port if p.port is not None else 443
+        if not 1 <= port <= 65535:
+            return None
+        q = _query_values(p.query)
+        if q is None:
+            return None
 
         def one(name, default=None):
-            v = q.get(name)
-            if isinstance(v, list):
-                v = v[0] if v else None
-            return v or default
+            values = q.get(name)
+            if values is None:
+                return default
+            return values[0] or default
 
         pbk = one("pbk")
-        if pbk and len(pbk) != 43:
-            # x25519 public key = ровно 43 символа; иначе xray v26.9.9 падает
-            # exit 23 'invalid password' (инцидент vless-31) — ключ отбрасываем
+        if not pbk or not re.fullmatch(r"[A-Za-z0-9_-]{43}", pbk):
             return None
-
-        return {
-            "uri": uri.rstrip("#").strip(),
+        try:
+            decoded = base64.urlsafe_b64decode(pbk + "=")
+        except (ValueError, TypeError):
+            return None
+        if len(decoded) != 32:
+            return None
+        try:
+            uuid.UUID(p.username)
+        except (ValueError, AttributeError, TypeError):
+            return None
+        candidate = {
+            "uri": raw,
             "tag": "",
-            "host": p.hostname,
-            "port": p.port or 443,
-            "uuid": p.username or "",
+            "host": host,
+            "port": port,
+            "uuid": p.username,
             "pbk": pbk,
             "sid": one("sid"),
             "fp": one("fp", "chrome"),
@@ -82,7 +136,10 @@ def _key_from_uri(uri):
             "flow": one("flow", "xtls-rprx-vision"),
             "source": "github",
         }
-    except Exception:
+        if pool.validate_vless_key(candidate, require_pbk=True):
+            return None
+        return candidate
+    except (TypeError, ValueError, UnicodeError):
         return None
 
 
@@ -120,15 +177,24 @@ def refresh_from_github():
         config.log("source: %s: %d uri (новых %d, в блоке пропущено %d, без reality %d)" % (
             url, len(uris), added, skipped, no_reality))
     after = len(pool.get_keys())
+    if total_new:
+        check_all(bg=True)
     _comm_done("github: добавлено %d ключей (всего %d)" % (total_new, after))
     config.log("source: всего в пуле %d (было %d, новых %d)" % (after, before, total_new))
     return total_new
 
 
+def _probe_host_allowed(host, port=443):
+    return pool.resolve_public_host(host, port) is not None
+
+
 # --- live-проверка ключа ---
 def _tcp_ping(host, port, timeout=4):
+    address = pool.resolve_public_host(host, port)
+    if not address:
+        return False
     try:
-        s = socket.create_connection((host, port), timeout=timeout)
+        s = socket.create_connection((address, port), timeout=timeout)
         s.close()
         return True
     except OSError:
@@ -137,9 +203,12 @@ def _tcp_ping(host, port, timeout=4):
 
 def _tcp_ping_ms(host, port, timeout=4):
     """TCP-пинг с замером времени. Возвращает мс или None при недоступности."""
+    address = pool.resolve_public_host(host, port)
+    if not address:
+        return None
     t = time.time()
     try:
-        s = socket.create_connection((host, port), timeout=timeout)
+        s = socket.create_connection((address, port), timeout=timeout)
         s.close()
         return int((time.time() - t) * 1000)
     except OSError:
@@ -148,6 +217,8 @@ def _tcp_ping_ms(host, port, timeout=4):
 
 def _gen_keytest_config(key, port):
     """Temp-конфиг: один vless-outbound (только этот ключ) + direct; API на порту."""
+    if not _probe_host_allowed(key.get("host")):
+        return None
     import json
     ob = pool.build_outbound(key)
     if not ob:
@@ -173,6 +244,11 @@ def _gen_keytest_config(key, port):
     return cfg
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 def _http_egress_check(port, timeout=8):
     """Реальный egress через temp-xray: HTTP+HTTPS ipify; белый IP отфильтрован."""
     for scheme in ("https", "http"):
@@ -182,7 +258,7 @@ def _http_egress_check(port, timeout=8):
                 "http": "http://127.0.0.1:%d" % port,
                 "https": "http://127.0.0.1:%d" % port,
             })
-            opener = urllib.request.build_opener(proxy)
+            opener = urllib.request.build_opener(proxy, _NoRedirect())
             req = urllib.request.Request(url, headers={"User-Agent": UA})
             with opener.open(req, timeout=timeout) as r:
                 body = r.read().decode("utf-8", errors="replace")
@@ -208,12 +284,43 @@ def _xray_bin():
     return None
 
 
+def _write_keytest_config(path, cfg):
+    import json
+    import os
+    import crypt
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    if hasattr(os, "O_BINARY"):
+        flags |= os.O_BINARY
+    fd = os.open(path, flags, 0o600)
+    closed = False
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            closed = True
+            json.dump(cfg, f)
+            f.flush()
+            os.fsync(f.fileno())
+        try:
+            crypt.restrict_file(path)
+        except OSError:
+            pass
+    except Exception:
+        if not closed:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+        crypt.unlink_quiet(path, "keytest config")
+        raise
+
+
 def keytest(key, timeout=15, port=None):
     """Полный тест: TCP -> keytest через temp-xray -> egress. Возвращает dict.
     port — уникальный temp-порт для xray (важно при параллельной проверке)."""
     import json
     import os
     import subprocess
+    import crypt
 
     port = port or KEYTEST_PORT
     host = key.get("host")
@@ -241,32 +348,45 @@ def keytest(key, timeout=15, port=None):
     if not cfg:
         return {"status": "bad", "reason": "bad-config", "exit_ip": "-", "ping_ms": 9999}
 
-    cfg_path = os.path.join(config.DATA_DIR, "keytest_cfg_%d.json" % port)
+    cfg_path = crypt.secure_temp_path(config.DATA_DIR, "keytest_cfg_", ".json")
     try:
-        with open(cfg_path, "w", encoding="utf-8") as f:
-            json.dump(cfg, f)
-    except OSError:
+        _write_keytest_config(cfg_path, cfg)
+    except (OSError, TypeError, ValueError):
         return {"status": "noip", "reason": "cfg-write-fail", "exit_ip": "-", "ping_ms": ping_ms}
 
     proc = None
     try:
-        proc = subprocess.Popen([xbin, "run", "-c", cfg_path],
-                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                creationflags=config.HIDE_FLAG)
-    except OSError:
-        pass
-
-    # ждём порт, затем egress-проба (не ждать завершения xray — он вечный)
-    _wait_port(port, timeout=4)
-    ip = _http_egress_check(port, timeout=8)
-    try:
-        if proc and proc.poll() is None:
-            proc.terminate()
-    except Exception:
-        pass
-    if ip:
-        return {"status": "ok", "exit_ip": ip, "sites_ok": 1, "ping_ms": ping_ms}
-    return {"status": "noip", "reason": "no-egress", "exit_ip": "-", "ping_ms": ping_ms}
+        try:
+            proc = subprocess.Popen([xbin, "run", "-c", cfg_path],
+                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                    creationflags=config.HIDE_FLAG)
+        except OSError:
+            return {"status": "noip", "reason": "xray-start-fail", "exit_ip": "-", "ping_ms": ping_ms}
+        if not _wait_port(port, timeout=4):
+            return {"status": "noip", "reason": "test-port", "exit_ip": "-", "ping_ms": ping_ms}
+        ip = _http_egress_check(port, timeout=8)
+        if ip:
+            return {"status": "ok", "exit_ip": ip, "sites_ok": 1, "ping_ms": ping_ms}
+        return {"status": "noip", "reason": "no-egress", "exit_ip": "-", "ping_ms": ping_ms}
+    finally:
+        if proc is not None:
+            try:
+                if proc.poll() is None:
+                    proc.terminate()
+            except Exception:
+                pass
+            try:
+                proc.wait(timeout=2)
+            except Exception:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+                try:
+                    proc.wait(timeout=2)
+                except Exception:
+                    pass
+        crypt.unlink_quiet(cfg_path, "keytest config")
 
 
 def _wait_port(port, timeout=4):

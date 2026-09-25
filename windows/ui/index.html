@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Aurora — прокси · меш · магазин</title>
+  <link rel="icon" href="/favicon.ico">
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -63,7 +64,7 @@
     <div class="side-foot">
       <span class="dot"></span>
       <span id="side-version">v—</span>
-      <span class="upd" id="side-upd" style="display:none" onclick="navTo('update')">⬆ NEW</span>
+      <span class="upd" id="side-upd" style="display:none" data-act="nav" data-tab="update">⬆ NEW</span>
     </div>
   </aside>
 
@@ -80,7 +81,7 @@
         <span class="pill gold" id="pill-plan">💎 basic</span>
         <span class="pill mono hide-sm" id="pill-ip">—</span>
       </div>
-      <select id="lang-sel" class="lang-sel" onchange="setLang(this.value)" title="Язык / Language">
+      <select id="lang-sel" class="lang-sel" data-act="lang" title="Язык / Language">
         <option value="ru">Русский</option>
         <option value="en">English</option>
         <option value="es">Español</option>
@@ -92,7 +93,7 @@
         <option value="ar">العربية</option>
         <option value="hi">हिन्दी</option>
       </select>
-      <button id="btn-policy" class="icon-btn" title="Политика сервиса" onclick="policyShow()">🛡️</button>
+      <button id="btn-policy" class="icon-btn" title="Политика сервиса" data-act="policy-open">🛡️</button>
       <button id="theme-btn" class="icon-btn" title="Сменить тему">🌙</button>
     </header>
 
@@ -140,8 +141,8 @@
               <div class="usub" id="du-msg">—</div>
             </div>
             <div class="uact" style="display:flex;gap:8px">
-              <button class="btn ghost" onclick="navTo('update')" data-i18n="upd.details">Подробнее</button>
-              <button class="btn primary" onclick="startUpdate()" data-i18n="upd.now">Обновить</button>
+              <button class="btn ghost" data-act="nav" data-tab="update" data-i18n="upd.details">Подробнее</button>
+              <button class="btn primary" data-act="update-start" data-i18n="upd.now">Обновить</button>
             </div>
           </div>
         </div>
@@ -158,8 +159,8 @@
             </div>
             <div class="widget-body" id="w-mesh-body">—</div>
             <div class="widget-foot">
-              <button class="btn small" onclick="navTo('mesh-topo')">🌌 <span data-i18n="nav.mesh-topo">Топология</span></button>
-              <button class="btn small" onclick="navTo('mesh-routes')">🧭 <span data-i18n="nav.mesh-routes">Маршруты</span></button>
+              <button class="btn small" data-act="nav" data-tab="mesh-topo">🌌 <span data-i18n="nav.mesh-topo">Топология</span></button>
+              <button class="btn small" data-act="nav" data-tab="mesh-routes">🧭 <span data-i18n="nav.mesh-routes">Маршруты</span></button>
             </div>
           </div>
 
@@ -172,8 +173,8 @@
             </div>
             <div class="widget-body" id="w-plan-body">—</div>
             <div class="widget-foot">
-              <button class="btn small" onclick="navTo('shop-plans')">💎 <span data-i18n="nav.shop-plans">Тарифы</span></button>
-              <button class="btn small" onclick="navTo('shop-features')">🧩 <span data-i18n="nav.shop-features">Функции</span></button>
+              <button class="btn small" data-act="nav" data-tab="shop-plans">💎 <span data-i18n="nav.shop-plans">Тарифы</span></button>
+              <button class="btn small" data-act="nav" data-tab="shop-features">🧩 <span data-i18n="nav.shop-features">Функции</span></button>
             </div>
           </div>
 
@@ -188,8 +189,8 @@
               Активный ключ <b id="w-key">—</b>, exit <b id="w-exit">—</b>. Восстановлений за сутки: <b id="w-rec">0</b>.
             </div>
             <div class="widget-foot">
-              <button class="btn small" onclick="navTo('keys')">🔑 <span data-i18n="nav.keys">Ключи</span></button>
-              <button class="btn small" onclick="navTo('logs')">📜 <span data-i18n="nav.logs">Логи</span></button>
+              <button class="btn small" data-act="nav" data-tab="keys">🔑 <span data-i18n="nav.keys">Ключи</span></button>
+              <button class="btn small" data-act="nav" data-tab="logs">📜 <span data-i18n="nav.logs">Логи</span></button>
             </div>
           </div>
 
@@ -202,7 +203,7 @@
             </div>
             <div class="widget-body" id="w-ru-body">—</div>
             <div class="widget-foot">
-              <button class="btn small" onclick="navTo('rusegment')">🧪 <span data-i18n="w.check-ru">Проверить</span></button>
+              <button class="btn small" data-act="nav" data-tab="rusegment">🧪 <span data-i18n="w.check-ru">Проверить</span></button>
             </div>
           </div>
         </div>
@@ -225,10 +226,10 @@
           <h2><span class="ic">🔑</span><span data-i18n="nav.keys">Ключи</span><span class="count" id="keyinfo" data-i18n="k.keys">ключей: 0</span></h2>
           <div class="cmd-row" style="margin-top:0">
             <input type="text" id="keyuri" data-i18n-placeholder="keys.uri-ph" placeholder="vless://… вставьте свою ссылку (Reality)">
-            <button class="btn primary" onclick="keyAdd()">➕ <span data-i18n="keys.add">Свой ключ</span></button>
+            <button class="btn primary" data-act="key-add">➕ <span data-i18n="keys.add">Свой ключ</span></button>
           </div>
           <div class="actions tight">
-            <button class="btn small" onclick="keyClean()">🧹 <span data-i18n="keys.clean">Очистить мёртвые</span></button>
+            <button class="btn small" data-act="key-clean">🧹 <span data-i18n="keys.clean">Очистить мёртвые</span></button>
             <span class="spacer"></span>
             <span class="badge mono" data-i18n="keys.src">github + свои</span>
           </div>
@@ -266,7 +267,7 @@
           <div class="qr-box" id="cx-qr"></div>
           <div class="cmd-row">
             <input type="text" id="cx-link" readonly>
-            <button class="btn" onclick="cxCopy()">📋 <span data-i18n="btn.copy">Копировать</span></button>
+            <button class="btn" data-act="cx-copy">📋 <span data-i18n="btn.copy">Копировать</span></button>
           </div>
           <div class="metrics" style="margin:12px 0 0">
             <div class="stat"><div class="k">🔗 <span data-i18n="cx.addr">Адрес</span></div><div class="v mono" id="cx-host" style="font-size:13px">–</div></div>
@@ -289,7 +290,7 @@
             <span class="badge" id="rg-title">🇷🇺 <span data-i18n="nav.rusegment">Ру-сегмент</span></span>
             <select id="rg-sel" style="max-width:240px"></select>
             <input type="text" id="rg-custom" data-i18n-placeholder="ru.custom-ph" placeholder="Доп. домены через запятую (необязательно)" style="flex:1;min-width:180px">
-            <button class="btn small" onclick="regionsSave()">💾 <span data-i18n="btn.save">Сохранить</span></button>
+            <button class="btn small" data-act="regions-save">💾 <span data-i18n="btn.save">Сохранить</span></button>
           </div>
           <div class="metrics" style="margin:0 0 12px">
             <div class="stat"><div class="k">✅ <span data-i18n="ru.ok">Доступно</span></div><div class="v" id="ru-ok">0/0</div></div>
@@ -298,8 +299,8 @@
             <div class="stat"><div class="k">🕐 <span data-i18n="ru.ts">Проверено</span></div><div class="v mono" id="ru-ts" style="font-size:13px">–</div></div>
           </div>
           <div class="actions" style="margin-top:0">
-            <button class="btn" id="ru-run" onclick="ruCheck()">🧪 <span data-i18n="ru.check-now">Проверить сейчас</span></button>
-            <button class="btn small" id="ru-failonly" onclick="ruToggleFail()">💀 Только проблемы</button>
+            <button class="btn" id="ru-run" data-act="ru-check">🧪 <span data-i18n="ru.check-now">Проверить сейчас</span></button>
+            <button class="btn small" id="ru-failonly" data-act="ru-toggle-fail">💀 Только проблемы</button>
           </div>
           <div class="tbl-wrap" style="margin-top:12px">
             <table>
@@ -322,7 +323,7 @@
             <div class="stat"><div class="k">🤫 <span data-i18n="tgws.secret">Секрет</span></div><div class="v mono" id="tg-sec" style="font-size:13px">–</div></div>
           </div>
           <div class="actions" style="margin-top:0">
-            <button class="btn" onclick="tgRestart()">🔄 <span data-i18n="tgws.restart">Рестарт TG-WS</span></button>
+            <button class="btn" data-act="tgws-restart">🔄 <span data-i18n="tgws.restart">Рестарт TG-WS</span></button>
           </div>
           <div class="qr-box" id="tg-qr"></div>
         </div>
@@ -337,7 +338,7 @@
           <p data-i18n="mj.p">Ваш прокси может быть частью приватной меш-сети Aurora. Это даёт доступ к эксклюзивным локациям других участников, автоматический обход блокировок и резервные маршруты.</p>
           <div class="invite-input">
             <input type="text" id="mesh-invite" data-i18n-placeholder="mj.invite-ph" placeholder="Вставьте invite-код меша (например: aurora-home-a1b2c3d4)">
-            <button class="btn primary" onclick="meshJoin()">🔗 <span data-i18n="mj.join">Подключиться</span></button>
+            <button class="btn primary" data-act="mesh-join">🔗 <span data-i18n="mj.join">Подключиться</span></button>
           </div>
         </div>
 
@@ -361,8 +362,8 @@
             </ul>
           </div>
           <div class="actions">
-            <button class="btn danger" onclick="meshLeave()">⛔ <span data-i18n="mj.leave">Покинуть меш</span></button>
-            <button class="btn ghost" onclick="meshRegen()">🔄 <span data-i18n="mj.regen">Обновить invite</span></button>
+            <button class="btn danger" data-act="mesh-leave">⛔ <span data-i18n="mj.leave">Покинуть меш</span></button>
+            <button class="btn ghost" data-act="mesh-regen">🔄 <span data-i18n="mj.regen">Обновить invite</span></button>
           </div>
         </div>
 
@@ -370,9 +371,9 @@
           <h2><span class="ic">🎛</span><span data-i18n="mj.pol">Политика хаба</span></h2>
           <p class="hint" data-i18n="mj.pol-hint">Головной сервер управляет тем, какие вкладки видны у клиентов меша. Клиенты, подключённые по invite этого сервера, автоматически применяют политику (обновление каждые 15&nbsp;сек).</p>
           <div class="widget-body" style="display:flex;flex-direction:column;gap:8px;font-size:13px">
-            <label class="chk"><input type="checkbox" id="m-master" onchange="meshPolicySave()"> <span data-i18n="mj.master">Cервер — головной, управляет видимостью у клиентов</span></label>
-            <label class="chk"><input type="checkbox" id="m-show-mesh" onchange="meshPolicySave()"> <span data-i18n="mj.show-mesh">Показывать клиентам вкладку «Меш-сеть»</span></label>
-            <label class="chk"><input type="checkbox" id="m-show-subs" onchange="meshPolicySave()"> <span data-i18n="mj.show-subs">Показывать клиентам вкладку «Магазин»</span></label>
+            <label class="chk"><input type="checkbox" id="m-master" data-act="mesh-policy-save"> <span data-i18n="mj.master">Cервер — головной, управляет видимостью у клиентов</span></label>
+            <label class="chk"><input type="checkbox" id="m-show-mesh" data-act="mesh-policy-save"> <span data-i18n="mj.show-mesh">Показывать клиентам вкладку «Меш-сеть»</span></label>
+            <label class="chk"><input type="checkbox" id="m-show-subs" data-act="mesh-policy-save"> <span data-i18n="mj.show-subs">Показывать клиентам вкладку «Магазин»</span></label>
           </div>
         </div>
       </section>
@@ -419,8 +420,8 @@
               </g>
             </svg>
             <div class="mesh-toolbar">
-              <button class="on" title="Авто-раскладка" onclick="toast('Авто-раскладка 🐾', true)">🌐</button>
-              <button title="Обновить" onclick="meshRefresh()">🔄</button>
+              <button class="on" title="Авто-раскладка" data-act="toast" data-msg="Авто-раскладка 🐾">🌐</button>
+              <button title="Обновить" data-act="mesh-refresh">🔄</button>
             </div>
             <div class="mesh-legend">
               <span><i style="background:var(--primary)"></i><span data-i18n="g.you">Вы</span></span>
@@ -507,9 +508,12 @@
             <div class="stat"><div class="k">💎 <span data-i18n="sb.plan">Текущий план</span></div><div class="v" id="bill-plan">–</div></div>
             <div class="stat"><div class="k">📅 <span data-i18n="sb.until">Активен до</span></div><div class="v mono" id="bill-until">–</div></div>
             <div class="stat"><div class="k">📦 <span data-i18n="plans.traffic">Трафик</span></div><div class="v mono" id="bill-traffic">–</div></div>
+            <div class="stat"><div class="k"><span data-i18n="sb.active">Активных</span></div><div class="v" id="bill-active">–</div></div>
+            <div class="stat"><div class="k"><span data-i18n="sb.income">Доход за месяц</span></div><div class="v" id="bill-income">–</div></div>
+            <div class="stat"><div class="k"><span data-i18n="sb.traffic-month">Трафик за месяц</span></div><div class="v mono" id="bill-traffic-month">–</div></div>
           </div>
           <div class="actions" style="margin-top:0">
-            <button class="btn gold" onclick="buyPlan()">💳 <span data-i18n="sb.buy">Продлить / сменить план</span></button>
+            <button class="btn gold" data-act="plan-buy">💳 <span data-i18n="sb.buy">Продлить / сменить план</span></button>
           </div>
           <h3 style="font-size:13px;font-weight:800;margin:14px 0 8px"><span data-i18n="sb.hist">История платежей</span></h3>
           <div class="tbl-wrap">
@@ -538,7 +542,7 @@
               <div class="usub" id="upd-msg">—</div>
             </div>
             <div class="uact" style="display:flex;gap:8px;flex-wrap:wrap">
-              <button class="btn primary" onclick="startUpdate()">⬆️ <span data-i18n="upd.apply">Обновить сейчас</span></button>
+              <button class="btn primary" data-act="update-start">⬆️ <span data-i18n="upd.apply">Обновить сейчас</span></button>
             </div>
           </div>
         </div>
@@ -557,10 +561,10 @@
               <option value="notify" data-i18n="upd.mode-notify">Только уведомлять</option>
               <option value="off" data-i18n="upd.mode-off">Не проверять</option>
             </select>
-            <button class="btn small" onclick="updSave()" data-i18n="btn.save">Сохранить</button>
+            <button class="btn small" data-act="update-save" data-i18n="btn.save">Сохранить</button>
           </div>
           <div class="actions tight">
-            <button class="btn small" onclick="checkUpdate()">🔍 <span data-i18n="upd.check-now">Проверить сейчас</span></button>
+            <button class="btn small" data-act="update-check">🔍 <span data-i18n="upd.check-now">Проверить сейчас</span></button>
             <span class="spacer"></span>
             <span class="badge" id="upd-last">Проверено: –</span>
           </div>
@@ -608,7 +612,7 @@
           <div style="font-size:11px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:var(--muted-2);margin:16px 0 8px" data-i18n="set.common">Общие</div>
           <div class="cmd-row">
             <input type="text" id="set-name" data-i18n-placeholder="set.name-ph" placeholder="Название сервера" value="">
-            <button class="btn small" onclick="settingsSave()" data-i18n="btn.save">Сохранить</button>
+            <button class="btn small" data-act="settings-save" data-i18n="btn.save">Сохранить</button>
           </div>
           <div style="font-size:11px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:var(--muted-2);margin:16px 0 8px" data-i18n="set.vis">Видимость вкладок</div>
           <div class="widget-body" style="display:flex;flex-direction:column;gap:8px;font-size:13px">
@@ -618,7 +622,7 @@
           <div style="font-size:11px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:var(--muted-2);margin:16px 0 8px" data-i18n="set.mesh">Меш</div>
           <div class="cmd-row">
             <input type="text" id="meshid" data-i18n-placeholder="set.meshid-ph" placeholder="ID меша" value="" readonly>
-            <button class="btn small" onclick="inviteCopy()">🔗 <span data-i18n="set.copy-invite">Копировать invite</span></button>
+            <button class="btn small" data-act="invite-copy">🔗 <span data-i18n="set.copy-invite">Копировать invite</span></button>
           </div>
         </div>
       </section>
@@ -633,17 +637,23 @@
           <div style="font-size:11px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:var(--muted-2);margin:16px 0 8px" data-i18n="sec.panel">Панель</div>
           <div class="cmd-row">
             <input type="password" id="sec-token" data-i18n-placeholder="sec.tok-ph" placeholder="Admin-токен (Bearer) — нужен для POST /api/*" autocomplete="off">
-            <button class="btn primary" onclick="secLogin()">🔑 <span data-i18n="btn.login">Войти</span></button>
-            <button class="btn ghost" id="sec-logout" style="display:none" onclick="secLogout()" data-i18n="btn.logout">Выйти</button>
+            <button class="btn primary" data-act="sec-login">🔑 <span data-i18n="btn.login">Войти</span></button>
+            <button class="btn ghost" id="sec-logout" style="display:none" data-act="sec-logout" data-i18n="btn.logout">Выйти</button>
           </div>
-          <div class="metrics" style="margin:0 0 12px">
-            <div class="stat"><div class="k">⚙️ <span data-i18n="sec.tok">Admin-токен</span></div><div class="v mono" id="sec-en" style="font-size:13px">–</div></div>
-            <div class="stat"><div class="k">🔑 <span data-i18n="sec.acc-v">Access</span></div><div class="v mono" id="sec-acc" style="font-size:13px">–</div></div>
-          </div>
-          <div style="font-size:11px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:var(--muted-2);margin:16px 0 8px" data-i18n="sec.reality">Reality</div>
+           <div class="metrics" style="margin:0 0 12px">
+             <div class="stat"><div class="k">⚙️ <span data-i18n="sec.tok">Admin-токен</span></div><div class="v mono" id="sec-en" style="font-size:13px">–</div></div>
+             <div class="stat"><div class="k">🔑 <span data-i18n="sec.acc-v">Access</span></div><div class="v mono" id="sec-acc" style="font-size:13px">–</div></div>
+             <div class="stat"><div class="k">🛡️ 2FA PIN</div><div class="v mono" id="sec-2fa" style="font-size:13px">–</div></div>
+           </div>
+           <div class="cmd-row">
+             <input type="password" id="sec-pin" placeholder="PIN 2FA" autocomplete="off">
+             <button class="btn small" data-act="sec-2fa-on">Включить 2FA</button>
+             <button class="btn ghost" data-act="sec-2fa-off">Выключить 2FA</button>
+           </div>
+           <div style="font-size:11px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:var(--muted-2);margin:16px 0 8px" data-i18n="sec.reality">Reality</div>
           <div class="cmd-row">
             <input type="text" id="sec-pbk" data-i18n-placeholder="sec.pbk-ph" placeholder="public key" readonly value="–">
-            <button class="btn small" onclick="secRotate()">🔄 <span data-i18n="sec.rotate">Ротация ключей</span></button>
+            <button class="btn small" data-act="sec-rotate">🔄 <span data-i18n="sec.rotate">Ротация ключей</span></button>
           </div>
         </div>
       </section>
@@ -656,8 +666,8 @@
           <h2><span class="ic">📜</span><span data-i18n="log.head">Системный лог</span><span class="count mono" id="log-count">0</span></h2>
           <div class="logbox tall" id="log"><span data-i18n="log.loading">загрузка…</span></div>
           <div class="actions tight">
-            <button class="btn small" onclick="loadLog()">🔄 <span data-i18n="log.refresh">Обновить</span></button>
-            <button class="btn small" onclick="toast('Лог скачивается с сервера…', true)">⬇ <span data-i18n="log.download">Скачать</span></button>
+            <button class="btn small" data-act="log-load">🔄 <span data-i18n="log.refresh">Обновить</span></button>
+            <button class="btn small" data-act="toast" data-msg="Лог скачивается с сервера…">⬇ <span data-i18n="log.download">Скачать</span></button>
           </div>
         </div>
         <div class="card">
@@ -685,8 +695,85 @@
       </div>
       <div class="policy-body" id="policy-text"></div>
       <div class="policy-foot">
-        <button class="btn ghost" onclick="policyShow(true)">🔍 <span data-i18n="pol.readOnly">Просмотр</span></button>
-        <button class="btn primary" id="policy-accept-btn" onclick="policyAccept()">✅ <span data-i18n="pol.accept">Принимаю</span></button>
+        <button class="btn ghost" data-act="policy-open" data-force="1">🔍 <span data-i18n="pol.readOnly">Просмотр</span></button>
+        <button class="btn primary" id="policy-accept-btn" data-act="policy-accept">✅ <span data-i18n="pol.accept">Принимаю</span></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="setup-screen" style="display:none">
+  <div class="setup-mask">
+    <div class="setup-card">
+      <div class="setup-head">
+        <span class="ic">⚙️</span>
+        <b>Первый запуск Aurora</b>
+        <span class="badge mono" id="setup-progress">1/7</span>
+      </div>
+      <div class="setup-body">
+        <section class="setup-step" data-setup-step="0">
+          <h3>Язык и оформление</h3>
+          <p class="hint">Настройте интерфейс первого запуска.</p>
+          <label class="setup-field"><span>Язык</span><select id="setup-lang"><option value="ru">Русский</option><option value="en">English</option><option value="es">Español</option><option value="de">Deutsch</option><option value="fr">Français</option><option value="tr">Türkçe</option><option value="pt">Português</option><option value="zh">中文</option><option value="ar">العربية</option><option value="hi">हिन्दी</option></select></label>
+          <label class="setup-field"><span>Тема</span><select id="setup-theme"><option value="dark">Тёмная</option><option value="light">Светлая</option></select></label>
+        </section>
+          <div class="setup-policy">
+            <div class="setup-policy-title">Условия использования</div>
+            <div id="setup-policy-text" class="setup-policy-text"></div>
+            <label class="check setup-policy-accept"><input type="checkbox" id="setup-policy-ok"> Принимаю условия использования</label>
+          </div>
+
+        <section class="setup-step" data-setup-step="1" style="display:none">
+          <h3>Имя сервера</h3>
+          <p class="hint">Как Aurora будет называться в панели и mesh-конфигурации.</p>
+          <label class="setup-field"><span>Название</span><input id="setup-name" type="text" maxlength="80" autocomplete="off" placeholder="Мой прокси"></label>
+        </section>
+        <section class="setup-step" data-setup-step="2" style="display:none">
+          <h3>Пароль администратора</h3>
+          <p class="hint">12–256 символов. Используется для Bearer-доступа к панели.</p>
+          <label class="setup-field"><span>Пароль</span><input id="setup-password" type="password" maxlength="256" autocomplete="new-password"></label>
+          <label class="setup-field"><span>Повторите пароль</span><input id="setup-password2" type="password" maxlength="256" autocomplete="new-password"></label>
+          <label class="setup-field"><span>Токен настройки</span><input id="setup-token" type="password" maxlength="256" autocomplete="off" placeholder="если задан AURORA_SETUP_TOKEN"></label>
+        </section>
+        <section class="setup-step" data-setup-step="3" style="display:none">
+          <h3>Двухфакторный PIN</h3>
+          <p class="hint">Ровно 6 цифр. PIN потребуется для изменений после первого запуска.</p>
+          <label class="setup-field"><span>PIN</span><input id="setup-pin" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password"></label>
+          <label class="setup-field"><span>Повторите PIN</span><input id="setup-pin2" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password"></label>
+        </section>
+        <section class="setup-step" data-setup-step="4" style="display:none">
+          <h3>Доступ и защита</h3>
+          <p class="hint">Параметры применяются к этой public-сборке; master-настройки здесь не меняются.</p>
+          <label class="setup-check"><input id="setup-lan" type="checkbox" checked><span>Разрешить доступ из LAN</span></label>
+          <label class="setup-check"><input id="setup-scanners" type="checkbox" checked><span>Блокировать шаблоны сканеров</span></label>
+          <label class="setup-check"><input id="setup-rate" type="checkbox" checked><span>Ограничить частоту запросов</span></label>
+        </section>
+                <section class="setup-step" data-setup-step="5" style="display:none">
+          <h3>Порты</h3>
+          <p class="hint">Укажите порты public-сборки. Они сохранятся и применятся после перезапуска службы.</p>
+          <fieldset class="setup-ports">
+            <legend>Сетевые порты</legend>
+            <div class="setup-ports-grid">
+              <label class="setup-field"><span>Панель</span><input id="setup-ui-port" type="number" min="1" max="65535" inputmode="numeric"></label>
+              <label class="setup-field"><span>Xray (mixed)</span><input id="setup-xray-port" type="number" min="1" max="65535" inputmode="numeric"></label>
+              <label class="setup-field"><span>Xray API</span><input id="setup-xray-api-port" type="number" min="1" max="65535" inputmode="numeric"></label>
+              <label class="setup-field"><span>TG-WS</span><input id="setup-tgws-port" type="number" min="1" max="65535" inputmode="numeric"></label>
+            </div>
+            <p class="hint">Для Docker и внешнего reverse proxy проброс портов обновите отдельно.</p>
+          </fieldset>
+        </section>
+<section class="setup-step" data-setup-step="6" style="display:none">
+          <h3>Mesh-приглашение</h3>
+          <p class="hint">Необязательно. Вставьте invite головного сервера, если он уже выдан.</p>
+          <label class="setup-field"><span>Invite</span><input id="setup-mesh" type="text" autocomplete="off" placeholder="aurora://invite?..."></label>
+          <p class="hint">VLESS и TG-WS настраиваются автоматически. Порты можно изменить на этом шаге. Секреты мастера в этот мастер не вводятся.</p>
+        </section>
+        <div id="setup-error" class="setup-error" style="display:none"></div>
+      </div>
+      <div class="setup-foot">
+        <button class="btn ghost" id="setup-back" type="button">Назад</button>
+        <button class="btn primary" id="setup-next" type="button">Далее</button>
+        <button class="btn primary" id="setup-finish" type="button" style="display:none">Завершить настройку</button>
       </div>
     </div>
   </div>

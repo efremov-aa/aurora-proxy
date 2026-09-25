@@ -1,8 +1,8 @@
 (function () {
   'use strict';
-  var V = { S: null, SUBS: null, MESH: null, RU: null, UPD: null, ROUTES: null, SET: null, SEC: null, TG: null };
+  var V = { S: null, SUBS: null, STATS: null, MESH: null, RU: null, UPD: null, ROUTES: null, SET: null, SEC: null, TG: null };
   var CFG = { tab: 'dashboard', ruFailOnly: false, _rid: 0, policyOnce: false };
-  var LS = { theme: 'aurora_theme', sec: 'aurora_sec_tok', lang: 'aurora_lang' };
+  var LS = { theme: 'aurora_theme', sec: 'aurora_sec_tok', tfa: 'aurora_2fa', lang: 'aurora_lang' };
 
   /* ================= I18N ================= */
   var LANGS = [
@@ -86,7 +86,7 @@
       'mrt.hint': 'Правила, какой трафик через какой узел выходит в интернет. Порядок — сверху вниз.', 'th.what': 'Что', 'th.via': 'Куда', 'th.proto': 'Протокол',
       'sp.head': 'Тарифные планы', 'sp.hint': 'Базовый набор функций прокси. Апгрейд — в один клик, применяется мгновенно, без потери соединений.', 'sp.loading': 'загрузка тарифов…', 'sp.comp': 'Состав тарифов', 'th.func': 'Функция', 'th.val': 'Значение',
       'sf.instant': '+ активируются мгновенно',
-      'sb.head': 'Оплата и продление', 'sb.hint': 'Активный план, срок действия и история платежей. Продление — в один клик.', 'sb.plan': 'Текущий план', 'sb.until': 'Активен до', 'sb.buy': 'Продлить / сменить план', 'sb.hist': 'История платежей',
+      'sb.head': 'Оплата и продление', 'sb.hint': 'Активный план, срок действия и история платежей. Продление — в один клик.', 'sb.plan': 'Текущий план', 'sb.until': 'Активен до', 'sb.buy': 'Продлить / сменить план', 'sb.hist': 'История платежей', 'sb.active': 'Активных', 'sb.income': 'Доход за месяц', 'sb.traffic-month': 'Трафик за месяц',
       'th.date': 'Дата', 'th.desc': 'Описание', 'th.sum': 'Сумма',
       'upd.apply': 'Обновить сейчас', 'upd.auto': 'Автообновление', 'upd.auto-hint': 'Обновление производится из GitHub-релизов. Бинарник скачивается, проверяется, заменяется атомарно — прокси перезапускается за пару секунд.',
       'upd.src': 'Источник обновлений', 'th.param': 'Параметр', 'upd.repo': 'Репозиторий', 'upd.sig': 'Проверка подписи', 'upd.rollback': 'Откат при сбое',
@@ -941,7 +941,6 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   }
-  function el(html) { var d = document.createElement('div'); d.innerHTML = html; return d.firstElementChild; }
   function fmtB(n) {
     if (n == null || isNaN(n)) return '0';
     n = +n;
@@ -981,20 +980,37 @@
   }
   function secTok() { return localStorage.getItem(LS.sec) || ''; }
   function authHdr() {
-    var h = { 'Content-Type': 'application/json' };
+    var h = { 'Content-Type': 'application/json', 'X-Aurora-Request': '1' };
+    var p = sessionStorage.getItem('aurora_token') || '';
+    if (p) h['X-Auth'] = p;
     var t = secTok();
     if (t) h['Authorization'] = 'Bearer ' + t;
+    var f = sessionStorage.getItem(LS.tfa) || '';
+    if (f) h['X-2FA'] = f;
     return h;
   }
   function getJSON(url) {
-    return fetch(url, { cache: 'no-store' }).then(function (r) { return r.json().catch(function () { return {}; }); })
-      .catch(function () { return {}; });
+    return fetch(url, { cache: 'no-store', headers: authHdr() }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        if (!r.ok && !j.error) j.error = 'HTTP_' + r.status;
+        return j;
+      });
+    }).catch(function () { return { error: 'network' }; });
   }
   function postJSON(url, data) {
     var body = data ? JSON.stringify(data) : '';
     return fetch(url, { method: 'POST', headers: authHdr(), body: body })
-      .then(function (r) { return r.json().catch(function () { return {}; }); })
-      .catch(function () { return {}; });
+      .then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (j) {
+          if (!r.ok) {
+            j = j && typeof j === 'object' ? j : {};
+            j.ok = false;
+            j.error = j.error || ('HTTP ' + r.status);
+          }
+          return j;
+        });
+      })
+      .catch(function () { return { ok: false, error: 'network error' }; });
   }
 
   /* ================= STATE ================= */
@@ -1002,6 +1018,7 @@
     getJSON('/api/state').then(function (j) {
       V.S = j || {};
       renderAll(soft);
+      if (j.setup_complete === false) setupShow();
     }).catch(function () { if (!soft) toast('Сервер недоступен', false); });
   }
 
@@ -1030,7 +1047,8 @@
     $('hero-badge').textContent = on ? 'VPN' : 'DIRECT';
     $('hero-badge').className = 'badge ' + (on ? 'on' : 'off');
     $('btn-vpn').textContent = on ? _t('btn.vpn-on') : _t('btn.vpn-off');
-    $('btn-vpn').disabled = !!S.comm && S.comm !== 'ready';
+    var commState = S.comm && S.comm.state ? String(S.comm.state) : '';
+    $('btn-vpn').disabled = commState === 'syncing' || commState === 'loading' || commState === 'running';
     $('mode').textContent = S.mesh_nodes ? (on ? 'VPN + mesh' : 'Direct') : (on ? 'VPN' : 'Direct');
     $('egress').textContent = (S.egress_ip && S.egress_ip !== '-') ? S.egress_ip : '–';
     $('conns').textContent = S.conns != null ? fmtNum(S.conns) : '–';
@@ -1069,7 +1087,7 @@
       else if (k.status === 'ok') { stCls = 'st-ok'; stTxt = _t('status.ok'); }
       var src = (k.source === 'my' || k.source === 'manual') ? '<span class="chip st-gold">' + _t('k.mine') + '</span>' : '<span class="chip st-dim">' + _t('k.github') + '</span>';
       var act = k.is_active ? ''
-        : '<button class="btn small icon" onclick="setActive(\'' + esc(k.tag) + '\')" title="' + _t('k.set-active') + '">▶</button>';
+        : '<button class="btn small icon" data-act="key-activate" data-tag="' + esc(k.tag) + '" title="' + _t('k.set-active') + '">▶</button>';
       h += '<tr class="' + (k.is_active ? 'tr-active' : k.dead ? 'tr-dead' : '') + '">'
         + '<td class="mono">' + esc(k.tag) + '</td>'
         + '<td>' + src + '</td>'
@@ -1172,6 +1190,10 @@
     if (rev) rev.textContent = 'rev ' + (S.policy_rev || 0);
     var need = !!(S.policy_rev && S.policy_rev > (S.policy_accepted_rev || 0));
     if (!$('policy-screen')) return;
+    if (S.setup_complete === false) {
+      $('policy-screen').style.display = 'none';
+      return;
+    }
     if (need && !CFG.policyOnce) {
       CFG.policyOnce = true;
       $('policy-screen').style.display = '';
@@ -1199,7 +1221,7 @@
     getJSON('/api/update/status').then(function (j) {
       j = j || {};
       V.UPD = j;
-      var avail = j.state === 'available' || (j.latest && j.current && j.latest !== j.current);
+       var avail = j.update === true || (j.latest && j.current && j.latest !== j.current);
       $('du-cur').textContent = j.current || '—';
       $('du-new').textContent = j.latest || '—';
       $('du-msg').textContent = j.msg || '';
@@ -1298,7 +1320,7 @@
         + '<td class="mono">' + esc((n.role === 'hub' || n.id === 'hub') ? _t('mesh.hub') : '') + '</td>'
         + '<td><span class="chip ' + stCls + '">' + stTxt + '</span></td>'
         + '<td class="mono">' + (n.ping_ms ? Math.round(n.ping_ms) + ' мс' : '–') + '</td>'
-        + '<td><button class="btn small ghost" onclick="navTo(\'mesh-routes\')">🧭</button></td>'
+        + '<td><button class="btn small ghost" data-act="nav" data-tab="mesh-routes">🧭</button></td>'
         + '</tr>';
     });
     rows.innerHTML = h;
@@ -1318,7 +1340,7 @@
       h += '<path class="mesh-link' + (on ? ' active' : '') + '" d="M' + cx + ',' + cy + ' L' + x + ',' + y + '"/>';
       var col = on ? 'var(--ok)' : 'var(--bad)';
       var lbl = (n.name || n.id || _t('mesh.node')) + (n.region ? ' · ' + n.region : '');
-      h += '<g class="mesh-node" color="' + col + '" onclick="toast(\'' + esc(lbl) + '\', true)">'
+      h += '<g class="mesh-node" data-label="' + esc(lbl) + '" color="' + col + '">'
         + '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="13" fill="' + col + '"/>'
         + '<text x="' + x.toFixed(1) + '" y="' + (y + 26).toFixed(1) + '">' + esc(lbl.substr(0, 22)) + '</text></g>';
     });
@@ -1328,6 +1350,11 @@
       + '<text x="' + cx + '" y="' + (cy + 34) + '">🏠 ' + esc((hub && (hub.name || hub.host)) || _t('g.you')) + '</text></g>';
     svg.setAttribute('viewBox', '0 0 800 340');
     svg.innerHTML = h;
+    Array.prototype.forEach.call(svg.querySelectorAll('.mesh-node[data-label]'), function (el) {
+      el.addEventListener('click', function () {
+        toast(el.getAttribute('data-label') || '', true);
+      });
+    });
   }
 
   /* ================= ROUTES ================= */
@@ -1358,15 +1385,24 @@
 
   /* ================= SUBS / SHOP ================= */
   function loadSubs() {
-    return getJSON('/api/subs/list').then(function (j) {
+    getJSON('/api/subs/list').then(function (j) {
       j = j || {};
       V.SUBS = j;
       renderPlans(j);
       renderBilling(j);
       renderPlanWidget(j);
-      if (j.default) { $('tag-plan').textContent = j.default; $('pill-plan').textContent = '💎 ' + j.default; }
-      var n = j.plans ? Object.keys(j.plans).length : 0;
-      $('tag-feat').textContent = '2';
+      if (j.error) {
+        V.STATS = { error: j.error };
+        renderBilling(j);
+        return;
+      }
+      getJSON('/api/stats').then(function (s) {
+        V.STATS = s && !s.error ? s : { error: (s && s.error) || 'stats' };
+        renderBilling(j);
+        renderPlanWidget(j);
+      });
+      var d = document.querySelector('#subs-count');
+      if (d && j.total !== undefined) d.textContent = j.total;
     });
   }
   function renderPlans(j) {
@@ -1400,7 +1436,7 @@
         + '<h3>' + esc(p.name || id) + (cur ? ' <span class="chip st-act">' + _t('plans.current') + '</span>' : '') + '</h3>'
         + '<div class="price">' + priceTxt + '<small>' + _t('plans.per-mo') + '</small></div>'
         + '<ul>' + feats.map(function (f) { return '<li' + (f.no ? ' class="no"' : '') + '>' + esc(f.t) + '</li>'; }).join('') + '</ul>'
-        + '<button class="btn' + (hot ? ' gold' : '') + '" onclick="buyPlan(\'' + esc(id) + '\')">' + _t('btn.choose') + '</button>'
+        + '<button class="btn' + (hot ? ' gold' : '') + '" data-act="plan-buy" data-plan-id="' + esc(id) + '">' + _t('btn.choose') + '</button>'
         + '</div>';
     });
     grid.innerHTML = h;
@@ -1408,28 +1444,38 @@
   function renderPlanWidget(j) {
     var cur = j.default || 'free';
     if (j.plans) { $('plan-st').textContent = cur; var pn = (j.plans[cur] || {}).name || cur; $('plan-name').textContent = pn; $('pill-plan').textContent = '💎 ' + cur; }
-    var active = (j.subs || []).find(function (s) { return s.enabled; });
+    var active = (j.subs || []).find(function (s) { return s.access_ok === true || s.access_status === 'ok'; });
     $('w-plan-body').innerHTML = _t('w.plan') + ' <b>' + esc(active ? (active.plan || cur) : cur) + '</b>'
       + (active && active.expires ? ' · до ' + fmtDate(active.expires) : '');
   }
   function renderBilling(j) {
     var cur = j.default || 'free';
     var subs = j.subs || [];
-    var active = subs.find(function (s) { return s.enabled; });
+    var active = subs.find(function (s) { return s.access_ok === true || s.access_status === 'ok'; });
+    var stats = V.STATS && !V.STATS.error ? V.STATS : null;
+    var payments = (stats && (Array.isArray(stats.payments) ? stats.payments : (Array.isArray(stats.recent_payments) ? stats.recent_payments : []))) || [];
     $('bill-plan').textContent = active ? (active.plan || cur) : cur;
     $('bill-until').textContent = active && active.expires ? fmtDate(active.expires) : '—';
     $('bill-traffic').textContent = (active && active.used_bytes != null)
       ? fmtB(active.used_bytes) + (active.limit_bytes ? ' / ' + fmtB(active.limit_bytes) : '')
       : (j.used_bytes != null ? fmtB(j.used_bytes) : '—');
+    $('bill-active').textContent = stats && stats.active != null ? String(stats.active) : String(subs.filter(function (s) { return s.access_ok === true || s.access_status === 'ok'; }).length);
+    $('bill-income').textContent = stats && stats.income_month != null ? fmtNum(stats.income_month) + ' ₽' : '—';
+    $('bill-traffic-month').textContent = stats && stats.traffic_month != null ? fmtB(stats.traffic_month) : '—';
     var rows = $('bill-rows');
     if (!rows) return;
-    if (!subs.length) { rows.innerHTML = '<tr><td colspan="4"><div class="empty"><span class="ic">💳</span>' + _t('bill.empty') + '</div></td></tr>'; return; }
-    rows.innerHTML = subs.map(function (s) {
+    if (!payments.length) { rows.innerHTML = '<tr><td colspan="4"><div class="empty"><span class="ic">💳</span>' + _t('bill.empty') + '</div></td></tr>'; return; }
+    rows.innerHTML = payments.map(function (p) {
+      var date = p.paid_at || p.created_at || 0;
+      var desc = p.plan_name || p.plan || p.name || '—';
+      if (p.name && p.plan_name) desc += ' · ' + p.name;
+      var amount = p.amount != null ? fmtNum(p.amount) + (p.currency ? ' ' + p.currency : '') : '—';
+      var status = p.operation || p.state || 'paid';
       return '<tr>'
-        + '<td class="mono">' + esc(s.name || s.uid || '—') + '</td>'
-        + '<td class="mono">' + esc(s.plan || '—') + '</td>'
-        + '<td class="mono">' + fmtDate(s.expires) + '</td>'
-        + '<td class="mono">' + (s.used_bytes != null ? fmtB(s.used_bytes) : '—') + '</td>'
+        + '<td class="mono">' + (date ? fmtDate(date) : '—') + '</td>'
+        + '<td class="mono">' + esc(desc) + '</td>'
+        + '<td class="mono">' + esc(amount) + '</td>'
+        + '<td class="mono">' + esc(status) + '</td>'
         + '</tr>';
     }).join('');
   }
@@ -1476,18 +1522,22 @@
     getJSON('/api/security').then(function (j) {
       j = j || {};
       V.SEC = j;
-      $('sec-en').textContent = j.enabled ? _t('sec.on') : _t('sec.off');
-      $('sec-en').className = j.enabled ? 'ok' : 'bad';
-      var a = j.access || {};
+       $('sec-en').textContent = j.enabled ? _t('sec.on') : _t('sec.off');
+       $('sec-en').className = j.enabled ? 'ok' : 'bad';
+       var tfa = $('sec-2fa');
+       if (tfa) { tfa.textContent = j.twofa ? _t('sec.on') : _t('sec.off'); tfa.className = j.twofa ? 'ok' : 'bad'; }
+       var a = j.access || {};
       $('sec-acc').textContent = _t('sec.access') + (a.lan_only ? _t('sec.da') : _t('sec.no')) + ' · сканеры: ' + (a.block_scanners ? _t('sec.blk') : _t('sec.no')) + ' · rate-limit: ' + (a.rate_limit ? _t('sec.rat') : _t('sec.rat-off'));
       $('sec-pbk').value = (j.pbk || '–') + (j.sid ? ' · sid=' + j.sid : '');
       var has = !!secTok();
       $('sec-token').value = has ? '' : $('sec-token').value;
       $('sec-logout').style.display = has ? '' : 'none';
-    }).catch(function () {
-      $('sec-en').textContent = '—';
-      $('sec-acc').textContent = '—';
-    });
+     }).catch(function () {
+       $('sec-en').textContent = '—';
+       $('sec-acc').textContent = '—';
+       $('sec-2fa').textContent = '—';
+       $('sec-2fa').className = 'v mono';
+     });
   }
 
   /* ================= LOGS ================= */
@@ -1591,6 +1641,7 @@
     renderRu(V.S || {});
   };
   window.policyShow = function (ro) {
+    if (V.S && V.S.setup_complete === false) return;
     var s = $('policy-screen');
     if (!s) return;
     s.style.display = '';
@@ -1635,16 +1686,8 @@
   window.meshJoin = function () {
     var v = ($('mesh-invite').value || '').trim();
     if (!v) { toast(_t('inv.need'), false); return; }
-    var q = {};
-    var m = v.split('?');
-    if (m.length > 1) {
-      String(m[1]).split('&').forEach(function (p) {
-        var kv = p.split('=');
-        if (kv[0]) q[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || '');
-      });
-    }
-    if (!q.host || !q.port) { toast(_t('inv.bad'), false); return; }
-    postJSON('/api/mesh/node/add', { name: q.name, host: q.host, port: q.port, region: q.region, role: (q.role === 'hub' ? 'hub' : 'node') }).then(function (j) {
+    if (v.indexOf('aurora://invite?') !== 0) { toast(_t('inv.bad'), false); return; }
+    postJSON('/api/mesh/join', { invite: v, name: '', region: '' }).then(function (j) {
       toast((j && j.ok) ? _t('inv.add-ok') : ((j && j.error) || _t('inv.add-err')), !!(j && j.ok));
       loadMesh(); loadState(true);
     });
@@ -1685,8 +1728,11 @@
     });
   };
   window.secLogin = function () {
-    var v = ($('sec-token').value || '').trim();
+    var v = ($('sec-token').value || '').trim() || secTok();
     if (!v) { toast(_t('sec.need-token'), false); return; }
+    var pin = ($('sec-pin').value || '').trim();
+    if (pin) sessionStorage.setItem(LS.tfa, pin);
+    else sessionStorage.removeItem(LS.tfa);
     localStorage.setItem(LS.sec, v);
     postJSON('/api/update/check', {}).then(function (j) {
       if (j && j.ok !== false) {
@@ -1696,13 +1742,41 @@
         loadSecurity();
       } else {
         localStorage.removeItem(LS.sec);
+        sessionStorage.removeItem(LS.tfa);
         toast((j && j.error) || _t('sec.reject'), false);
       }
     });
   };
+  window.secTwofaEnable = function () {
+    var pin = ($('sec-pin').value || '').trim();
+    if (!pin) { toast('Введите PIN 2FA', false); return; }
+    if (!secTok()) { toast(_t('sec.need-token'), false); return; }
+    postJSON('/api/security/twofa', { pin: pin }).then(function (j) {
+      if (j && j.ok) {
+        sessionStorage.setItem(LS.tfa, pin);
+        $('sec-pin').value = '';
+        toast((j.msg || '2FA включена'), true);
+        loadSecurity();
+      } else toast((j && j.error) || '2FA не включена', false);
+    });
+  };
+  window.secTwofaDisable = function () {
+    if (!secTok()) { toast(_t('sec.need-token'), false); return; }
+    postJSON('/api/security/twofa', { pin: '' }).then(function (j) {
+      if (j && j.ok) {
+        sessionStorage.removeItem(LS.tfa);
+        $('sec-pin').value = '';
+        toast((j.msg || '2FA выключена'), true);
+        loadSecurity();
+      } else toast((j && j.error) || '2FA не выключена', false);
+    });
+  };
   window.secLogout = function () {
     localStorage.removeItem(LS.sec);
+    sessionStorage.removeItem(LS.tfa);
     $('sec-logout').style.display = 'none';
+    $('sec-2fa').textContent = '—';
+    $('sec-2fa').className = 'v mono';
     toast(_t('sec.logout'), true);
   };
   window.secRotate = function () {
@@ -1735,7 +1809,220 @@
     toast(id ? (_t('feat.buy') + id + _t('feat.buy2')) : _t('feat.admin'), true);
   };
 
+  var SETUP = { step: 0, values: {}, shown: false };
+  function setupError(message) {
+    var el = $('setup-error');
+    if (!el) return;
+    el.textContent = message || '';
+    el.style.display = message ? '' : 'none';
+  }
+  function setupPort(key, value) {
+    var base = (SETUP.prefill && SETUP.prefill[key]) || '';
+    if (!value || value === base) return '';
+    return Number(value);
+  }
+
+  function setupRead() {
+    return {
+      lang: $('setup-lang') ? $('setup-lang').value : 'ru',
+      theme: $('setup-theme') ? $('setup-theme').value : '',
+      policy_accepted: !!($('setup-policy-ok') && $('setup-policy-ok').checked),
+      name: $('setup-name') ? $('setup-name').value.trim() : '',
+      password: $('setup-password') ? $('setup-password').value : '',
+      pin: $('setup-pin') ? $('setup-pin').value.trim() : '',
+      lan_only: !!($('setup-lan') && $('setup-lan').checked),
+      block_scanners: !!($('setup-scanners') && $('setup-scanners').checked),
+      rate_limit: !!($('setup-rate') && $('setup-rate').checked),
+      ui_port: $('setup-ui-port') ? $('setup-ui-port').value.trim() : '',
+      xray_port: $('setup-xray-port') ? $('setup-xray-port').value.trim() : '',
+      xray_api_port: $('setup-xray-api-port') ? $('setup-xray-api-port').value.trim() : '',
+      tgws_port: $('setup-tgws-port') ? $('setup-tgws-port').value.trim() : '',
+      mesh_invite: $('setup-mesh') ? $('setup-mesh').value.trim() : '',
+      setup_token: $('setup-token') ? $('setup-token').value.trim() : ''
+    };
+  }
+
+  function setupValidate(all) {
+    var d = setupRead();
+    if (all || SETUP.step === 0) {
+      if (!$('setup-theme') || !d.theme) return 'Выберите тему';
+      if (!d.policy_accepted) return 'Примите условия использования';
+    }
+    if ((all || SETUP.step === 1) && (!d.name || d.name.length > 80)) return 'Имя сервера: 1–80 символов';
+    if ((all || SETUP.step === 2) && (d.password.length < 12 || d.password.length > 256 || /\s/.test(d.password))) return 'Пароль: 12–256 символов без пробелов';
+    if ((all || SETUP.step === 3) && !/^[0-9]{6}$/.test(d.pin)) return 'PIN: 6 цифр';
+    if (all || SETUP.step === 5) {
+      var used = {};
+      var fields = [
+        ['ui_port', 'Панель'], ['xray_port', 'Xray'],
+        ['xray_api_port', 'Xray API'], ['tgws_port', 'TG-WS']
+      ];
+      for (var i = 0; i < fields.length; i++) {
+        var raw = d[fields[i][0]];
+        if (raw === '') continue;
+        var n = Number(raw);
+        if (!isFinite(n) || Math.floor(n) !== n || n < 1 || n > 65535) return fields[i][1] + ': порт 1–65535';
+        if (used[n]) return 'Порты должны различаться';
+        used[n] = true;
+      }
+    }
+    if (d.mesh_invite && d.mesh_invite.indexOf('aurora://invite?') !== 0) {
+      return 'Invite: нужен формат aurora://invite?...';
+    }
+    return '';
+  }
+
+  function setupRender() {
+    var step = SETUP.step;
+    var pr = $('setup-progress');
+    if (pr) pr.textContent = (step + 1) + '/7';
+    Array.prototype.forEach.call(document.querySelectorAll('[data-setup-step]'), function (n) {
+      n.style.display = Number(n.getAttribute('data-setup-step')) === step ? '' : 'none';
+    });
+    $('setup-back').style.display = step === 0 ? 'none' : '';
+    var last = step === 6;
+    $('setup-next').style.display = last ? 'none' : '';
+    $('setup-finish').style.display = last ? '' : 'none';
+  }
+
+  function setupShow() {
+    if (!V.S || V.S.setup_complete !== false) return;
+    if (SETUP.shown) return;
+    SETUP.shown = true;
+    SETUP.step = 0;
+    var lang = $('setup-lang'); if (lang) lang.value = langNow();
+    var th = $('setup-theme'); if (th) th.value = 'light';
+    var pol = $('setup-policy-text'); if (pol) pol.textContent = V.S.policy_text || '';
+    var pok = $('setup-policy-ok');
+    if (pok) pok.checked = !!(V.S.policy_rev && (V.S.policy_accepted_rev || 0) >= V.S.policy_rev);
+    var nm = $('setup-name'); if (nm && !nm.value) nm.value = V.S.server_name || '';
+    var lan = $('setup-lan'); if (lan) lan.checked = true;
+    var sc = $('setup-scanners'); if (sc) sc.checked = true;
+    var rate = $('setup-rate'); if (rate) rate.checked = true;
+    var up = $('setup-ui-port'); if (up) up.value = V.S.ui_port || 8890;
+    var xp = $('setup-xray-port'); if (xp) xp.value = V.S.xray_port || 8899;
+    var ap = $('setup-xray-api-port'); if (ap) ap.value = V.S.xray_api_port || 8897;
+    var tp = $('setup-tgws-port'); if (tp) tp.value = V.S.tgws_port || 443;
+    SETUP.prefill = {
+      ui_port: up ? up.value : '',
+      xray_port: xp ? xp.value : '',
+      xray_api_port: ap ? ap.value : '',
+      tgws_port: tp ? tp.value : ''
+    };
+    $('setup-screen').style.display = '';
+    setupRender();
+  }
+
+  function setupFinish() {
+    var d = setupRead();
+    var err = setupValidate(true);
+    if (err) { $('setup-error').textContent = err; return; }
+    $('setup-error').textContent = '';
+    $('setup-finish').disabled = true;
+    postJSON('/api/setup/complete', {
+      server_name: d.name,
+      password: d.password,
+      pin: d.pin,
+      policy_rev: (V.S && V.S.policy_rev) || 0,
+      ui_port: setupPort('ui_port', d.ui_port),
+      xray_port: setupPort('xray_port', d.xray_port),
+      xray_api_port: setupPort('xray_api_port', d.xray_api_port),
+      tgws_port: setupPort('tgws_port', d.tgws_port),
+      lan_only: d.lan_only,
+      block_scanners: d.block_scanners,
+      rate_limit: d.rate_limit,
+      mesh_invite: d.mesh_invite,
+      setup_token: d.setup_token
+    }).then(function (r) {
+      if (!r || r.ok !== true) throw new Error((r && r.error) || 'Ошибка');
+      try {
+        sessionStorage.setItem('aurora_pin', d.pin);
+        sessionStorage.setItem('aurora_token', d.password);
+        sessionStorage.setItem(LS.tfa, d.pin);
+      } catch (e) { }
+      $('setup-screen').style.display = 'none';
+      toast(r.restart_required ? 'Мяу! Порты применятся после перезапуска службы' : 'Мяу! Настройка завершена');
+      setTimeout(function () { location.reload(); }, 800);
+    }).catch(function (e) {
+      $('setup-error').textContent = (e && e.message) || 'Ошибка';
+    }).then(function () {
+      $('setup-finish').disabled = false;
+    });
+  }
+
+  function setupNext() {
+    var d = setupRead();
+    var err = setupValidate();
+    if (err) { $('setup-error').textContent = err; return; }
+    $('setup-error').textContent = '';
+    if (SETUP.step === 0 && V.S && V.S.policy_rev && (V.S.policy_accepted_rev || 0) < V.S.policy_rev) {
+      $('setup-next').disabled = true;
+      postJSON('/api/policy/accept', { rev: V.S.policy_rev }).then(function (r) {
+        if (!r || r.ok !== true) throw new Error((r && r.error) || 'Ошибка');
+        V.S.policy_accepted_rev = V.S.policy_rev;
+        V.S.policy_required = false;
+        SETUP.step = Math.min(6, SETUP.step + 1);
+        setupRender();
+      }).catch(function (e) {
+        $('setup-error').textContent = (e && e.message) || 'Ошибка';
+      }).then(function () {
+        $('setup-next').disabled = false;
+      });
+      return;
+    }
+    SETUP.step = Math.min(6, SETUP.step + 1);
+    setupRender();
+  }
+
+  function setupBack() { setupError(''); SETUP.step = Math.max(0, SETUP.step - 1); setupRender(); }
+
+  var ACTS = {
+    nav: function (t) { navTo(t.getAttribute('data-tab')); },
+    toast: function (t) { toast(t.getAttribute('data-msg') || '', true); },
+    lang: function (t, ev) { setLang(((ev && ev.target && ev.target.value) || t.value || 'ru')); },
+    'key-activate': function (t) { window.setActive(t.getAttribute('data-tag') || ''); },
+    'plan-buy': function (t) { var id = t.getAttribute('data-plan-id'); if (id) window.buyPlan(id); else window.buyPlan(); },
+    'policy-open': function (t) { window.policyShow(t.getAttribute('data-force') === '1'); },
+    'policy-accept': function () { window.policyAccept(); },
+    'update-start': function () { window.startUpdate(); },
+    'update-save': function () { window.updSave(); },
+    'update-check': function () { window.checkUpdate(); },
+    'key-add': function () { window.keyAdd(); },
+    'key-clean': function () { window.keyClean(); },
+    'cx-copy': function () { window.cxCopy(); },
+    'regions-save': function () { window.regionsSave(); },
+    'ru-check': function () { window.ruCheck(); },
+    'ru-toggle-fail': function () { window.ruToggleFail(); },
+    'tgws-restart': function () { window.tgRestart(); },
+    'mesh-join': function () { window.meshJoin(); },
+    'mesh-leave': function () { window.meshLeave(); },
+    'mesh-regen': function () { window.meshRegen(); },
+    'mesh-refresh': function () { window.meshRefresh(); },
+    'mesh-policy-save': function () { window.meshPolicySave(); },
+    'settings-save': function () { window.settingsSave(); },
+    'invite-copy': function () { window.inviteCopy(); },
+    'sec-login': function () { window.secLogin(); },
+    'sec-logout': function () { window.secLogout(); },
+    'sec-2fa-on': function () { window.secTwofaEnable(); },
+    'sec-2fa-off': function () { window.secTwofaDisable(); },
+    'sec-rotate': function () { window.secRotate(); },
+    'log-load': function () { window.loadLog(); }
+  };
+  function actTarget(ev) {
+    var node = ev && ev.target;
+    return (node && node.closest) ? node.closest('[data-act]') : null;
+  }
+  function actDispatch(ev) {
+    var t = actTarget(ev);
+    if (!t) return;
+    var fn = ACTS[t.getAttribute('data-act')];
+    if (!fn) return;
+    if (ev.type === 'click') ev.preventDefault();
+    fn(t, ev);
+  }
   function bindActions() {
+    document.addEventListener('click', actDispatch);
+    document.addEventListener('change', actDispatch);
     $('btn-vpn') && ($('btn-vpn').onclick = function () {
       var on = !(V.S && V.S.vpn_mode);
       postJSON('/api/vpn_mode', { on: on }).then(function (j) {
@@ -1773,11 +2060,11 @@
       $('theme-btn').textContent = cur === 'dark' ? '🌙' : '☀️';
     });
     $('menu-btn') && ($('menu-btn').onclick = function () { $('side').classList.toggle('open'); });
+    $('setup-back') && ($('setup-back').onclick = setupBack);
+    $('setup-next') && ($('setup-next').onclick = setupNext);
+    $('setup-finish') && ($('setup-finish').onclick = setupFinish);
     Array.prototype.forEach.call(document.querySelectorAll('#nav button[data-t]'), function (b) {
       b.onclick = function () { navTo(b.getAttribute('data-t')); };
-    });
-    Array.prototype.forEach.call(document.querySelectorAll('.update-actions .btn.primary'), function (b) {
-      if (b.getAttribute('onclick')) return;
     });
   }
   function setVis(el, on) { if (el) el.style.display = on ? '' : 'none'; }
@@ -1828,7 +2115,10 @@
     applyLang();
     bindActions();
     loadState();
-    loadSubs().then(function () { return 0; });
+    var subsTask = loadSubs();
+    if (subsTask && typeof subsTask.then === 'function') {
+      subsTask.then(function () { return 0; });
+    }
     loadUpdate();
     setInterval(function () { loadState(true); }, 5000);
     setInterval(function () { loadUpdate(); }, 30000);

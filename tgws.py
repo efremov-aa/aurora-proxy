@@ -8,27 +8,51 @@ import time
 
 import config
 
-SECRET_FILE = os.path.join(config.BASE_DIR, "data", "tg_secret.txt")
+SECRET_FILE = os.path.join(config.DATA_DIR, "tg_secret.txt")
 RUN_SCRIPT = os.path.join(config.BASE_DIR, "run_tgws.sh")
+_SECRET_LOCK = threading.RLock()
 
 
 def _get_secret():
     """Секрет из data/tg_secret.txt или генерация нового."""
-    try:
-        with open(SECRET_FILE, "r", encoding="utf-8") as f:
-            s = f.read().strip()
-        if s:
-            return s
-    except OSError:
-        pass
-    import secrets
-    s = secrets.token_hex(16)
-    try:
-        with open(SECRET_FILE, "w", encoding="utf-8") as f:
-            f.write(s)
-    except OSError:
-        pass
-    return s
+    with _SECRET_LOCK:
+        import crypt
+        missing = object()
+        try:
+            raw = crypt.load_bytes(SECRET_FILE, default=missing)
+        except crypt.StorageError as e:
+            config.quarantine_file(SECRET_FILE)
+            raise config.StorageDataError("tg_secret.txt: %s" % e) from e
+        if raw is missing:
+            import secrets
+            value = secrets.token_hex(16)
+            try:
+                crypt.save_bytes(SECRET_FILE, value.encode("ascii"), exclusive=True)
+            except FileExistsError:
+                try:
+                    raw = crypt.load_bytes(SECRET_FILE)
+                    value = raw.decode("utf-8").strip()
+                except (crypt.StorageError, UnicodeError, AttributeError) as e:
+                    config.quarantine_file(SECRET_FILE)
+                    raise config.StorageDataError("tg_secret.txt: %s" % e) from e
+            except (crypt.StorageError, OSError) as e:
+                config.quarantine_file(SECRET_FILE)
+                raise config.StorageDataError("tg_secret.txt: %s" % e) from e
+            return value
+        try:
+            value = raw.decode("utf-8").strip()
+        except UnicodeError as e:
+            config.quarantine_file(SECRET_FILE)
+            raise config.StorageDataError("tg_secret.txt: %s" % e) from e
+        if not value or len(value) > 256:
+            config.quarantine_file(SECRET_FILE)
+            raise config.StorageDataError("tg_secret.txt: invalid secret")
+        try:
+            crypt.save_bytes(SECRET_FILE, value.encode("utf-8"))
+        except (crypt.StorageError, OSError) as e:
+            config.quarantine_file(SECRET_FILE)
+            raise config.StorageDataError("tg_secret.txt: %s" % e) from e
+        return value
 
 
 def port_open(timeout=1):
@@ -66,11 +90,17 @@ def restart():
 
 
 def tgws_link():
-    """Ссылка tg://proxy?... для QR. host берём из VM_HOST."""
+    """Ссылка tg://proxy?... для QR."""
+    import urllib.parse
     secret = _get_secret()
-    if not secret:
+    host = config.external_link_host()
+    if not secret or not host:
         return ""
-    return "tg://proxy?server=%s&port=%d&secret=%s" % (config.VM_HOST, config.TGWS_PORT, secret)
+    return "tg://proxy?%s" % urllib.parse.urlencode({
+        "server": config._format_link_host(host),
+        "port": config.TGWS_PORT,
+        "secret": secret,
+    })
 
 
 def status():

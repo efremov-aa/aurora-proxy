@@ -1,4 +1,4 @@
-# Aurora Proxy — Windows (сборка v1.3.1 «Auto-Update»)
+# Aurora Proxy — Windows (сборка v1.9.1 «Кот-крепость»)
 
 Прокси-сервер VLESS Reality с веб-панелью для Windows. Основа — тот же код, что в публичном репозитории
 `aurora-proxy` (Linux/Docker); здесь он адаптирован под Windows-сервис NSSM.
@@ -18,6 +18,7 @@
 - Windows 10/11 x64
 - Python 3.8+ (python.org, **Add to PATH**)
 - Библиотека `tg-ws-proxy` (`pip install -r requirements.txt`)
+В комплекте `bin\tg-ws-proxy.exe` поддерживает FD; секрет передаётся через stdin FD0 (`--secret-fd 0`) и никогда не передаётся через argv.
 - Xray для Windows: `xray.exe` + `geoip.dat` + `geosite.dat` (+ `wintun.dll`) в папке `bin\`
 
 ## Установка

@@ -6,7 +6,7 @@
 ![кот](https://img.shields.io/badge/mascot-%F0%9F%90%B1-pink)
 ![python](https://img.shields.io/badge/python-3.12-blue)
 ![xray](https://img.shields.io/badge/xray-v26.9.9-blue)
-![version](https://img.shields.io/badge/version-1.3.1%20%C2%ABAuto-Update%C2%BB-pink)
+![version](https://img.shields.io/badge/version-1.9.1%20%C2%AB%D0%9A%D0%BE%D1%82-%D0%BA%D1%80%D0%B5%D0%BF%D0%BE%D1%81%D1%82%D1%8C%C2%BB-pink)
 
 > Мяу! Готово 🐾 — панель в стиле Neko: тёплые кошачьи тона, тосты «Мяу! Готово 🐾».
 
@@ -23,15 +23,15 @@
 
 ## 📥 Загрузка
 
-Архивы и список изменений — в [Release v1.3.1](https://github.com/efremov-aa/aurora-proxy/releases):
+Архивы и список изменений — в [Release v1.9.1](https://github.com/efremov-aa/aurora-proxy/releases):
 
-- **`Aurora-v1.3.1-linux.zip`** — Linux-версия: исходники + `Dockerfile`/`docker-compose.yml`
+- **`Aurora-v1.9.1-linux.zip`** — Linux-версия: исходники + `Dockerfile`/`docker-compose.yml`
   (Docker, `XRAY_MANAGE=proc`) или развёртывание на сервере с systemd (`aurora.service` и юниты).
-- **`Aurora-v1.3.1-windows.zip`** — Windows-версия (папка `windows/`): авто-детект локального и
+- **`Aurora-v1.9.1-windows.zip`** — Windows-версия (папка `windows/`): авто-детект локального и
   публичного IP, телеметрия через `netstat`, служба **NSSM «Aurora»** (`nssm/install_service.bat`),
   бинарь xray ставится скриптом `download_xray.ps1`. Подробности — в `windows/README-windows.md`.
 
-Версия для обеих платформ: `VERSION=1.3.1`, `VERSION_NAME=Auto-Update`.
+Версия для обеих платформ: `VERSION=1.9.1`, `VERSION_NAME=Кот-крепость`.
 
 ## ✨ Возможности
 
@@ -84,8 +84,13 @@ cp .env.example .env    # заполните AURORA_HOST и при желани�
 docker compose up -d --build
 ```
 
-Порты: панель `:8890`, API `:8897`, TG-WS `:443`, mixed-прокси `:8899` (опционально),
-внешний VLESS `:8443` (опционально). Данные — в томе `./data`.
+Порты Docker: панель `:8890`, API `:8897`; mixed-прокси `:8899` и внешний VLESS `:8443`
+не публикуются по умолчанию. Данные — в томе `./data`.
+
+TG-WS в Docker-варианте не запускается и порт `:443` не публикуется. Telegram WS-прокси
+запускается только в режиме systemd через `run_tgws.sh` и `tg-ws-proxy.service`.
+TG-WS запускается только через systemd. Секрет хранится encrypted в `data/tg_secret.txt`; runner расшифровывает его во временный файл с `umask 077`, открывает FD 3, удаляет файл и передаёт FD 3 прокси. Секрет не попадает в argv или journal.
+`AURORA_TGWS_RUNTIME_DIR` — каталог для временного runtime-секрета TG-WS; Docker TG-WS не запускает.
 
 Xray в образ уже встроен (v26.9.9 + geoip/geosite). Управление xray — режим `XRAY_MANAGE=proc`
 (подпроцесс), systemd/юниты в контейнере не нужны.
@@ -111,7 +116,8 @@ Xray в образ уже встроен (v26.9.9 + geoip/geosite). Управл
 | `AURORA_VLESS_SNI` | `www.microsoft.com` | SNI прикрытия Reality |
 | `XRAY_MANAGE` | `systemctl` | `systemctl` (сервер) или `proc` (Docker) |
 | `AURORA_DATA_DIR` | `<base>/data` | каталог данных |
-| `AURORA_TGWS_PORT` | `443` | порт Telegram WS-прокси |
+| `AURORA_TGWS_PORT` | `443` | порт Telegram WS-прокси в режиме systemd; Docker-порт не публикуется |
+| `AURORA_TGWS_RUNTIME_DIR` | `%t/aurora-tgws` | runtime-каталог для временного секрета TG-WS; Docker TG-WS не запускает |
 | `AURORA_ADMIN_TOKEN` | пусто | admin-токен панели (Bearer для POST `/api/*`; пусто — выключено) |
 
 ## 🔌 API (выборка)

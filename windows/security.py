@@ -11,6 +11,7 @@ import threading
 import time
 
 import config
+import crypt
 
 _SECRET_FILE = os.path.join(config.DATA_DIR, "admin_secret.json")
 _TOKEN = {"value": ""}          # "" = авторизация выключена
@@ -23,16 +24,36 @@ _RL = {}                        # {ip: [ts_fail, ...]}
 _RL_LOCK = threading.Lock()
 
 
+def _storage_failure(reason):
+    config.quarantine_file(_SECRET_FILE)
+    raise config.StorageDataError("admin_secret.json: %s" % reason)
+
+
 def _load_secret():
     """Читает токен из env или файла (env имеет приоритет)."""
     env_tok = (os.environ.get("AURORA_ADMIN_TOKEN") or "").strip()
     if env_tok:
         return env_tok
+    import crypt
+    missing = object()
     try:
-        with open(_SECRET_FILE, "r", encoding="utf-8") as f:
-            return (json.load(f).get("admin_token") or "").strip()
-    except (OSError, ValueError):
+        raw = crypt.load_json(_SECRET_FILE, default=missing)
+    except crypt.StorageError as e:
+        _storage_failure(str(e))
+    if raw is missing:
         return ""
+    if not isinstance(raw, dict):
+        _storage_failure("root is not an object")
+    token = raw.get("admin_token")
+    if not isinstance(token, str) or not token.strip():
+        _storage_failure("admin token is invalid")
+    if "created_at" in raw and (type(raw["created_at"]) is not int or raw["created_at"] < 0):
+        _storage_failure("created_at is invalid")
+    try:
+        crypt.save_json(_SECRET_FILE, raw)
+    except (crypt.StorageError, OSError) as e:
+        _storage_failure(str(e))
+    return token.strip()
 
 
 def init():
@@ -95,35 +116,43 @@ def rotate():
     """Генерирует новый токен в data/admin_secret.json. Возвращает токен."""
     new_tok = secrets.token_hex(24)
     with _LOCK:
+        import crypt
         payload = {"admin_token": new_tok, "created_at": int(time.time())}
-        tmp = _SECRET_FILE + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=2)
-        os.replace(tmp, _SECRET_FILE)
-        if os.name != "nt":
-            try:
-                os.chmod(_SECRET_FILE, 0o600)
-            except OSError:
-                pass
+        try:
+            crypt.save_json(_SECRET_FILE, payload)
+        except (crypt.StorageError, OSError) as e:
+            _storage_failure(str(e))
         _TOKEN["value"] = new_tok
     config.log("security: admin-token ротирован")
     return new_tok
 
 
 def protect_files():
-    """chmod 700 data/ и 600 *.json (Linux best-effort)."""
+    """chmod 700 data/ и 600 sensitive files (Linux best-effort)."""
+    try:
+        import crypt
+        crypt.sweep_stale_temps((config.DATA_DIR, getattr(config, "BASE_DIR", config.DATA_DIR)))
+    except Exception:
+        pass
     if os.name == "nt":
         return
     try:
-        os.chmod(config.DATA_DIR, 0o700)
+        crypt.restrict_dir(config.DATA_DIR)
     except OSError:
         pass
     try:
         for name in os.listdir(config.DATA_DIR):
             if name.endswith(".json"):
                 try:
-                    os.chmod(os.path.join(config.DATA_DIR, name), 0o600)
+                    crypt.restrict_file(os.path.join(config.DATA_DIR, name))
                 except OSError:
                     pass
     except OSError:
         pass
+    for path in (getattr(config, "XRAY_CONFIG", ""), getattr(config, "LOG_FILE", "")):
+        if not path:
+            continue
+        try:
+            crypt.restrict_file(path)
+        except OSError as e:
+            config.log("security: chmod %s не удался: %s" % (os.path.basename(path), e))

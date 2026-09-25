@@ -21,11 +21,23 @@ def _boot():
     """Стартовая последовательность: настройки -> ключи -> sync -> фоновые треды."""
     config.load_settings()
     security.init()  # admin-токен + chmod data/ (до любых действий)
+    try:
+        import crypt
+        migrated = crypt.migrate_all()
+        if migrated:
+            config.log("boot: хранилище AURORA2 (%s)" % ", ".join(sorted(migrated)))
+    except Exception as e:
+        config.log("boot: миграция хранилища пропущена: %s" % e)
+    config.ensure_vless()
+    config.refresh_public_ip_async()
+    config.open_firewall()
     # v1.8.0: уникальное имя сервера + авто-вступление в меш головного (фон)
     mesh.ensure_unique_name()
     threading.Thread(target=mesh.auto_join, daemon=True).start()
     pool.load()
     subs.load()  # подписки — до сборки конфига (клиенты vless-in)
+    mesh.start_policy_loop()
+    subs.start_background()
     pool.cleanup()  # убрать мёртвые github-ключи при старте
     config.log("Aurora v%s boot" % config.VERSION)
 

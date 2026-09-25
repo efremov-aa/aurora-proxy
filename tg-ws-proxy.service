@@ -4,9 +4,34 @@ After=network-online.target
 
 [Service]
 Type=simple
+WorkingDirectory=/opt/aurora
+Environment=PYTHONPATH=/opt/aurora
+Environment=AURORA_TGWS_RUNTIME_DIR=%t/aurora-tgws
+RuntimeDirectory=aurora-tgws
+RuntimeDirectoryMode=0700
+ReadWritePaths=%t/aurora-tgws
 ExecStart=/opt/aurora/run_tgws.sh
 Restart=always
 RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+LimitNOFILE=65536
+TasksMax=2048
+MemoryMax=256M
+TimeoutStopSec=30s
+KillSignal=SIGTERM
 
 [Install]
 WantedBy=default.target

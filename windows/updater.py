@@ -4,16 +4,22 @@
 # Windows-сборка: статика включает qr.js, ассет релиза — windows.zip.
 
 import hashlib
+import io
 import json
 import os
+import re
 import shutil
+import subprocess
+import sys
 import tarfile
+import tempfile
 import threading
 import time
 import urllib.request
 import zipfile
 
 import config
+import release_sign
 
 _REPO = (getattr(config, "UPDATE_REPO", "") or "").strip()
 _API = "https://api.github.com/repos/"
@@ -23,12 +29,45 @@ _RAW = "https://raw.githubusercontent.com/"
 _MODULES = [
     "config.py", "pool.py", "source.py", "core.py", "telemetry.py",
     "tgws.py", "recovery.py", "rusegment.py", "api.py", "ui.py", "run.py",
-    "updater.py", "security.py", "subs.py", "mesh.py", "crypt.py",
+    "updater.py", "security.py", "subs.py", "mesh.py", "crypt.py", "release_sign.py",
+    "proxy/__init__.py", "proxy/_aes.py", "proxy/balancer.py", "proxy/bridge.py",
+    "proxy/config.py", "proxy/fake_tls.py", "proxy/pool.py", "proxy/raw_websocket.py",
+    "proxy/stats.py", "proxy/tg_ws_proxy.py", "proxy/utils.py",
 ]
 _STATIC = ["ui/index.html", "ui/app.js", "ui/style.css", "ui/qr.js"]
 
-_LOCK = threading.Lock()
+_MAX_ARCHIVE_BYTES = 32 * 1024 * 1024
+_MAX_UNPACKED_BYTES = 64 * 1024 * 1024
+_MAX_ENTRY_BYTES = 16 * 1024 * 1024
+_MAX_ENTRIES = 512
+_MAX_SIGNATURE_BYTES = 64 * 1024
+_MAX_INSTALLER_BYTES = 128 * 1024 * 1024
+
+_LOCK = threading.RLock()
 _STATE = {"state": "idle", "msg": "", "ts": 0.0}  # idle/checking/ready/applying/done/error
+
+
+def _pubkey():
+    """Публичный ключ подписи: config.UPDATE_PUBKEY имеет приоритет над окружением."""
+    configured = str(getattr(config, "UPDATE_PUBKEY", "") or "").strip()
+    if configured:
+        return release_sign.parse_pubkey(configured)
+    return release_sign.load_pubkey()
+
+
+def _asset_url(assets, name):
+    for a in assets or []:
+        if (a.get("name") or "") == name:
+            url = a.get("browser_download_url")
+            if not url:
+                raise RuntimeError("у ассета %s отсутствует URL" % name)
+            return url
+    raise RuntimeError("в релизе отсутствует ассет %s" % name)
+
+
+def _verify_signature(data, name, version, signature):
+    return release_sign.verify_release(data, signature, pubkey=_pubkey(),
+                                        repo=_REPO, version=str(version), asset=name)
 
 
 def _set_state(st, msg=""):
@@ -46,6 +85,16 @@ def status():
     s["enabled"] = bool(_REPO)
     s["current"] = config.VERSION
     s["repo"] = _REPO
+    s["latest"] = _STATE.get("latest", "")
+    s["update"] = bool(_STATE.get("update", False))
+    try:
+        key = _pubkey()
+    except Exception as e:
+        key = b""
+        s["pubkey_error"] = str(e)
+    s["signature_required"] = True
+    s["signed"] = bool(key)
+    s["pubkey"] = release_sign.fingerprint(key) if key else ""
     return s
 
 
@@ -88,6 +137,9 @@ def check():
         rel = _http_json(_API + _REPO + "/releases/latest")
         latest = str(rel.get("tag_name") or "").lstrip("v")
         update = _ver_tuple(latest) > _ver_tuple(config.VERSION)
+        with _LOCK:
+            _STATE["latest"] = latest
+            _STATE["update"] = update
         _set_state("ready" if update else "done",
                    ("доступно: v%s" % latest) if update else ("актуально: v%s" % config.VERSION))
         return {"ok": True, "current": config.VERSION, "latest": latest, "update": update}
@@ -107,25 +159,170 @@ def _backup_current(tag):
     return bk
 
 
+def _archive_rel(name, want):
+    name = str(name or "").replace("\\", "/")
+    if not name or name.startswith("/") or (len(name) > 1 and name[1] == ":"):
+        return None
+    parts = [p for p in name.split("/") if p not in ("", ".")]
+    if not parts or any(p == ".." for p in parts):
+        return None
+    if any(p.lower() in ("linux", "windows") for p in parts):
+        return None
+    rel = "/".join(parts)
+    if rel in want:
+        return rel
+    if len(parts) > 1:
+        rel = "/".join(parts[1:])
+        if rel in want:
+            return rel
+    return None
+
+
+def _digest(value):
+    value = str(value or "").strip().lower()
+    if value.startswith("sha256:"):
+        value = value[7:]
+    if not re.fullmatch(r"[0-9a-f]{64}", value):
+        raise RuntimeError("у релиза отсутствует корректный sha256 digest")
+    return value
+
+
 def _download_release_zip():
-    """Скачивает zip-ассет релиза (windows.zip) или source-архив при отсутствии → bytes."""
     rel = _http_json(_API + _REPO + "/releases/latest")
-    for a in rel.get("assets") or []:
+    assets = rel.get("assets") or []
+    for a in assets:
         name = a.get("name") or ""
-        if name.endswith(".zip") and "windows" in name.lower():
-            return _http_bytes(a.get("browser_download_url")), name, ""
-    # фолбэк: source zip
-    url = rel.get("zipball_url")
-    if url:
-        return _http_bytes(url), "source.zip", ""
-    raise RuntimeError("нет zip в релизе")
+        if not (name.endswith(".zip") and "windows" in name.lower()):
+            continue
+        url = a.get("browser_download_url")
+        if not url:
+            raise RuntimeError("у zip-ассета отсутствует URL")
+        signature = _http_bytes(_asset_url(assets, name + ".sig"))
+        return _http_bytes(url), name, _digest(a.get("digest")), signature
+    raise RuntimeError("нет windows zip в релизе")
+
+def _http_bytes_limited(url, max_bytes, timeout=120):
+    req = urllib.request.Request(url, headers={"User-Agent": "Aurora/" + config.VERSION})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        raw_length = r.headers.get("Content-Length")
+        if raw_length is not None:
+            try:
+                length = int(raw_length)
+            except (TypeError, ValueError):
+                raise RuntimeError("некорректный Content-Length установщика")
+            if length < 0 or length > max_bytes:
+                raise RuntimeError("установщик слишком большой")
+        data = bytearray()
+        while True:
+            chunk = r.read(1024 * 1024)
+            if not chunk:
+                break
+            data.extend(chunk)
+            if len(data) > max_bytes:
+                raise RuntimeError("установщик слишком большой")
+    return bytes(data)
+
+
+def _download_release_installer(version):
+    rel = _http_json(_API + _REPO + "/releases/latest")
+    expected_name = "Aurora-Setup-%s.exe" % str(version).lstrip("v")
+    for a in rel.get("assets") or []:
+        name = str(a.get("name") or "")
+        if name != expected_name:
+            continue
+        url = a.get("browser_download_url")
+        if not url:
+            raise RuntimeError("у установщика отсутствует URL")
+        digest = _digest(a.get("digest"))
+        data = _http_bytes_limited(url, _MAX_INSTALLER_BYTES)
+        signature = _http_bytes_limited(_asset_url(rel.get("assets") or [], name + ".sig"),
+                                        _MAX_SIGNATURE_BYTES)
+        signed = _verify_signature(data, name, version, signature)
+        if not _verify_sha256(data, digest):
+            raise RuntimeError("sha256 установщика не совпал — обновление отменено")
+        if signed and not hmac_compare(signed["digest"], _digest(digest)):
+            raise RuntimeError("подпись и метаданные установщика расходятся — обновление отменено")
+        return data, name
+    raise RuntimeError("в релизе отсутствует установщик %s" % expected_name)
+
+
+def _save_installer(data, name):
+    updates_dir = os.path.join(config.DATA_DIR, "updates")
+    os.makedirs(updates_dir, exist_ok=True)
+    target = os.path.join(updates_dir, name)
+    fd, tmp = tempfile.mkstemp(prefix="aurora_setup_", suffix=".tmp", dir=updates_dir)
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, target)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+    return target
+
+
+def _launch_installer(path):
+    if not os.path.isfile(path):
+        raise RuntimeError("файл установщика не найден")
+    kwargs = {"close_fds": True}
+    if os.name == "nt":
+        kwargs["creationflags"] = getattr(config, "HIDE_FLAG", 0)
+    proc = subprocess.Popen([
+        path, "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-",
+    ], **kwargs)
+    return getattr(proc, "pid", None)
 
 
 def _verify_sha256(data, expected):
-    if not expected:
-        return True
+    expected = _digest(expected)
     got = hashlib.sha256(data).hexdigest()
     return hmac_compare(got, expected)
+
+
+def _validate_staged(staged, expected_version):
+    for rel, path in staged.items():
+        if not rel.endswith(".py"):
+            continue
+        with open(path, "r", encoding="utf-8-sig") as f:
+            compile(f.read(), rel, "exec")
+    config_path = staged.get("config.py")
+    if not config_path:
+        raise RuntimeError("в архиве отсутствует config.py")
+    with open(config_path, "r", encoding="utf-8-sig") as f:
+        match = re.search(r"^\s*VERSION\s*=\s*['\"]([^'\"]+)['\"]", f.read(), re.M)
+    if not match or match.group(1) != str(expected_version):
+        raise RuntimeError("версия config.py не совпадает с релизом")
+
+
+def _replace_staged(staged, rollback_dir):
+    history = []
+    try:
+        for rel, src in sorted(staged.items()):
+            dst = os.path.join(config.BASE_DIR, *rel.split("/"))
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            backup = os.path.join(rollback_dir, *rel.split("/"))
+            os.makedirs(os.path.dirname(backup), exist_ok=True)
+            had_old = os.path.isfile(dst)
+            if had_old:
+                shutil.copy2(dst, backup)
+            history.append((dst, backup, had_old))
+            os.replace(src, dst)
+    except Exception:
+        for dst, backup, had_old in reversed(history):
+            try:
+                if had_old:
+                    shutil.copy2(backup, dst)
+                elif os.path.exists(dst):
+                    os.unlink(dst)
+            except OSError:
+                pass
+        raise
+    return sorted(staged)
 
 
 def hmac_compare(a, b):
@@ -146,12 +343,22 @@ def apply():
             return chk
         if not chk.get("update"):
             return {"ok": True, "msg": "уже актуально", "current": config.VERSION}
+        if getattr(sys, "frozen", False):
+            _set_state("applying", "проверка установщика обновления")
+            data, name = _download_release_installer(chk["latest"])
+            path = _save_installer(data, name)
+            _set_state("applying", "запуск установщика обновления")
+            pid = _launch_installer(path)
+            _set_state("done", "установщик v%s запущен" % chk["latest"])
+            return {"ok": True, "latest": chk["latest"],
+                    "installer": os.path.basename(path), "installer_started": True,
+                    "pid": pid, "restart_required": True}
         _set_state("applying", "скачивание zip")
-        data, name, _ = _download_release_zip()
+        data, name, digest, signature = _download_release_zip()
         _set_state("applying", "бэкап текущих файлов")
         bk = _backup_current(chk["latest"])
         _set_state("applying", "распаковка и замена")
-        replaced = _extract_and_replace(data, name)
+        replaced = _extract_and_replace(data, name, digest, chk["latest"], signature)
         _set_state("done", "обновлено до v%s (заменено %d файлов, бэкап %s)"
                    % (chk["latest"], len(replaced), os.path.basename(bk)))
         return {"ok": True, "latest": chk["latest"], "replaced": replaced,
@@ -164,42 +371,63 @@ def apply():
         _LOCK.release()
 
 
-def _extract_and_replace(zip_bytes, name):
-    """Распаковывает zip во временную папку и заменяет _MODULES/_STATIC.
-    sha256 zip (если задан в data/update_sha256.txt) сверяется заранее."""
-    import tempfile
-    replaced = []
+def _extract_and_replace(zip_bytes, name, digest, expected_version, signature=b""):
+    if len(zip_bytes) > _MAX_ARCHIVE_BYTES:
+        raise RuntimeError("архив обновления слишком большой")
+    signed = _verify_signature(zip_bytes, name, expected_version, signature)
+    if not _verify_sha256(zip_bytes, digest):
+        raise RuntimeError("sha256 релиза не совпал — обновление отменено")
+    if signed and not hmac_compare(signed["digest"], _digest(digest)):
+        raise RuntimeError("подпись и метаданные релиза расходятся — обновление отменено")
     want = set(_MODULES) | set(_STATIC)
-    # сверка sha256, если рядом лежит файл с ожидаемым хэшем
-    sha_file = os.path.join(config.DATA_DIR, "update_sha256.txt")
-    if os.path.isfile(sha_file):
-        expected = open(sha_file, "r", encoding="utf-8").read().strip()
-        if not _verify_sha256(zip_bytes, expected):
-            raise RuntimeError("sha256 релиза не совпал — обновление отменено")
-    tmpd = tempfile.mkdtemp(prefix="aurora_upd_")
-    try:
-        zp = os.path.join(tmpd, "r.zip")
-        with open(zp, "wb") as f:
-            f.write(zip_bytes)
-        with zipfile.ZipFile(zp) as z:
-            # внутри source-zip/github-ассета обычно корень-папка с префиксом
-            for info in z.infolist():
+    with tempfile.TemporaryDirectory(prefix="aurora_upd_") as tmpd:
+        stage = os.path.join(tmpd, "stage")
+        rollback = os.path.join(tmpd, "rollback")
+        os.makedirs(stage, exist_ok=True)
+        os.makedirs(rollback, exist_ok=True)
+        staged = {}
+        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as z:
+            infos = z.infolist()
+            if len(infos) > _MAX_ENTRIES:
+                raise RuntimeError("слишком много файлов в архиве обновления")
+            total_size = 0
+            for info in infos:
                 if info.is_dir():
                     continue
-                rel = info.filename.split("/", 1)[-1] if "/" in info.filename else info.filename
-                if rel not in want:
+                if info.file_size < 0 or info.file_size > _MAX_ENTRY_BYTES:
+                    raise RuntimeError("файл обновления слишком большой")
+                total_size += info.file_size
+            if total_size > _MAX_UNPACKED_BYTES:
+                raise RuntimeError("распакованный архив слишком большой")
+            for info in infos:
+                if info.is_dir():
                     continue
-                dst = os.path.join(config.BASE_DIR, rel)
+                mode = (info.external_attr >> 16) & 0o170000
+                if mode == 0o120000:
+                    raise RuntimeError("символические ссылки в обновлении запрещены")
+                rel = _archive_rel(info.filename, want)
+                if rel is None:
+                    continue
+                if rel in staged:
+                    raise RuntimeError("дубликат файла в архиве обновления: %s" % rel)
+                dst = os.path.join(stage, *rel.split("/"))
                 os.makedirs(os.path.dirname(dst), exist_ok=True)
-                with z.open(info) as src, open(dst + ".new", "wb") as out:
-                    shutil.copyfileobj(src, out)
-                os.replace(dst + ".new", dst)
-                replaced.append(rel)
-        if not replaced:
-            raise RuntimeError("в архиве не найдено ни одного нашего файла")
-        return replaced
-    finally:
-        shutil.rmtree(tmpd, ignore_errors=True)
+                copied = 0
+                with z.open(info) as src, open(dst, "wb") as out:
+                    while True:
+                        chunk = src.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        copied += len(chunk)
+                        if copied > _MAX_ENTRY_BYTES:
+                            raise RuntimeError("файл обновления слишком большой")
+                        out.write(chunk)
+                staged[rel] = dst
+        if set(staged) != want:
+            missing = sorted(want - set(staged))
+            raise RuntimeError("неполный манифест обновления: %s" % ", ".join(missing))
+        _validate_staged(staged, expected_version)
+        return _replace_staged(staged, rollback)
 
 
 AUTO_INTERVAL = getattr(config, "UPDATE_CHECK_INTERVAL", 15 * 60)
@@ -224,6 +452,8 @@ def auto_update():
                 r = apply()
                 if not r.get("ok"):
                     config.log("update: %s" % (r.get("error") or r.get("msg") or "?"))
+                elif r.get("installer_started"):
+                    config.log("update: установщик v%s запущен" % r.get("latest"))
                 elif r.get("restart_required"):
                     config.log("update: применено v%s, перезапуск" % r.get("latest"))
                     _restart_after_apply()

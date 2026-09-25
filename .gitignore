@@ -13,3 +13,4 @@ xray.json
 windows/installer/output/
 windows/nssm/nssm.exe
 *.bak_mojibake
+AUDIT_FIX_TRACKER.md

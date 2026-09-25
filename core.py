@@ -1,17 +1,23 @@
 # Aurora v1.0 — ядро: сборка xray.json, старт/рестарт xray, ротация, watch.
 # Принцип: final-тег — только живой ключ с реальным egress. VPN OFF -> direct.
 
+import hashlib
+import ipaddress
 import json
 import os
 import re
+import shutil
 import socket
 import subprocess
+import tempfile
 import threading
 import time
 import urllib.parse
 import urllib.request
+from contextlib import contextmanager
 
 import config
+import crypt
 import pool
 import subs
 
@@ -19,9 +25,67 @@ XRAY_CONFIG_LOCK = threading.RLock()  # RLock: read-modify-write оборачи�
 EGRESS_LOCK = threading.Lock()
 _ROTATE_LOCK = threading.Lock()
 _MODE_LOCK = threading.Lock()  # сериализация sync/set_direct (гонка vpn ON->OFF)
+_MODE_STATE_LOCK = threading.RLock()
+_MODE_GENERATION = [0]
 _EGRESS_CACHE = {"ip": "-", "ts": 0.0}
 _LAST_ROTATE = [0.0]
 _WATCH_STOP = threading.Event()
+_XRAY_FILE_LOCK = threading.RLock()
+_XRAY_FILE_STATE = {"handle": None, "depth": 0}
+
+
+@contextmanager
+def _cross_process_lock():
+    with _XRAY_FILE_LOCK:
+        if _XRAY_FILE_STATE["depth"] == 0:
+            os.makedirs(config.DATA_DIR, exist_ok=True)
+            path = os.path.join(config.DATA_DIR, ".xray-transaction.lock")
+            handle = open(path, "a+", encoding="utf-8")
+            try:
+                if os.name == "nt":
+                    import msvcrt
+                    handle.seek(0, os.SEEK_END)
+                    if handle.tell() == 0:
+                        handle.write("0")
+                        handle.flush()
+                    deadline = time.monotonic() + 120.0
+                    while True:
+                        try:
+                            handle.seek(0)
+                            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                            break
+                        except OSError:
+                            if time.monotonic() >= deadline:
+                                raise TimeoutError("xray transaction lock timeout")
+                            time.sleep(0.05)
+                else:
+                    import fcntl
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+                    crypt.restrict_file(path)
+            except Exception:
+                handle.close()
+                raise
+            _XRAY_FILE_STATE["handle"] = handle
+            _XRAY_FILE_STATE["depth"] = 1
+        else:
+            _XRAY_FILE_STATE["depth"] += 1
+        try:
+            yield
+        finally:
+            _XRAY_FILE_STATE["depth"] -= 1
+            if _XRAY_FILE_STATE["depth"] == 0:
+                handle = _XRAY_FILE_STATE["handle"]
+                try:
+                    if os.name == "nt":
+                        import msvcrt
+                        handle.seek(0)
+                        msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+                    else:
+                        import fcntl
+                        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+                finally:
+                    handle.close()
+                    _XRAY_FILE_STATE["handle"] = None
 
 # Как управлять xray: "systemctl" (по умолчанию) или "proc" (в Docker: xray — подпроцесс).
 XRAY_MANAGE = os.environ.get("XRAY_MANAGE", "systemctl")
@@ -30,14 +94,29 @@ _XRAY_PROC = [None]  # Popen (режим proc)
 
 def _xray_bin():
     cands = [
+        shutil.which("xray"),
+        shutil.which("xray.exe"),
         os.path.join(os.path.expanduser("~"), "xray"),
         os.path.join(config.BASE_DIR, "xray"),
         "/usr/local/bin/xray",
     ]
     for c in cands:
-        if os.path.exists(c):
+        if c and os.path.exists(c):
             return c
     return None
+
+
+def _master_source_ip():
+    raw = str(config.get("master_addr", "") or "").strip()
+    if not raw:
+        return None
+    if "://" not in raw:
+        raw = "//" + raw
+    try:
+        host = urllib.parse.urlparse(raw).hostname
+        return str(ipaddress.ip_address(host)) if host else None
+    except ValueError:
+        return None
 
 
 def build_xray_config(final_tag):
@@ -82,6 +161,10 @@ def build_xray_config(final_tag):
     # публичные сборки не гонят битторрент через туннель. Правило первым.
     rules.insert(0, {"type": "field", "protocol": ["bittorrent"],
                      "outboundTag": "direct"})
+    rules.insert(len(rules) - 1, {"type": "field", "protocol": ["quic"],
+                                  "outboundTag": "block"})
+    rules.insert(len(rules) - 1, {"type": "field", "network": "udp",
+                                  "outboundTag": "block"})
 
     cfg = {
         "log": {"loglevel": "warning", "access": "", "error": ""},
@@ -100,7 +183,7 @@ def build_xray_config(final_tag):
     # Внешний VLESS-Reality inbound для подключения к прокси ИЗВНЕ.
     # При замке master_only сервер не раскрывает наружу входящий VLESS:
     # просочиться в этот сервер извне нельзя, работает только локальный http-in.
-    vln = config.VLESS_PUBLIC
+    vln = config.vless_public()
     master_locked = config.get("master_only", False)
     if vln.get("enabled") and vln.get("uuid") and not master_locked:
         # мастер-uuid (владелец сервера) + все активные подписочные клиенты
@@ -108,15 +191,12 @@ def build_xray_config(final_tag):
             "id": vln["uuid"],
             "flow": vln.get("flow", "xtls-rprx-vision"),
         }]
-        try:
-            for cuuid in subs.build_client_list():
-                clients.append({
-                    "id": cuuid,
-                    "email": cuuid,
-                    "flow": vln.get("flow", "xtls-rprx-vision"),
-                })
-        except Exception:
-            pass
+        for cuuid in subs.build_client_list():
+            clients.append({
+                "id": cuuid,
+                "email": cuuid,
+                "flow": vln.get("flow", "xtls-rprx-vision"),
+            })
         cfg["inbounds"].insert(1, {
             "tag": "vless-in",
             "listen": "0.0.0.0",
@@ -140,12 +220,72 @@ def build_xray_config(final_tag):
             },
         })
         http_rule["inboundTag"] = ["http-in", "vless-in"]
+    if master_locked:
+        master_ip = _master_source_ip()
+        if master_ip:
+            rules.insert(0, {
+                "type": "field",
+                "sourceIP": [master_ip],
+                "inboundTag": ["http-in"],
+                "outboundTag": tag,
+            })
+            rules.insert(1, {
+                "type": "field",
+                "inboundTag": ["http-in"],
+                "outboundTag": "block",
+            })
+        else:
+            cfg["inbounds"][0]["listen"] = "127.0.0.1"
     return cfg
 
 
+def _authoritative_config(cfg, target):
+    import copy
+    allowed = {k.get("tag", "") for k in pool.get_keys() if k.get("tag")}
+    allowed.update(("direct", "block"))
+    outbounds = []
+    used = set()
+    for ob in list(cfg.get("outbounds", []) or []):
+        tag = ob.get("tag")
+        if not isinstance(tag, str) or not tag or tag in used:
+            continue
+        if tag not in allowed:
+            continue
+        used.add(tag)
+        outbounds.append(copy.deepcopy(ob))
+    for tag in ("direct", "block"):
+        if tag not in used:
+            if tag == "direct":
+                outbounds.append({
+                    "protocol": "freedom", "tag": "direct",
+                    "settings": {"domainStrategy": "UseIP"},
+                })
+            else:
+                outbounds.append({"protocol": "blackhole", "tag": "block"})
+            used.add(tag)
+    if target not in used:
+        target = "direct"
+    result = copy.deepcopy(cfg)
+    result["outbounds"] = outbounds
+    for rule in result.get("routing", {}).get("rules", []) or []:
+        outbound = rule.get("outboundTag")
+        if outbound not in used:
+            rule["outboundTag"] = "direct"
+    if not any(rule.get("type") == "field" and rule.get("inboundTag") == ["http-in"]
+               for rule in result.get("routing", {}).get("rules", []) or []):
+        rules = result.setdefault("routing", {}).setdefault("rules", [])
+        rules.insert(0, {
+            "type": "field", "inboundTag": ["http-in"], "outboundTag": target,
+        })
+    return result, target
+
+
 def _read_config():
+    path = config.XRAY_CONFIG
     try:
-        with open(config.XRAY_CONFIG, "r", encoding="utf-8") as f:
+        if os.path.islink(path) or os.path.getsize(path) > 16 * 1024 * 1024:
+            return None
+        with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except (OSError, ValueError):
         return None
@@ -153,17 +293,85 @@ def _read_config():
 
 def _write_config(cfg):
     with XRAY_CONFIG_LOCK:
-        tmp = config.XRAY_CONFIG + ".tmp"
+        path = os.path.abspath(config.XRAY_CONFIG)
+        directory = os.path.dirname(path) or "."
+        tmp = None
         try:
-            with open(tmp, "w", encoding="utf-8") as f:
+            os.makedirs(directory, exist_ok=True)
+            fd, tmp = tempfile.mkstemp(
+                prefix=".xray-", suffix=".tmp", dir=directory)
+            crypt.restrict_file(tmp)
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
                 json.dump(cfg, f, indent=2)
                 f.flush()
                 os.fsync(f.fileno())
-            os.replace(tmp, config.XRAY_CONFIG)
+            os.replace(tmp, path)
+            try:
+                crypt.restrict_file(path)
+            except OSError as e:
+                config.log("core: chmod xray.json не удался: %s" % e)
+            if os.name != "nt":
+                dir_fd = os.open(directory, os.O_RDONLY)
+                try:
+                    os.fsync(dir_fd)
+                finally:
+                    os.close(dir_fd)
             return True
         except OSError as e:
             config.log("core: запись xray.json не удалась: %s" % e)
             return False
+        finally:
+            if tmp and os.path.exists(tmp):
+                try:
+                    os.unlink(tmp)
+                except OSError:
+                    pass
+
+
+def _config_fingerprint(cfg):
+    data = json.dumps(
+        cfg, sort_keys=True, separators=(",", ":"),
+        ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(data).hexdigest()
+
+
+def _current_fingerprint():
+    current = _read_config()
+    return None if current is None else _config_fingerprint(current)
+
+
+def _xray_config_valid(cfg):
+    xbin = _xray_bin()
+    if not xbin:
+        return False
+    directory = os.path.dirname(os.path.abspath(config.XRAY_CONFIG)) or "."
+    tmp = None
+    try:
+        os.makedirs(directory, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(
+            prefix=".xray-test-", suffix=".json", dir=directory)
+        crypt.restrict_file(tmp)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        kwargs = {"capture_output": True, "timeout": 10}
+        if os.name == "nt":
+            kwargs["creationflags"] = config.HIDE_FLAG
+        result = subprocess.run(
+            [xbin, "run", "-test", "-config", tmp], **kwargs)
+        return result.returncode == 0
+    except (OSError, TypeError, ValueError, subprocess.SubprocessError):
+        return False
+    finally:
+        if tmp:
+            crypt.unlink_quiet(tmp, "xray preflight")
+
+
+def _restore_config_cas(expected, previous):
+    if previous is None or _current_fingerprint() != expected:
+        return False
+    return _write_config(previous)
 
 
 def _port_open(port, timeout=1):
@@ -199,6 +407,26 @@ def _xray_proc_start():
     return False
 
 
+def _service_value(prop):
+    try:
+        result = subprocess.run(
+            ["systemctl", "--user", "show", "xray", "-p", prop, "--value"],
+            capture_output=True, timeout=3, text=True)
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    if result.returncode != 0:
+        return ""
+    return str(result.stdout or "").strip()
+
+
+def _service_runtime_ok():
+    active = _service_value("ActiveState")
+    main_pid = _service_value("MainPID")
+    if not active and not main_pid:
+        return True
+    return active in ("active", "activating") and main_pid.isdigit() and main_pid != "0"
+
+
 def _restart_xray():
     """Внешний перезапуск xray. Режим systemctl — `systemctl --user restart xray`,
     режим proc (Docker) — подпроцесс. Ждёт порт до 15с."""
@@ -212,25 +440,54 @@ def _restart_xray():
         _XRAY_PROC[0] = None
         return _xray_proc_start()
     try:
-        subprocess.run(
+        result = subprocess.run(
             ["systemctl", "--user", "restart", "xray"],
             capture_output=True, timeout=20)
-    except Exception:
-        pass
+        if result.returncode != 0:
+            config.log("core: xray restart failed rc=%s" % result.returncode)
+            return False
+    except Exception as e:
+        config.log("core: xray restart failed: %s" % e)
+        return False
     end = time.time() + 15
     while time.time() < end:
-        if _port_open(config.XRAY_PORT):
+        if _port_open(config.XRAY_PORT) and _service_runtime_ok():
             return True
         time.sleep(1)
     config.log("core: xray не поднял порт за 15с")
     return False
 
 
+def request_mode(on):
+    on = bool(on)
+    with _MODE_STATE_LOCK:
+        _MODE_GENERATION[0] += 1
+        generation = _MODE_GENERATION[0]
+        config.set("vpn_mode", on)
+
+    def run():
+        with _MODE_STATE_LOCK:
+            if generation != _MODE_GENERATION[0] or config.get("vpn_mode", True) != on:
+                return
+        with _MODE_LOCK:
+            with _MODE_STATE_LOCK:
+                if generation != _MODE_GENERATION[0] or config.get("vpn_mode", True) != on:
+                    return
+            with _cross_process_lock():
+                if on:
+                    _sync_impl()
+                else:
+                    _set_direct_impl()
+
+    threading.Thread(target=run, daemon=True).start()
+    return generation
+
+
 def sync():
     """Полная синхронизация: пул -> конфиг -> старт -> проверка egress.
     Возвращает (ok: bool, final: str). Под _MODE_LOCK: параллельный set_direct
     не может перезаписать результат после чтения vpn_mode."""
-    with _MODE_LOCK:
+    with _MODE_LOCK, _cross_process_lock():
         return _sync_impl()
 
 
@@ -246,14 +503,23 @@ def _sync_impl():
         else:
             final_tag = "direct"
 
+    previous = _read_config()
     cfg = build_xray_config(final_tag)
-    if not _write_config(cfg):
-        config.update_state(vless_now="-", final_mode="direct",
-                            comm={"state": "idle", "msg": ""})
+    cfg, final_tag = _authoritative_config(cfg, final_tag)
+    if not _xray_config_valid(cfg):
+        config.update_state(vless_now="-", final_mode="-", egress_ip="-",
+                            comm={"state": "error", "msg": "xray config preflight failed"})
         return False, "direct"
-    if not _restart_xray():
-        config.update_state(vless_now="-", final_mode="direct",
-                            comm={"state": "idle", "msg": ""})
+    if not _write_config(cfg):
+        config.update_state(vless_now="-", final_mode="-", egress_ip="-",
+                            comm={"state": "error", "msg": "xray config write failed"})
+        return False, "direct"
+    expected = _config_fingerprint(cfg)
+    if not _restart_xray() or _current_fingerprint() != expected:
+        if previous is not None and _restore_config_cas(expected, previous):
+            _restart_xray()
+        config.update_state(vless_now="-", final_mode="-", egress_ip="-",
+                            comm={"state": "error", "msg": "xray restart failed"})
         return False, "direct"
 
     # egress-проверка активного канала (4 попытки — cold start Reality >8с)
@@ -269,9 +535,21 @@ def _sync_impl():
             config.log("core: final=%s БЕЗ egress, откат на direct" % final_tag)
             final_tag = "direct"
             cfg = build_xray_config("direct")
-            _write_config(cfg)
-            _restart_xray()
-            config.update_state(vless_now="direct", final_mode="direct", egress_ip=config.WHITE_IP,
+            cfg, final_tag = _authoritative_config(cfg, final_tag)
+            if not _xray_config_valid(cfg) or not _write_config(cfg):
+                if previous is not None and _restore_config_cas(expected, previous):
+                    _restart_xray()
+                config.update_state(vless_now="-", final_mode="-", egress_ip="-",
+                                    comm={"state": "error", "msg": "direct fallback failed"})
+                return False, "direct"
+            direct_expected = _config_fingerprint(cfg)
+            if not _restart_xray() or _current_fingerprint() != direct_expected:
+                if previous is not None and _restore_config_cas(direct_expected, previous):
+                    _restart_xray()
+                config.update_state(vless_now="-", final_mode="-", egress_ip="-",
+                                    comm={"state": "error", "msg": "direct fallback failed"})
+                return False, "direct"
+            config.update_state(vless_now="direct", final_mode="direct", egress_ip=config.get_direct_ip() or "-",
                                 comm={"state": "idle", "msg": ""})
             return False, "direct"
 
@@ -287,6 +565,11 @@ def _sync_impl():
     return True, final_tag
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 def egress_probe(timeout=10):
     """Фактический egress через живой порт xray. Возвращает IP или None.
     Только HTTP: HTTPS через CONNECT даёт SSL EOF (ложный провал)."""
@@ -296,12 +579,13 @@ def egress_probe(timeout=10):
             "http": "http://127.0.0.1:%d" % config.XRAY_PORT,
             "https": "http://127.0.0.1:%d" % config.XRAY_PORT,
         })
-        opener = urllib.request.build_opener(handler)
+        opener = urllib.request.build_opener(handler, _NoRedirect())
         req = urllib.request.Request(url, headers={"User-Agent": "curl"})
         with opener.open(req, timeout=timeout) as r:
             body = r.read().decode("utf-8", errors="replace")
         ip = json.loads(body).get("ip", "")
-        if ip and ip not in ("", "-", config.WHITE_IP):
+        direct_ip = config.get_direct_ip()
+        if direct_ip and ip not in ("", "-", direct_ip):
             return ip
     except Exception:
         return None
@@ -336,7 +620,7 @@ def get_vless_now():
 def set_direct():
     """Переключение final=direct (правки routing, vless-outbounds сохраняются).
     Под _MODE_LOCK: сериализация с sync при смене vpn_mode."""
-    with _MODE_LOCK:
+    with _MODE_LOCK, _cross_process_lock():
         return _set_direct_impl()
 
 
@@ -356,7 +640,7 @@ def _set_direct_impl():
     if not _restart_xray():
         config.update_state(comm={"state": "idle", "msg": ""})
         return False
-    config.update_state(vless_now="direct", final_mode="direct", egress_ip=config.WHITE_IP,
+    config.update_state(vless_now="direct", final_mode="direct", egress_ip=config.get_direct_ip() or "-",
                         comm={"state": "idle", "msg": ""})
     config.log("core: final=direct (прямой режим)")
     return True
@@ -367,46 +651,52 @@ def apply_sub_clients():
     (мастер + все активные подписочные uuid) и рестартует xray.
     ТОЛЬКО правка clients — routing/outbounds не трогаются (безопасно вживую).
     Возвращает (ok: bool, msg: str)."""
-    if not (config.VLESS_PUBLIC.get("enabled") and config.VLESS_PUBLIC.get("uuid")):
+    if not (config.vless_public().get("enabled") and config.vless_public().get("uuid")):
         return False, "внешний inbound не настроен"
     clients = [{
-        "id": config.VLESS_PUBLIC["uuid"],
-        "flow": config.VLESS_PUBLIC.get("flow", "xtls-rprx-vision"),
+        "id": config.vless_public()["uuid"],
+        "flow": config.vless_public().get("flow", "xtls-rprx-vision"),
     }]
     try:
         for cuuid in subs.build_client_list():
             clients.append({
                 "id": cuuid,
                 "email": cuuid,
-                "flow": config.VLESS_PUBLIC.get("flow", "xtls-rprx-vision"),
+                "flow": config.vless_public().get("flow", "xtls-rprx-vision"),
             })
-    except Exception:
-        pass
-    with XRAY_CONFIG_LOCK:
-        cfg = _read_config()
-        if not cfg:
-            return False, "нет конфига"
-        # статистика по пользователям нужна и для живого конфига (не только при sync)
-        if "policy" not in cfg:
-            cfg["policy"] = {"levels": {"0": {"statsUserUplink": True,
-                                              "statsUserDownlink": True}}}
-        done = False
-        for inbound in cfg.get("inbounds", []):
-            if inbound.get("tag") == "vless-in":
-                inbound.setdefault("settings", {})["clients"] = clients
-                done = True
-                break
-        if not done:
-            return False, "vless-in не найден в xray.json"
-        if not _write_config(cfg):
-            return False, "write fail"
-    if not _restart_xray():
-        return False, "restart fail"
-    config.log("core: vless-in clients обновлены (%d всего)" % len(clients))
-    return True, "clients %d" % len(clients)
+    except Exception as e:
+        config.log("core: subscription clients failed: %s" % e)
+        return False, "subscription clients failed"
+    with _cross_process_lock():
+        with XRAY_CONFIG_LOCK:
+            cfg = _read_config()
+            if not cfg:
+                return False, "нет конфига"
+            if "policy" not in cfg:
+                cfg["policy"] = {"levels": {"0": {"statsUserUplink": True,
+                                                  "statsUserDownlink": True}}}
+            done = False
+            for inbound in cfg.get("inbounds", []):
+                if inbound.get("tag") == "vless-in":
+                    inbound.setdefault("settings", {})["clients"] = clients
+                    done = True
+                    break
+            if not done:
+                return False, "vless-in не найден в xray.json"
+            if not _write_config(cfg):
+                return False, "write fail"
+        if not _restart_xray():
+            return False, "restart fail"
+        config.log("core: vless-in clients обновлены (%d всего)" % len(clients))
+        return True, "clients %d" % len(clients)
 
 
 def set_active_tag(tag):
+    with _MODE_LOCK, _cross_process_lock():
+        return _set_active_tag_impl(tag)
+
+
+def _set_active_tag_impl(tag):
     """Переключение final на тег из xray.json (vless). Возвращает (ok, msg)."""
     config.update_state(comm={"state": "syncing", "msg": "переключение ключа..."})
     with XRAY_CONFIG_LOCK:  # read-modify-write целиком под локом (TOCTOU)
@@ -438,6 +728,9 @@ def set_active_tag(tag):
             break
         time.sleep(3)
     if ip:
+        with EGRESS_LOCK:
+            _EGRESS_CACHE["ip"] = ip
+            _EGRESS_CACHE["ts"] = time.time()
         config.update_state(vless_now=tag, final_mode=tag, egress_ip=ip,
                             comm={"state": "idle", "msg": ""})
         config.log("core: switch -> %s (egress %s)" % (tag, ip))
@@ -466,38 +759,41 @@ def _rotate_guard():
 
 
 def rotate():
+    with _MODE_LOCK:
+        with _cross_process_lock():
+            return _rotate_impl()
+
+
+def _rotate_impl():
     """Ротация: пробуем до 3 кандидатов с живым egress. Возвращает новый тег или None."""
-    with _ROTATE_LOCK:  # guard + установка кулдауна атомарны (гонка watch+API)
+    with _ROTATE_LOCK:
         if _rotate_guard():
             config.log("core: rotate cooldown, skip")
             return None
-        _LAST_ROTATE[0] = time.time()  # фиксируем сразу после прохода guard
+        _LAST_ROTATE[0] = time.time()
     cur = get_vless_now()
     pool.dedupe()
     keys = pool.get_keys()
-    # кандидаты: не текущий, с egress/IP
     cands = []
     for k in keys:
         if k.get("tag") == cur or pool.blocked(k.get("uri", "")):
             continue
-        st = pool._STATUS.get(pool._norm_uri(k.get("uri", "")), {})
-        ip = st.get("exit_ip", "-")
-        if pool._good_ip(ip):
+        st = pool.get_status(k.get("uri", ""))
+        if pool._good_ip(st.get("exit_ip", "-")):
             cands.append(k)
-    if not cands:  # фолбек: все живые, кроме текущего
+    if not cands:
         cands = [k for k in keys if k.get("tag") != cur and not pool.blocked(k.get("uri", ""))]
     cands = cands[:3]
     for k in cands:
         tag = k.get("tag")
         if not tag:
             continue
-        ok, msg = set_active_tag(tag)
+        ok, msg = _set_active_tag_impl(tag)
         if ok:
             config.log("core: rotate -> %s (%s)" % (tag, msg))
             return tag
     config.log("core: rotate: кандидаты мертвы")
     return None
-
 
 # --- watchdog final ---
 def _final_watch():

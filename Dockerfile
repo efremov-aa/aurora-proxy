@@ -33,7 +33,7 @@ ENV XRAY_MANAGE=proc \
 
 RUN mkdir -p /app/data && python3 -m compileall -q /app || true
 
-EXPOSE 8890 8899 8897 443 8443
+EXPOSE 8890 8899 8897 8443
 VOLUME ["/app/data"]
 
 CMD ["python3", "/app/run.py"]

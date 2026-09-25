@@ -29,7 +29,6 @@ def _probe(host):
     t0 = time.time()
     ip = ""
     try:
-        # форсируем IPv4: на сервере нет гарантированного IPv6, HTTP проще по IPv4
         ip = socket.getaddrinfo(host, 80, socket.AF_INET)[0][4][0]
     except Exception:
         pass
@@ -37,10 +36,10 @@ def _probe(host):
     try:
         req = urllib.request.Request("http://" + host + "/",
                                      headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=_TIMEOUT) as r:
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(req, timeout=_TIMEOUT) as r:
             code = r.getcode() or 0
-    except Exception as e:
-        err = str(e)
+    except Exception:
         code = -1
     return {
         "host": host,
@@ -59,24 +58,29 @@ def check_all():
         st.setdefault("rusegment", {})["running"] = True
         config.update_state(rusegment=st["rusegment"])
     results = []
-    domains = config.segment_domains() or RU_DOMAINS
-    with concurrent.futures.ThreadPoolExecutor(max_workers=_MAX_WORKERS) as ex:
-        futs = {ex.submit(_probe, h): h for h in domains}
-        for fut in concurrent.futures.as_completed(futs):
-            try:
-                results.append(fut.result())
-            except Exception:
-                results.append({"host": futs[fut], "ip": "", "code": -1, "ms": 0})
-    results.sort(key=lambda r: domains.index(r["host"]) if r["host"] in domains else 99)
-    with _LOCK:
-        st = config.get_state()
-        st.setdefault("rusegment", {})
-        st["rusegment"]["results"] = results
-        st["rusegment"]["running"] = False
-        st["rusegment"]["ts"] = time.time()
-        config.update_state(rusegment=st["rusegment"])
-    config.log("rusegment: проверено %d доменов" % len(results))
-    return True
+    completed = False
+    try:
+        domains = config.segment_domains() or RU_DOMAINS
+        with concurrent.futures.ThreadPoolExecutor(max_workers=_MAX_WORKERS) as ex:
+            futs = {ex.submit(_probe, h): h for h in domains}
+            for fut in concurrent.futures.as_completed(futs):
+                try:
+                    results.append(fut.result())
+                except Exception:
+                    results.append({"host": futs[fut], "ip": "", "code": -1, "ms": 0})
+        results.sort(key=lambda r: domains.index(r["host"]) if r["host"] in domains else 99)
+        completed = True
+    finally:
+        with _LOCK:
+            st = config.get_state()
+            st.setdefault("rusegment", {})
+            st["rusegment"]["results"] = results
+            st["rusegment"]["running"] = False
+            st["rusegment"]["ts"] = time.time()
+            config.update_state(rusegment=st["rusegment"])
+    if completed:
+        config.log("rusegment: проверено %d доменов" % len(results))
+    return completed
 
 
 def start():
