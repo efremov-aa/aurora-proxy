@@ -1,4 +1,4 @@
-# Aurora Proxy — Windows (сборка v1.9.2 «Кот-починщик»)
+# Aurora Proxy — Windows (сборка v1.9.3 «Кот-глашатай»)
 
 Прокси-сервер VLESS Reality с веб-панелью для Windows. Основа — тот же код, что в публичном репозитории
 `aurora-proxy` (Linux/Docker); здесь он адаптирован под Windows-сервис NSSM.

@@ -35,7 +35,7 @@
       'c.secret-hint': 'Секреты видны только локально. Укажите X-Auth токен панели, если включён.',
       'ru.empty': 'проверка ещё не выполнялась', 'ru.avail': 'доступен', 'ru.unavail': 'недоступен', 'ru.all': 'все домены доступны ✅',
       'upd.avail': 'доступно', 'upd.cur': 'актуально', 'upd.msg-avail': 'Доступно обновление', 'upd.msg-cur': 'Установлена актуальная версия',
-      'upd.checked': 'Проверено: ',
+      'upd.checked': 'Проверено: ', 'upd.err': 'ошибка', 'upd.err-hint': 'Обновление не удалось — подробности видны администратору',
       'w.mesh-nodes': 'Узлов в сети:', 'w.mesh-exit': 'выход через', 'w.hub': 'хаб', 'w.mesh-none': 'Меш не подключён. Приглашение — во вкладке «Подключение».',
       'w.plan': 'Активный план:', 'w.ru': 'RU-доменов:', 'w.ru-ok': 'доступно',
       'mesh.connected': 'подключён', 'mesh.not': 'не подключён', 'mesh.member': 'участник', 'mesh.hub': 'хаб',
@@ -124,7 +124,7 @@
       'c.secret-hint': 'Secrets are only visible locally. Provide the panel X-Auth token if enabled.',
       'ru.empty': 'check not run yet', 'ru.avail': 'available', 'ru.unavail': 'unavailable', 'ru.all': 'all domains available ✅',
       'upd.avail': 'available', 'upd.cur': 'up to date', 'upd.msg-avail': 'Update available', 'upd.msg-cur': 'Up to date',
-      'upd.checked': 'Checked: ',
+      'upd.checked': 'Checked: ', 'upd.err': 'error', 'upd.err-hint': 'Update failed - details are visible to the administrator',
       'w.mesh-nodes': 'Mesh nodes:', 'w.mesh-exit': 'exit via', 'w.hub': 'hub', 'w.mesh-none': 'Mesh not connected. Invite is in the "Connect" tab.',
       'w.plan': 'Active plan:', 'w.ru': 'RU domains:', 'w.ru-ok': 'available',
       'mesh.connected': 'connected', 'mesh.not': 'not connected', 'mesh.member': 'member', 'mesh.hub': 'hub',
@@ -213,7 +213,7 @@
       'c.secret-hint': 'Los secretos solo se ven localmente. Indique el token X-Auth si está activado.',
       'ru.empty': 'verificación pendiente', 'ru.avail': 'disponible', 'ru.unavail': 'no disponible', 'ru.all': 'todos los dominios disponibles ✅',
       'upd.avail': 'disponible', 'upd.cur': 'actualizado', 'upd.msg-avail': 'Actualización disponible', 'upd.msg-cur': 'Versión actual',
-      'upd.checked': 'Comprobado: ',
+      'upd.checked': 'Comprobado: ', 'upd.err': 'error', 'upd.err-hint': 'Actualizacion fallida - los detalles son visibles para el administrador',
       'w.mesh-nodes': 'Nodos de mesh:', 'w.mesh-exit': 'salida por', 'w.hub': 'hub', 'w.mesh-none': 'Mesh no conectado. Invitación en la pestaña «Conexión».',
       'w.plan': 'Plan activo:', 'w.ru': 'Dominios RU:', 'w.ru-ok': 'disponibles',
       'mesh.connected': 'conectado', 'mesh.not': 'no conectado', 'mesh.member': 'miembro', 'mesh.hub': 'hub',
@@ -302,7 +302,7 @@
       'c.secret-hint': 'Geheimnisse sind nur lokal sichtbar. Geben Sie das X-Auth-Token an, falls aktiviert.',
       'ru.empty': 'Prüfung noch nicht durchgeführt', 'ru.avail': 'verfügbar', 'ru.unavail': 'nicht verfügbar', 'ru.all': 'alle Domains verfügbar ✅',
       'upd.avail': 'verfügbar', 'upd.cur': 'aktuell', 'upd.msg-avail': 'Update verfügbar', 'upd.msg-cur': 'Aktuelle Version installiert',
-      'upd.checked': 'Geprüft: ',
+      'upd.checked': 'Geprüft: ', 'upd.err': 'Fehler', 'upd.err-hint': 'Aktualisierung fehlgeschlagen - Details sieht der Administrator',
       'w.mesh-nodes': 'Mesh-Knoten:', 'w.mesh-exit': 'Ausgang über', 'w.hub': 'Hub', 'w.mesh-none': 'Mesh nicht verbunden. Einladung im Tab „Verbinden“.',
       'w.plan': 'Aktiver Tarif:', 'w.ru': 'RU-Domains:', 'w.ru-ok': 'verfügbar',
       'mesh.connected': 'verbunden', 'mesh.not': 'nicht verbunden', 'mesh.member': 'Mitglied', 'mesh.hub': 'Hub',
@@ -391,7 +391,7 @@
       'c.secret-hint': 'Les secrets ne sont visibles que localement. Indiquez le jeton X-Auth s\'il est activé.',
       'ru.empty': 'vérification pas encore effectuée', 'ru.avail': 'disponible', 'ru.unavail': 'indisponible', 'ru.all': 'tous les domaines disponibles ✅',
       'upd.avail': 'disponible', 'upd.cur': 'à jour', 'upd.msg-avail': 'Mise à jour disponible', 'upd.msg-cur': 'Version actuelle installée',
-      'upd.checked': 'Vérifié : ',
+      'upd.checked': 'Vérifié : ', 'upd.err': 'erreur', 'upd.err-hint': 'Echec de la mise a jour - les details sont visibles au responsable',
       'w.mesh-nodes': 'Nœuds mesh :', 'w.mesh-exit': 'sortie via', 'w.hub': 'hub', 'w.mesh-none': 'Mesh non connecté. Invitation dans l\'onglet « Connexion ».',
       'w.plan': 'Forfait actif :', 'w.ru': 'Domaines RU :', 'w.ru-ok': 'disponibles',
       'mesh.connected': 'connecté', 'mesh.not': 'non connecté', 'mesh.member': 'membre', 'mesh.hub': 'hub',
@@ -480,7 +480,7 @@
       'c.secret-hint': 'Sırlar yalnızca yerelde görünür. Etkinse panel X-Auth jetonunu girin.',
       'ru.empty': 'kontrol henüz yapılmadı', 'ru.avail': 'erişilebilir', 'ru.unavail': 'erişilemez', 'ru.all': 'tüm alan adları erişilebilir ✅',
       'upd.avail': 'mevcut', 'upd.cur': 'güncel', 'upd.msg-avail': 'Güncelleme mevcut', 'upd.msg-cur': 'Güncel sürüm kurulu',
-      'upd.checked': 'Kontrol: ',
+      'upd.checked': 'Kontrol: ', 'upd.err': 'hata', 'upd.err-hint': 'Guncelleme basarisiz - ayrintilari yonetici gorur',
       'w.mesh-nodes': 'Mesh düğümleri:', 'w.mesh-exit': 'çıkış', 'w.hub': 'hub', 'w.mesh-none': 'Mesh bağlı değil. Davet "Bağlan" sekmesinde.',
       'w.plan': 'Aktif plan:', 'w.ru': 'RU alan adları:', 'w.ru-ok': 'erişilebilir',
       'mesh.connected': 'bağlı', 'mesh.not': 'bağlı değil', 'mesh.member': 'üye', 'mesh.hub': 'hub',
@@ -569,7 +569,7 @@
       'c.secret-hint': 'Os segredos só são visíveis localmente. Informe o token X-Auth do painel, se ativado.',
       'ru.empty': 'verificação ainda não feita', 'ru.avail': 'disponível', 'ru.unavail': 'indisponível', 'ru.all': 'todos os domínios disponíveis ✅',
       'upd.avail': 'disponível', 'upd.cur': 'atual', 'upd.msg-avail': 'Atualização disponível', 'upd.msg-cur': 'Versão atual instalada',
-      'upd.checked': 'Verificado: ',
+      'upd.checked': 'Verificado: ', 'upd.err': 'erro', 'upd.err-hint': 'Atualizacao falhou - os detalhes sao visiveis ao administrador',
       'w.mesh-nodes': 'Nós de mesh:', 'w.mesh-exit': 'saída por', 'w.hub': 'hub', 'w.mesh-none': 'Mesh não conectado. Convite na aba «Conectar».',
       'w.plan': 'Plano ativo:', 'w.ru': 'Domínios RU:', 'w.ru-ok': 'disponíveis',
       'mesh.connected': 'conectado', 'mesh.not': 'não conectado', 'mesh.member': 'membro', 'mesh.hub': 'hub',
@@ -658,7 +658,7 @@
       'c.secret-hint': '密钥仅本地可见。已启用面板 X-Auth 令牌时请输入。',
       'ru.empty': '尚未检查', 'ru.avail': '可用', 'ru.unavail': '不可用', 'ru.all': '所有域名均可访问 ✅',
       'upd.avail': '可用', 'upd.cur': '最新', 'upd.msg-avail': '有可用更新', 'upd.msg-cur': '已安装最新版本',
-      'upd.checked': '已检查：',
+      'upd.checked': '已检查：', 'upd.err': '错误', 'upd.err-hint': '更新失败 - 详情仅管理员可见',
       'w.mesh-nodes': 'Mesh节点：', 'w.mesh-exit': '出口', 'w.hub': '集线器', 'w.mesh-none': 'Mesh 未连接。邀请在「连接」选项卡中。',
       'w.plan': '活动套餐：', 'w.ru': 'RU 域名：', 'w.ru-ok': '可用',
       'mesh.connected': '已连接', 'mesh.not': '未连接', 'mesh.member': '成员', 'mesh.hub': '集线器',
@@ -747,7 +747,7 @@
       'c.secret-hint': 'الأسرار مرئية محليًا فقط. أدخل رمز X-Auth للوحة إذا كان مفعّلاً.',
       'ru.empty': 'لم يتم الفحص بعد', 'ru.avail': 'متاح', 'ru.unavail': 'غير متاح', 'ru.all': 'جميع النطاقات متاحة ✅',
       'upd.avail': 'متاح', 'upd.cur': 'محدّث', 'upd.msg-avail': 'تحديث متاح', 'upd.msg-cur': 'تم تثبيت الإصدار الحالي',
-      'upd.checked': 'تم الفحص: ',
+      'upd.checked': 'تم الفحص: ', 'upd.err': 'خطأ', 'upd.err-hint': 'فشل التحديث - التفاصيل مرئية للمسؤول',
       'w.mesh-nodes': 'عقد الشبكة:', 'w.mesh-exit': 'الخروج عبر', 'w.hub': 'المحور', 'w.mesh-none': 'الشبكة غير متصلة. الدعوة في تبويب «الاتصال».',
       'w.plan': 'الباقة النشطة:', 'w.ru': 'نطاقات RU:', 'w.ru-ok': 'متاحة',
       'mesh.connected': 'متصل', 'mesh.not': 'غير متصل', 'mesh.member': 'عضو', 'mesh.hub': 'محور',
@@ -836,7 +836,7 @@
       'c.secret-hint': 'गुप्त कुंजियाँ केवल स्थानीय रूप से दिखती हैं। सक्षम होने पर पैनल X-Auth टोकन दें।',
       'ru.empty': 'जाँच अभी नहीं हुई', 'ru.avail': 'उपलब्ध', 'ru.unavail': 'अनुपलब्ध', 'ru.all': 'सभी डोमेन उपलब्ध ✅',
       'upd.avail': 'उपलब्ध', 'upd.cur': 'नवीनतम', 'upd.msg-avail': 'अपडेट उपलब्ध', 'upd.msg-cur': 'नवीनतम संस्करण स्थापित',
-      'upd.checked': 'जाँचा गया: ',
+      'upd.checked': 'जाँचा गया: ', 'upd.err': 'त्रुटि', 'upd.err-hint': 'अपडेट विफल - विवरण केवल व्यवस्थापक को दिखते हैं',
       'w.mesh-nodes': 'मेश नोड:', 'w.mesh-exit': 'निकास', 'w.hub': 'हब', 'w.mesh-none': 'मेश कनेक्ट नहीं। निमंत्रण «कनेक्ट» टैब में है।',
       'w.plan': 'सक्रिय योजना:', 'w.ru': 'RU डोमेन:', 'w.ru-ok': 'उपलब्ध',
       'mesh.connected': 'कनेक्टेड', 'mesh.not': 'कनेक्ट नहीं', 'mesh.member': 'सदस्य', 'mesh.hub': 'हब',
@@ -1221,20 +1221,28 @@
     getJSON('/api/update/status').then(function (j) {
       j = j || {};
       V.UPD = j;
-       var avail = j.update === true || (j.latest && j.current && j.latest !== j.current);
+      var avail = j.update === true || (j.latest && j.current && j.latest !== j.current);
+      var s = j.state || '';
+      var stateText = _t('upd.cur');
+      var stateCls = 'badge on';
+      if (s === 'error') { stateText = _t('upd.err'); stateCls = 'badge off'; }
+      else if (s === 'applying' || s === 'checking') { stateText = _t('upd.now'); stateCls = 'badge warn'; }
+      else if (avail) { stateText = _t('upd.avail'); stateCls = 'badge gold'; }
+      var msgText = j.msg || (s === 'error' ? _t('upd.err-hint') : (avail ? _t('upd.msg-avail') : _t('upd.msg-cur')));
       $('du-cur').textContent = j.current || '—';
       $('du-new').textContent = j.latest || '—';
-      $('du-msg').textContent = j.msg || '';
+      $('du-msg').textContent = msgText;
       $('dash-update').style.display = avail ? '' : 'none';
       $('side-upd').style.display = avail ? '' : 'none';
+      var updTag = $('tag-upd');
+      if (updTag) { updTag.style.display = avail ? '' : 'none'; }
       $('upd-cur').textContent = j.current || '—';
       $('upd-new').textContent = j.latest || '—';
-      $('upd-state-b').textContent = avail ? _t('upd.avail') : _t('upd.cur');
-      $('upd-msg').textContent = j.msg || (avail ? _t('upd.msg-avail') : _t('upd.msg-cur'));
+      $('upd-state-b').textContent = stateText;
+      $('upd-state-b').className = stateCls;
+      $('upd-msg').textContent = msgText;
       $('upd-repo').textContent = j.repo || '–';
       $('upd-last').textContent = _t('upd.checked') + fmtDate(j.ts);
-      var s = j.state || '';
-      $('upd-state-b').className = 'badge gold';
     });
   }
   function renderUpdateDash() { loadUpdate(); }

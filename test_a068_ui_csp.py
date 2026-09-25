@@ -128,6 +128,23 @@ def app_contract(path):
         assert ("function %s(" % fn in text or "window.%s = function" % fn in text
                 or "%s: function" % fn in text), (path, fn)
     assert "authHdr" in text, path
+    upd = region(text, "function loadUpdate() {", "\n  function renderUpdateDash()")
+    for needle in ("var s = j.state || '';",
+                   "var stateText = _t('upd.cur');",
+                   "var stateCls = 'badge on';",
+                   "stateText = _t('upd.err'); stateCls = 'badge off';",
+                   "stateText = _t('upd.now'); stateCls = 'badge warn';",
+                   "stateText = _t('upd.avail'); stateCls = 'badge gold';",
+                   "var msgText = j.msg || (s === 'error' ? _t('upd.err-hint')",
+                   "$('upd-state-b').textContent = stateText;",
+                   "$('upd-state-b').className = stateCls;",
+                   "$('du-msg').textContent = msgText;",
+                   "var updTag = $('tag-upd');",
+                   "updTag.style.display = avail ? '' : 'none';"):
+        assert needle in upd, (path, needle)
+    assert upd.count("stateText = _t(") == 4, path
+    assert text.count("'upd.err':") == 10, path
+    assert text.count("'upd.err-hint':") == 10, path
 
 
 def api_contract(path):
@@ -164,7 +181,8 @@ def parity():
     assert hashlib.md5(linux_html.read_bytes()).hexdigest() == hashlib.md5(windows_html.read_bytes()).hexdigest()
     linux_app = read(ROOT / "ui" / "app.js")
     windows_app = read(ROOT / "windows" / "ui" / "app.js")
-    for start, end in (("var ACTS = {", "\n  function bindActions"),):
+    for start, end in (("var ACTS = {", "\n  function bindActions"),
+                       ("function loadUpdate() {", "\n  function renderUpdateDash()")):
         assert region(linux_app, start, end) == region(windows_app, start, end)
     linux_api = read(ROOT / "api.py")
     windows_api = read(ROOT / "windows" / "api.py")

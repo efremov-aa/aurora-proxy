@@ -13,8 +13,8 @@ def value(path, pattern):
 
 version = value("config.py", r'^VERSION\s*=\s*["\']([^"\']+)["\']')
 name = value("config.py", r'^VERSION_NAME\s*=\s*["\']([^"\']+)["\']')
-assert version == "1.9.2"
-assert name == "Кот-починщик"
+assert version == "1.9.3"
+assert name == "Кот-глашатай"
 assert value("windows/config.py", r'^VERSION\s*=\s*["\']([^"\']+)["\']') == version
 assert value("windows/config.py", r'^VERSION_NAME\s*=\s*["\']([^"\']+)["\']') == name
 readme = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
