@@ -7,11 +7,11 @@
 ![mascot](https://img.shields.io/badge/mascot-%F0%9F%90%B1-pink)
 ![python](https://img.shields.io/badge/python-3.12%20stdlib-blue)
 ![xray](https://img.shields.io/badge/xray-v26.9.9-blue)
-![version](https://img.shields.io/badge/version-1.9.3-pink)
+![version](https://img.shields.io/badge/version-1.9.4-pink)
 ![tests](https://img.shields.io/badge/tests-34%20regression%20suites-blue)
 ![i18n](https://img.shields.io/badge/i18n-10%20languages-blue)
 
-**Версия:** `VERSION=1.9.3`, `VERSION_NAME=Кот-глашатай` · **Политика:** ревизия 2 (обязательна при первом запуске)
+**Версия:** `VERSION=1.9.4`, `VERSION_NAME=Кот-привратник` · **Политика:** ревизия 2 (обязательна при первом запуске)
 
 ## Содержание
 
@@ -28,12 +28,12 @@
 
 ## 📥 Загрузка
 
-Архивы, установщик и список изменений — в [Release v1.9.3 «Кот-глашатай»](https://github.com/efremov-aa/aurora-proxy/releases).
+Архивы, установщик и список изменений — в [Release v1.9.4 «Кот-глашатай»](https://github.com/efremov-aa/aurora-proxy/releases).
 
 | Ассет | Что внутри |
 |---|---|
-| `Aurora-v1.9.3-linux.zip` | Linux-версия: модули, `ui/`, `proxy/`, `Dockerfile`, `docker-compose.yml`, systemd-юниты |
-| `Aurora-v1.9.3-windows.zip` | Windows-версия (папка `windows/`): те же модули + `bin/`, `nssm/`, `installer/`, `download_xray.ps1` |
+| `Aurora-v1.9.4-linux.zip` | Linux-версия: модули, `ui/`, `proxy/`, `Dockerfile`, `docker-compose.yml`, systemd-юниты |
+| `Aurora-v1.9.4-windows.zip` | Windows-версия (папка `windows/`): те же модули + `bin/`, `nssm/`, `installer/`, `download_xray.ps1` |
 | `Aurora-Setup-1.9.3.exe` 🪟 | **Установщик для Windows**: ставит Aurora как службу **NSSM «Aurora»**, xray и TG-WS внутри, авто-обновление |
 | `*.sig` | Подпись Ed25519 каждого ассета — авто-обновление откажется принимать неподписанный файл 🐾 |
 

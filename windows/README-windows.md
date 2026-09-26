@@ -1,10 +1,10 @@
-# 🐱 Aurora — Windows-сборка v1.9.3 «Кот-глашатай» 🐾
+# 🐱 Aurora — Windows-сборка v1.9.4 «Кот-привратник» 🐾
 
 > Мяу! Та же кошка, только на Windows: те же модули, что и в Linux/Docker-версии, но под Windows-службу
 > **NSSM «Aurora»**. Окна консоли не вылезают, IP определяется сам, обновление подписано. 🐾
 
 ![mascot](https://img.shields.io/badge/mascot-%F0%9F%90%B1-pink)
-![version](https://img.shields.io/badge/version-1.9.3-pink)
+![version](https://img.shields.io/badge/version-1.9.4-pink)
 ![windows](https://img.shields.io/badge/windows-10%2F11%20x64-blue)
 
 Основа — публичный репозиторий [`aurora-proxy`](https://github.com/efremov-aa/aurora-proxy)
