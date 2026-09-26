@@ -28,13 +28,13 @@
 
 ## 📥 Загрузка
 
-Архивы, установщик и список изменений — в [Release v1.9.4 «Кот-глашатай»](https://github.com/efremov-aa/aurora-proxy/releases).
+Архивы, установщик и список изменений — в [Release v1.9.4 «Кот-привратник»](https://github.com/efremov-aa/aurora-proxy/releases).
 
 | Ассет | Что внутри |
 |---|---|
 | `Aurora-v1.9.4-linux.zip` | Linux-версия: модули, `ui/`, `proxy/`, `Dockerfile`, `docker-compose.yml`, systemd-юниты |
 | `Aurora-v1.9.4-windows.zip` | Windows-версия (папка `windows/`): те же модули + `bin/`, `nssm/`, `installer/`, `download_xray.ps1` |
-| `Aurora-Setup-1.9.3.exe` 🪟 | **Установщик для Windows**: ставит Aurora как службу **NSSM «Aurora»**, xray и TG-WS внутри, авто-обновление |
+| `Aurora-Setup-1.9.4.exe` 🪟 | **Установщик для Windows**: ставит Aurora как службу **NSSM «Aurora»**, xray и TG-WS внутри, авто-обновление |
 | `*.sig` | Подпись Ed25519 каждого ассета — авто-обновление откажется принимать неподписанный файл 🐾 |
 
 Проверено: подпись релизов валидна end-to-end (Ed25519, fingerprint `ca4f87c9999e0282…`), скачанный
@@ -161,8 +161,10 @@ docker compose up -d --build
 
 ### Вариант 3 — Windows 🪟
 
-Скачайте `Aurora-Setup-1.9.3.exe` и запустите: ставится служба **NSSM «Aurora»** (автозапуск,
-авто-рестарт, логи в `%LOCALAPPDATA%\Aurora\service.log`). Альтернатива — ручная установка из
+Скачайте `Aurora-Setup-1.9.4.exe` и запустите: ставится служба **NSSM «Aurora»** (автозапуск,
+авто-рестарт, логи в `%LOCALAPPDATA%\Aurora\service.log`). Данные службы тоже лежат в
+`%LOCALAPPDATA%\Aurora` (`xray.json`, `keys.json`, `settings.json`, логи) — обновление «поверх»
+и удаление работают штатно. Альтернатива — ручная установка из
 `windows/README-windows.md` (`nssm\install_service.bat`, `download_xray.ps1`).
 
 При первом запуске мастер спрашивает язык/тему, имя сервера, пароль админа, PIN 2FA и — по желанию —
@@ -174,7 +176,7 @@ docker compose up -d --build
 |---|---|---|
 | `AURORA_HOST` | `127.0.0.1` | адрес/домен сервера для внешних ссылок (VLESS, `tg://proxy`) |
 | `AURORA_WHITE_IP` | пусто | «белый» IP провайдера — фильтр, не засчитывается как выход VPN |
-| `AURORA_DATA_DIR` | `<base>/data` | каталог данных |
+| `AURORA_DATA_DIR` | `<base>/data`, а для установщика 🪟 — `%LOCALAPPDATA%\Aurora` | каталог данных |
 | `AURORA_UI_PORT` | `8890` | порт веб-панели |
 | `AURORA_XRAY_PORT` | `8899` | mixed-вход xray (http+socks) |
 | `AURORA_XRAY_API_PORT` | `8897` | докодемо-API xray (статистика трафика) |
@@ -287,10 +289,13 @@ A-164: сам пакет расширения (ZIP) хранит и раздаё
 
 ## 📝 Замечания и известные проблемы
 
-- 🪟 **Windows 1.9.3: каталог данных.** NSSM-переменная `AppEnvironmentExtra` не доходит до
-  frozen-процесса, поэтому установщик 1.9.3 пишет данные в `Aurora\_internal\data` вместо
-  `%LOCALAPPDATA%\Aurora`. Это ломает обновление «поверх» и удаление (ошибка 145). Исправление —
-  кандидат в **1.9.4**; до него при обновлении переносите каталог данных вручную.
+- 🪟 **Каталог данных установщика (1.9.4).** NSSM-переменная `AppEnvironmentExtra` не доходит до
+  frozen-процесса, поэтому установщик **1.9.3** писал данные в `Aurora\_internal\data` вместо
+  `%LOCALAPPDATA%\Aurora` — это ломало обновление «поверх» и удаление (ошибка 145). В **1.9.4**
+  исправлено в самой сборке: при установленном приложении каталог данных по умолчанию —
+  `%LOCALAPPDATA%\Aurora`. Проверено на живой установке: файлы лежат в `%LOCALAPPDATA%\Aurora`,
+  в `_internal` ничего не пишется. Если у вас стоял 1.9.3 — перенесите старый каталог
+  `Aurora\_internal\data` в `%LOCALAPPDATA%\Aurora` один раз руками.
 - 🌐 **Egress проверяется только по HTTP**: HTTPS-проба через прокси даёт ложный SSL EOF.
   Факт: `curl --proxy http://127.0.0.1:8899 http://api.ipify.org`.
 - 🔁 **Источники ключей статичны**: список `barry-far` обновляется редко, при каждом refresh

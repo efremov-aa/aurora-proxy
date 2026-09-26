@@ -148,17 +148,20 @@ UPDATE_CHECK_INTERVAL = 15 * 60  # проверка признаков обно�
 
 # --- пути (относительно корня проекта) ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.environ.get("AURORA_DATA_DIR", os.path.join(BASE_DIR, "data"))
-XRAY_CONFIG = os.path.join(BASE_DIR, "xray.json")
-LOG_FILE = os.path.join(BASE_DIR, "aurora.log")
+_FROZEN = getattr(sys, "frozen", False)
+if _FROZEN and not os.environ.get("AURORA_DATA_DIR"):
+    # У frozen-сборки BASE_DIR указывает на _internal (read-only в Program Files),
+    # поэтому данные кладём в %LOCALAPPDATA%\Aurora: иначе обновление поверх
+    # установки и деинсталляция падают с ошибкой 145.
+    _DEFAULT_DATA_DIR = os.path.join(
+        os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "Aurora")
+else:
+    _DEFAULT_DATA_DIR = os.path.join(BASE_DIR, "data")
+DATA_DIR = os.environ.get("AURORA_DATA_DIR") or _DEFAULT_DATA_DIR
+XRAY_CONFIG = os.path.join(DATA_DIR if _FROZEN else BASE_DIR, "xray.json")
+LOG_FILE = os.path.join(DATA_DIR if _FROZEN else BASE_DIR, "aurora.log")
 
 os.makedirs(DATA_DIR, exist_ok=True)
-
-if getattr(sys, "frozen", False):
-    # в frozen-бандле BASE_DIR указывает на _internal (read-only при Program Files) —
-    # журнал и xray.json переносим в каталог данных пользователя (AURORA_DATA_DIR)
-    XRAY_CONFIG = os.path.join(DATA_DIR, "xray.json")
-    LOG_FILE = os.path.join(DATA_DIR, "aurora.log")
 
 # --- подписки (продаваемые VLESS-ключи клиентам) ---
 SUBS_FILE = os.path.join(DATA_DIR, "subs.json")
