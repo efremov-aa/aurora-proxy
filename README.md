@@ -116,7 +116,7 @@ aurora/
 ├── ui.py             # отдача static-файлов панели
 ├── ui/               # index.html, app.js, style.css, qr.js (локальный QR)
 ├── proxy/            # исходники TG-WS-прокси (Python): tg_ws_proxy.py, bridge.py, balancer.py, ...
-tests/            # регрессионные harness-и (test_*.py) - только локально,
+tests/            # регрессионные harness-и (test_*.py) - только локально, в репозитории папки нет
                   # в репозитории папки нет (решение владельца), гоняются
                   # скриптом-обвязкой _github\run_local_tests.py
 ├── EXTENSION.md      # описание браузерного расширения MV3 + контракт /api/ext/config
@@ -273,6 +273,8 @@ node --check ui/app.js && node --check ui/qr.js
 `{proxy:{host,port}, mode, ru_bypass, blocked, plan, expires, used, limit, buy_url,
 rules_version}`; при истёкшей подписке — 403/410/429 с текстом «купить» и ссылкой
 на бота. Полное описание фич и контракта — в [`EXTENSION.md`](EXTENSION.md).
+
+A-164: сам пакет расширения (ZIP) хранит и раздаёт **только головной сервер** — в публичной сборке пакетов нет, и в репозитории их тоже нет. `GET /api/ext/download?target=chrome|edge` отдаёт архив только когда файл реально лежит на сервере (список `packages` в `GET /api/ext/license`), а пока пакетов нет — панель честно пишет «Пакет выдаёт головной сервер 🐾». Скачать расширение можно на своём Aurora у мастера или в Telegram-боте.
 
 ## 🛡 Безопасность и приватность
 
