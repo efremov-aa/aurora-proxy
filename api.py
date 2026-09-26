@@ -15,6 +15,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import config
 import crypt
+import extgate
 import core
 import mesh
 import pool
@@ -268,6 +269,10 @@ def _twofa_ok(self):
     """2FA-пин: если включён, POST-запросы требуют X-2FA."""
     if not config.get("twofa", False):
         return True
+    # Владелец в своей LAN-сети: доступ к панели уже выдан по lan_only,
+    # поэтому 2FA-пин поверх не спрашиваем — иначе кнопки недоступны вовсе.
+    if config.get("lan_only", False) and _host_in_lan(self.client_address[0]):
+        return True
     pin = config.get("ui_pin", "")
     return bool(pin) and self.headers.get("X-2FA", "") == pin
 
@@ -447,6 +452,12 @@ def _subs_safe(s, masked=False, include_secrets=False):
             "created": 0 if masked else k.get("created", 0),
             "remark": "" if masked else k.get("remark", ""),
         })
+    dev_limit = 0
+    try:
+        dev_limit = int(s.get("limit_devices", 0) or 0)
+    except (TypeError, ValueError):
+        dev_limit = 0
+    dev_count = len([k for k in keys if not k["revoked"]])
     return {
         "uid": uid if include_secrets else ((uid[:8] + "\u2026") if uid else ""),
         "name": "" if masked else s.get("name", ""),
@@ -471,6 +482,9 @@ def _subs_safe(s, masked=False, include_secrets=False):
         "blocked_until": 0 if masked else s.get("blocked_until", 0),
         "block_reason": "" if masked else s.get("block_reason", ""),
         "keys": keys,
+        "devices": dev_count,
+        "devices_limit": dev_limit,
+        "key_count": len(keys),
         "sub_url": "",
         "credential_required": False,
     }
@@ -495,6 +509,11 @@ def _subs_list(include_secrets=False):
         "subs": out,
         "plans": config.SUBS_PLANS,
         "default": config.SUBS_PLAN_DEFAULT,
+        # A-106: витрина «Дополнительные возможности Aurora» рисуется из
+        # ответа списка подписок, поэтому extras и buy_url нужны и здесь.
+        "extras": getattr(config, "SUBS_EXTRAS", {}) or {},
+        "buy_url": config.BUY_URL,
+            "extras_source": config.extras_source(),
         "masked": masked,
         "vless_params": params,
     }
@@ -735,6 +754,12 @@ def build_state(local=True):
     st["mesh_master"] = False
     st["setup_complete"] = bool(config.get("setup_complete", False))
     st["setup_token_required"] = bool(config.SETUP_TOKEN)
+    # A-111: лицензия PRO-функций приходит с головного сервера; адрес мастера
+    # наружу не отдаём (внутренний IP), остальное нужно панели и гейту.
+    ext = extgate.state()
+    if not local:
+        ext["master"] = ""
+    st["ext"] = ext
     if not local:
         v = dict(st["vless_ext"])
         for sec in ("link", "uuid", "pbk", "sid", "host", "port", "sni", "fp"):
@@ -813,11 +838,35 @@ def _redact_log_line(value):
     return re.sub(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", "<ip>", text)
 
 
+# Оплата и подписки — админ-функция ГОЛОВНОГО сервера. В сборке с GitHub
+# головным быть нельзя (mesh_master жёстко False), поэтому клиент не может
+# записать оплату или выдать себе тариф — только купить в боте.
+SUBS_ADMIN_POSTS = frozenset({
+    "/api/subs/purchase", "/api/subs/apply", "/api/subs/create",
+    "/api/subs/update", "/api/subs/delete", "/api/subs/add_key",
+    "/api/subs/remove_key", "/api/plans/save",
+})
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "Aurora/1.0"
 
     def log_message(self, *a):
         pass
+
+    def _send_binary(self, status, ctype, body, filename):
+        """A-161: отдача файла (архив расширения) с Content-Disposition."""
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Content-Disposition", 'attachment; filename="%s"' % filename)
+            self.send_header("Cache-Control", "no-store")
+            for _name, _value in _security_headers():
+                self.send_header(_name, _value)
+            self.end_headers()
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            return
 
     def _send(self, status, ctype, body):
         try:
@@ -942,6 +991,44 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/recovery/log":
             self._send(*_json(recovery.status()))
             return
+        if path == "/api/ext/download":
+            # A-161: архив браузерного расширения - по подписке (триал или PRO).
+            # Прокси при этом не падает: без подписки отдаём честный экран
+            # с buy_url, его дальше рисует панель.
+            _target = ""
+            _qs = self.path.split("?", 1)[1] if "?" in self.path else ""
+            for _pair in _qs.split("&"):
+                if _pair.startswith("target="):
+                    try:
+                        _target = urllib.parse.unquote(_pair[7:]).strip().lower()
+                    except Exception:
+                        _target = ""
+            _denied = extgate.require("extension")
+            if _denied is not None:
+                self._send(*_json(_denied, 403))
+                return
+            _name = (getattr(config, "EXT_PACKAGES", {}) or {}).get(_target, "")
+            if not _name:
+                self._send(*_json({"ok": False, "error": "ext: неизвестная сборка расширения"}, 400))
+                return
+            _path = os.path.join(getattr(config, "EXT_ASSETS_DIR", ""), os.path.basename(_name))
+            try:
+                with open(_path, "rb") as _fh:
+                    _body = _fh.read(16 * 1024 * 1024 + 1)
+            except OSError:
+                self._send(*_json({"ok": False, "error": "ext: архив расширения не найден"}, 404))
+                return
+            if len(_body) > 16 * 1024 * 1024:
+                self._send(*_json({"ok": False, "error": "ext: архив слишком большой"}, 400))
+                return
+            self._send_binary(200, "application/zip", _body, _name)
+            return
+
+        if path == "/api/ext/license":
+            # A-111: снимок лицензии (план/PRO/до купки) - панель спрашивает
+            # на старте и раз в час, гейт берёт решение на сервере.
+            self._send(*_json(extgate.state()))
+            return
         if path == "/api/tgws/status":
             status = tgws.status(include_secret=trusted)
             if not trusted:
@@ -960,7 +1047,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/versions":
             # история версий для вкладки «Версии»: без дублей, с описанием
             self._send(*_json({"ok": True, "versions": _versions_list(),
-                               "current": config.VERSION}))
+                               "current": config.VERSION,
+                               "chronicle": getattr(config, "VERSION_CHRONICLE", {}) or {}}))
             return
         if path == "/api/subs/list":
             self._send(*_json(_subs_list(include_secrets=trusted)))
@@ -981,7 +1069,9 @@ class Handler(BaseHTTPRequestHandler):
             self._send(*_json(_stats(include_secrets=trusted)))
             return
         if path == "/api/mesh":
-            nodes = mesh.all_nodes()
+            # A-101: показываем честную живость узла (пинг порта прокси,
+            # при неудаче - порта панели), иначе все узлы выглядят мертвыми.
+            nodes = [_node_alive(n) for n in mesh.all_nodes()]
             if not trusted:
                 nodes = [dict(n) for n in nodes if isinstance(n, dict)]
                 for node in nodes:
@@ -992,7 +1082,8 @@ class Handler(BaseHTTPRequestHandler):
                                "count": mesh.node_count()}))
             return
         if path == "/api/nodes":
-            nodes = mesh.ping_all()
+            # A-101: ping_all отдаёт ok/ping_ms, добавляем status/ping_port.
+            nodes = [_node_alive(n) for n in mesh.ping_all()]
             if not trusted:
                 nodes = [{k: v for k, v in node.items()
                           if k not in ("ip", "host", "port", "address", "secret", "invite")}
@@ -1080,6 +1171,14 @@ class Handler(BaseHTTPRequestHandler):
             self._send(*_json({"ok": False, "error": "subs: закрыто до команды мастера"}, 403))
             return
 
+        # Оплата и подписки — только головной сервер (см. SUBS_ADMIN_POSTS).
+        if path in SUBS_ADMIN_POSTS and not config.get("mesh_master", False):
+            self._send(*_json({"ok": False, "error": "subs: оплату и "
+                                                    "подписки ведёт "
+                                                    "головной "
+                                                    "сервер"}, 403))
+            return
+
         handler = {
             "/api/vpn_mode": self._vpn_mode,
             "/api/rotate": self._rotate,
@@ -1110,6 +1209,7 @@ class Handler(BaseHTTPRequestHandler):
             "/api/subs/remove_key": self._subs_remove_key,
             "/api/subs/apply": self._subs_apply,
             "/api/subs/purchase": self._subs_purchase,
+            "/api/subs/device/instructions": self._subs_device_instructions,
             "/api/plans/save": self._plans_save,
             "/api/settings/save": self._settings_save,
             "/api/setup/complete": self._setup_complete,
@@ -1597,6 +1697,43 @@ class Handler(BaseHTTPRequestHandler):
         self._subs_apply_clients_bg()
         self._send(*_json({"ok": True, "removed": kid or True}))
 
+    def _subs_device_instructions(self, data):
+        """A-110: инструкция подключения ключа (устройство = купленный ключ).
+
+        Клиент знает только маскированный uid/key_handle, поэтому ищем подписку
+        по handle, а если он не пришёл - берём единственную с ключами.
+        """
+        key_handle = str(data.get("key_handle", "") or data.get("key_id", "") or "").strip()
+        uid = str(data.get("uid", "") or "").strip()
+        platform = str(data.get("platform", "") or "").strip()
+        rows = [s for s in subs.all() if isinstance(s, dict)]
+        target = None
+        for s in rows:
+            if uid and str(s.get("uid", "")) == uid:
+                target = s
+                break
+            if key_handle:
+                for k in s.get("keys") or []:
+                    if not isinstance(k, dict):
+                        continue
+                    if _key_handle(s.get("uid", ""), k.get("id", "")) == key_handle:
+                        target = s
+                        break
+            if target is not None:
+                break
+        if target is None and not uid and not key_handle:
+            for s in rows:
+                if s.get("keys"):
+                    target = s
+                    break
+        if target is None:
+            self._send(*_json({"ok": False, "error": "subscription not found"}, 404))
+            return
+        info = subs.device_instructions(target, platform=platform,
+                                        key_id=str(data.get("key_id", "") or "").strip())
+        info["buy_url"] = config.BUY_URL
+        self._send(*_json(info))
+
     def _subs_apply(self, data):
         ok, msg = core.apply_sub_clients()
         self._send(*_json({"ok": bool(ok), "pending": not ok, "msg": msg},
@@ -1911,6 +2048,47 @@ def _stats(include_secrets=True):
         "payments": (snapshot.get("payments", []) or [])
         if include_secrets else [],
     }
+
+
+def _node_alive(node, timeout=2.0):
+    """A-101: живость узла для панели.
+
+    Пингуем порт прокси, а если он не отвечает - порт панели узла
+    (в узлах часто указан именно порт панели, а не прокси).
+    Возвращает копию узла с полями ok/ping_ms/status/ping_port/reason.
+    """
+    if not isinstance(node, dict):
+        return {"id": "", "name": "-", "region": "", "role": "node",
+                "ok": False, "ping_ms": 0, "status": "off", "ping_port": 0,
+                "reason": "bad-node"}
+    host = str(node.get("host") or "").strip()
+    ports = []
+    for key in ("port", "policy_port"):
+        try:
+            port = int(node.get(key) or 0)
+        except (TypeError, ValueError):
+            port = 0
+        if 1 <= port <= 65535 and port not in ports:
+            ports.append(port)
+    ok = False
+    ms = 0
+    used = 0
+    for port in ports:
+        try:
+            ok, ms = mesh.ping(host, port, timeout)
+        except Exception:
+            ok, ms = False, 0
+        if ok:
+            used = port
+            break
+    out = dict(node)
+    out["ok"] = bool(ok)
+    out["ping_ms"] = int(ms) if ok else 0
+    out["status"] = ("online" if ms <= 500 else "warn") if ok else "off"
+    out["ping_port"] = used
+    if not ok:
+        out["reason"] = "timeout" if ports else "no-port"
+    return out
 
 
 def _routes():

@@ -2,10 +2,13 @@
 
 import os
 import signal
+import os
 import threading
 
 import config
 import core
+import extgate
+import meshtunnel
 import mesh
 import pool
 import rusegment
@@ -35,6 +38,19 @@ def _boot():
     subs.load()  # подписки — до сборки конфига (клиенты vless-in)
     mesh.start_policy_loop()
     subs.start_background()
+    extgate.start_background()  # A-111: лицензия PRO (прокси не падает при сети)
+
+    extgate.start_background()  # A-111: лицензия PRO (прокси не падает при сети)
+    # A-151: релей-туннель меш-сети. По умолчанию выключен (config.mesh_tunnel),
+    # роль - из env AURORA_MESH_ROLE. Ошибки не роняют запуск: туннель - это канал,
+    # а не условие жизни прокси.
+    if config.get("mesh_tunnel", False):
+        try:
+            import meshtunnel
+            if meshtunnel.start(os.environ.get("AURORA_MESH_ROLE", "")):
+                config.log("mesh: relay-туннель запущен")
+        except Exception as e:
+            config.log("mesh: relay-туннель не запущен: %s" % type(e).__name__)
     pool.cleanup()  # убрать мёртвые github-ключи при старте
     config.log("Aurora v%s boot" % config.VERSION)
 

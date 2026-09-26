@@ -31,6 +31,7 @@ _MODULES = [
     "config.py", "pool.py", "source.py", "core.py", "telemetry.py",
     "tgws.py", "recovery.py", "rusegment.py", "api.py", "ui.py", "run.py",
     "updater.py", "security.py", "subs.py", "mesh.py", "crypt.py", "release_sign.py",
+    "extgate.py", "meshtunnel.py",   # A-151: гейт лицензии и меш-релей
     "proxy/__init__.py", "proxy/_aes.py", "proxy/balancer.py", "proxy/bridge.py",
     "proxy/config.py", "proxy/fake_tls.py", "proxy/pool.py", "proxy/raw_websocket.py",
     "proxy/stats.py", "proxy/tg_ws_proxy.py", "proxy/utils.py",

@@ -6,27 +6,31 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 EXPECTED_ACTS = {
+    "ext-buy",
     "nav", "toast", "lang", "key-activate", "plan-buy", "policy-open",
     "policy-accept", "update-start", "update-save", "update-check",
     "key-add", "key-clean", "cx-copy", "regions-save", "ru-check",
     "ru-toggle-fail", "tgws-restart", "mesh-join", "mesh-leave",
     "mesh-regen", "mesh-refresh", "mesh-policy-save", "settings-save",
     "invite-copy", "sec-login", "sec-logout", "sec-2fa-on", "sec-2fa-off",
-    "sec-rotate", "log-load", "feature-buy", "subs-pay", "tg-copy",
+    "sec-rotate", "log-load", "feature-buy", "tg-copy",
+    "sub-how", "sub-copy", "ext-download",
 }
 
 HTML_ACTIONS = {
+    "ext-buy",
     "nav", "toast", "lang", "plan-buy", "policy-open", "policy-accept",
     "update-start", "update-save", "update-check", "key-add", "key-clean",
     "cx-copy", "regions-save", "ru-check", "ru-toggle-fail", "tgws-restart",
     "mesh-join", "mesh-leave", "mesh-regen", "mesh-refresh",
     "mesh-policy-save", "settings-save", "invite-copy", "sec-login",
     "sec-logout", "sec-2fa-on", "sec-2fa-off", "sec-rotate", "log-load",
-    "subs-pay", "tg-copy",
+    "tg-copy",
 }
 
 # key-activate и feature-buy рисуются самим app.js, в разметке их нет
-DYNAMIC_ACTIONS = {"key-activate", "plan-buy", "nav", "feature-buy"}
+DYNAMIC_ACTIONS = {"key-activate", "plan-buy", "nav", "feature-buy",
+                     "sub-how", "sub-copy", "ext-download"}
 
 CSP_REQUIRED = (
     "default-src 'self'",
@@ -72,7 +76,9 @@ def html_contract(path):
     assert all(re.search(r'src\s*=\s*"/(qr|app)\.js"', tag) for tag in scripts), (path, scripts)
     acts = set(re.findall(r'data-act="([^"]+)"', text))
     assert acts == HTML_ACTIONS, (path, sorted(acts ^ HTML_ACTIONS))
-    assert EXPECTED_ACTS - HTML_ACTIONS == {"key-activate", "feature-buy"}, path
+    assert EXPECTED_ACTS - HTML_ACTIONS == {"key-activate", "feature-buy",
+                                        "sub-how", "sub-copy",
+                                        "ext-download"}, path
     for tab in ("update", "mesh-topo", "mesh-routes", "shop-plans",
                 "shop-features", "keys", "logs", "rusegment"):
         assert 'data-act="nav" data-tab="%s"' % tab in text, (path, tab)
@@ -163,7 +169,9 @@ def api_contract(path):
     assert '("X-Frame-Options", "DENY")' in headers, path
     assert '("Referrer-Policy", "no-referrer")' in headers, path
     assert '("Content-Security-Policy", _CSP)' in headers, path
-    assert text.count("for _name, _value in _security_headers():") == 2, path
+    # A-161: +1 - проход security-заголовков в _send_binary (отдача архива
+    # расширения). Итого: определение _security_headers + _send + _send_binary.
+    assert text.count("for _name, _value in _security_headers():") == 3, path
     send = region(text, "def _send(self", "def do_GET(self)")
     assert "for _name, _value in _security_headers():" in send, path
     assert "Cache-Control" in send, path

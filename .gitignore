@@ -25,3 +25,8 @@ store.json
 perm-target.json
 perm-dir/
 *.perm-*.json
+
+# А-161: архивы браузерного расширения (PRO-фича) - их раздаёт панель.
+assets/
+!assets/
+!assets/aurora-extension-*.zip

@@ -1072,6 +1072,97 @@ def build_client_list():
     return out
 
 
+# --- A-110: инструкция подключения ключа (устройство = купленный ключ) --------
+# happ://crypt5/... НЕ генерируем: это зашифрованный payload приложения Happ.
+# Отдаем ссылку-подписку - Happ сам забирает ключи при первом запуске.
+_HOW_APPS = {
+    "iphone": {"app": "Happ", "store": "App Store", "mobile": True},
+    "android": {"app": "Happ", "store": "Google Play", "mobile": True},
+    "pc": {"app": "v2rayN / Nekoray / любой VLESS-клиент", "store": "", "mobile": False},
+    "router": {"app": "v2rayN или роутер с поддержкой VLESS", "store": "", "mobile": False},
+}
+_HOW_ALIASES = {
+    "iphone": "iphone", "ios": "iphone", "ipad": "iphone", "apple": "iphone",
+    "android": "android", "apk": "android", "google": "android", "droid": "android",
+    "pc": "pc", "windows": "pc", "win": "pc", "mac": "pc", "macos": "pc",
+    "linux": "pc", "desktop": "pc", "computer": "pc", "pcwin": "pc",
+    "router": "router", "keenetic": "router", "wifi": "router",
+}
+
+
+def normalize_platform(value):
+    """Название платформы -> канон: iphone / android / pc / router."""
+    key = _clean_id(value).lower()
+    return _HOW_ALIASES.get(key, "pc")
+
+
+def device_instructions(sub, platform="", key_id=""):
+    """Инструкция подключения ключа под платформу (устройство = ключ) 🐾."""
+    if not isinstance(sub, dict):
+        return {"ok": False, "error": "subscription not found"}
+    plat = normalize_platform(platform)
+    info = _HOW_APPS.get(plat, _HOW_APPS["pc"])
+    revoked = set(str(x) for x in (sub.get("revoked_key_ids") or []))
+    want = str(key_id or "").strip()
+    kid = ""
+    for k in sub.get("keys") or []:
+        if not isinstance(k, dict):
+            continue
+        cur = str(k.get("id", ""))
+        if not cur or cur in revoked:
+            continue
+        if want and cur != want:
+            continue
+        kid = cur
+        break
+    pname = (plan_info(sub.get("plan")) or {}).get("name") or sub.get("plan") or ""
+    link = vless_link(kid, remark=sub.get("name") or pname) if kid else ""
+    sub_link = public_link(sub)
+    used = _int(sub.get("used_bytes"), 0)
+    limit = _int(sub.get("limit_bytes"), 0)
+    traffic = "безлимит" if limit <= 0 else ("%d / %d байт" % (used, limit))
+    lines = ["🐾 Aurora %s - подключение ключа" % (pname or "тариф")]
+    lines.append("Ключ: %s" % (_mask(kid)))
+    lines.append("Трафик: %s" % traffic)
+    lines.append("")
+    if info["mobile"]:
+        lines.append("1) Установите %s из %s." % (info["app"], info["store"]))
+        if sub_link:
+            lines.append("2) Вставьте ссылку подписки в приложение:")
+            lines.append("   %s" % sub_link)
+        else:
+            lines.append("2) Ссылка подписки недоступна - напишите мастеру.")
+        lines.append("3) Нажмите «Подключиться в 1 клик» - ключ подтянется сам.")
+        lines.append("Ссылку happ://crypt5/... вручную не вставляем - это внутренний "
+                     "формат приложения, его выдаёт сам Happ.")
+    else:
+        lines.append("1) Скопируйте ссылку ключа:")
+        lines.append("   %s" % (link or "ключ не найден - напишите мастеру"))
+        lines.append("2) Вставьте в %s (Импорт из буфера) или отсканируйте QR."
+                     % info["app"])
+        lines.append("3) Параметры оставьте как в ссылке: Reality, "
+                     "xtls-rprx-vision, домен и порт.")
+    if kid and not link:
+        lines.append("")
+        lines.append("Ссылка на ключ включится, когда мастер откроет внешний вход "
+                     "(VLESS Reality). Пока смотрите ключ в панели.")
+    lines.append("")
+    lines.append("Если что-то не подключается - напишите мастеру, он проверит ключ.")
+    return {
+        "ok": bool(kid or link or sub_link),
+        "link_ready": bool(link),
+        "platform": plat,
+        "app": info["app"],
+        "store": info["store"],
+        "mobile": bool(info["mobile"]),
+        "key_masked": _mask(kid),
+        "sub_url": sub_link,
+        "vless": link,
+        "qr": link or sub_link,
+        "text": "\n".join(lines),
+    }
+
+
 def _mask(u):
     """Маскирует uuid для отображения (сохранив визуальный контроль)."""
     if not u:

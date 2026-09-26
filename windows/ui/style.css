@@ -640,3 +640,34 @@ select{cursor:pointer;appearance:none;padding-right:32px;
     grid-template-columns: 1fr;
   }
 }
+
+/* Пока язык не применён (первая отрисовка после F5) — подписи в сайдбаре и
+   заголовок вкладки скрыты, иначе мигает сырое название («Функции»).
+   Если скрипты недоступны (scripting: none) — подписи видны сразу. */
+body.pre-lang #nav .lb,
+body.pre-lang #tb-name {
+  opacity: 0;
+}
+@media (scripting: none) {
+  body.pre-lang #nav .lb,
+  body.pre-lang #tb-name {
+    opacity: 1;
+  }
+}
+
+/* Хроники кота-маскота — заголовок истории версий */
+.chron{padding:14px 18px 10px;border-bottom:1px dashed var(--line);margin-bottom:4px}
+.chron h3{margin:0 0 4px;font-size:15px}
+.chron p{margin:0;color:var(--muted);font-size:12.5px;line-height:1.5}
+
+/* A-100: QR рисуется как SVG (qr.js = qrcode-generator, createSvgTag) */
+.qr-box svg{width:150px;height:150px;display:block;margin:0 auto}
+
+/* A-111: честный экран PRO-гейта */
+.ext-card{display:flex;gap:12px;align-items:flex-start;padding:12px;margin-bottom:12px;
+  border:1px solid var(--line);border-radius:12px}
+.ext-card .f-ic.dim{opacity:.7}
+
+/* A-112: PRO-фичи не прячем - помечаем: видно прайс и кнопку «Купить» */
+.pro-tag{display:inline-block;margin-top:8px;padding:2px 8px;border-radius:999px;font-size:11px;background:rgba(255,183,77,.15);color:#ffb74d;border:1px solid rgba(255,183,77,.35)}
+.feature.pro-lock .f-price{opacity:.75}

@@ -37,28 +37,42 @@ VERSION_HISTORY = (
 
 # Описания версий для вкладки «Версии» (v -> текст). Показываются в панели.
 VERSION_NOTES = {
-    "1.9.3": "Магазин тарифов, оплата и продление в Telegram-боте, контракт конфигурации для "
-             "расширения браузера MV3/DNR, состав тарифов и доп. возможности в панели.",
-    "1.9.2": "Починено авто-обновление: байтовый публичный ключ подписи, base64 .sig и замена "
-             "файлов между разными дисками (EXDEV). Добавлен установщик Aurora-Setup для Windows.",
-    "1.9.1": "Крепость: подпись релизов Ed25519, шифрование хранилища AURORA2 (ChaCha20-Poly1305), "
-             "подписанный mesh-invite, read-scope проекции, owner-only права, CSP без inline-JS, "
-             "мастер первого запуска.",
-    "1.9.0": "Правозащитник: пункт политики о сотрудничестве с правооёзными органами, bit-torrent "
-             "всегда напрямую, вкладки «Меш» и «Магазин» закрыты до команды главного сервера.",
-    "1.8.0": "Именитый: автоимя и автовступление в меш, тестовый узел, видимость вкладок "
-             "«Меш» и «Магазин» с головного сервера.",
-    "1.7.0": "Дипломат: политика первой страницей с версионностью, шифрование секретов, "
-             "раздел «Защита», ру-сегмент и регионы.",
-    "1.6.0": "Банкир: меш-сеть и магазин тарифов, статистика, топология, маршруты, безопасность.",
-    "1.5.0": "Кот в мешке: подписки с оплатой и продлением, счётчик трафика, лимиты и устройства.",
-    "1.4.0": "Подписки: тарифы free/basic/prem, маскирование ключей, внешний VLESS Reality.",
-    "1.3.1": "Мур-апдейт: обязательное авто-обновление с GitHub Releases (linux/windows).",
-    "1.3.0": "Mesh: tg-ws на :443, раздел безопасности, авто-обновление, подписи версий.",
-    "1.2.0": "Windows-fix: tgws по внутреннему IP, авто-генерация VLESS, локальный QR, "
-             "авто-heal порта, порты из переменных окружения и правила брандмауэра.",
-    "1.1.0": "Свежая рыба: пре-фильтр ключей Reality, лимит 120 ключей, честный egress IP.",
+    "1.9.3": "Глашатай выходит на площадь: тарифы, оплата и продление теперь прямо в Telegram-боте. Браузерное "
+                                  "расширение стало дружелюбнее, а в панели — понятный состав тарифов и дополнительных возможностей.",
+    "1.9.2": "Починщик подлатал авто-обновление: теперь оно аккуратнее переносит файлы и не спотыкается на разных "
+                                  "дисках. Для Windows появился установщик Aurora-Setup — быстрый старт без лишних движений.",
+    "1.9.1": "Крепость укрепила стены: релизы и хранилище под надёжной защитой, приглашения в сеть — безопаснее, "
+                                  "права доступа — строже. Первый запуск стал понятным мастером, а интерфейс — чище и спокойнее.",
+    "1.9.0": "Правозащитник обновил политику и правила. Некоторые разделы теперь открываются только после команды "
+                                  "головного сервера — так в сети больше порядок.",
+    "1.8.0": "Именитый сам выбирает имя и вступает в сеть. Появился тестовый узел, а вкладки «Меш» и «Магазин» "
+                                  "стали видны с головного сервера.",
+    "1.7.0": "Дипломат вынес политику на первую страницу с историей версий, спрятал секреты под замкок и добавил "
+                                  "раздел «Защита». Русский сегмент и регионы — под рукой.",
+    "1.6.0": "Банкир построил меш-сеть и магазин тарифов: статистика, топология, маршруты, безопасность — всё в "
+                                  "одном месте.",
+    "1.5.0": "Кот в мешке принёс подписки с оплатой и продлением, счётчик трафика, лимиты и управление "
+                                  "устройствами.",
+    "1.4.0": "Появились тарифы free/basic/prem, маскирование ключей и внешний защищённый профиль.",
+    "1.3.1": "Мур-апдейт сделал авто-обновление обязательным и заботливым: Linux и Windows получают свежие версии "
+                                  "сами.",
+    "1.3.0": "Mesh принёс защищённое подключение, раздел безопасности, авто-обновление и проверку версий.",
+    "1.2.0": "Windows-fix навёл порядок: подключение по внутреннему IP, авто-генерация профиля, локальный QR, "
+                                  "авто-восстановление порта, настройки через переменные окружения и правила брандмауэра.",
+    "1.1.0": "Свежая рыба улучшила умный фильтр ключей, добавила лимит в 120 ключей и честный исходящий IP."
 }
+
+# Заголовок вкладки «Версии» — в стиле маскота (общий для всех языков).
+VERSION_CHRONICLE = {
+    "title": "🐾 Хроники "
+             "кота-маскота Aurora",
+    "sub": "Каждый релиз — "
+           "новая глава: "
+           "кот взрослеет, "
+           "учится, охраняет "
+           "и приносит подарки.",
+}
+
 
 # --- политика сервиса (GitHub-сборки: первая страница — правила) ---
 # POLICY_REV меняется ТОЛЬКО при изменении POLICY_TEXT.
@@ -135,6 +149,7 @@ os.makedirs(DATA_DIR, exist_ok=True)
 # --- подписки (продаваемые VLESS-ключи клиентам) ---
 SUBS_FILE = os.path.join(DATA_DIR, "subs.json")
 SUBS_PLANS_FILE = os.path.join(DATA_DIR, "plans.json")
+SUBS_EXTRAS_FILE = os.path.join(DATA_DIR, "extras.json")
 AUTO_REFRESH_INTERVAL = 1800   # фоновый цикл обновления github-ключей (сек)
 
 SUBS_PLANS = {
@@ -159,20 +174,117 @@ SUBS_MASK_UUID = True  # в UI показывать маскированные u
 
 # --- дополнительные возможности Aurora (витрина «Дополнительные возможности») ---
 # Каталог платных доп. услуг поверх тарифа. Показывается в панели, покупка — в Telegram-боте.
-SUBS_EXTRAS = {
-    "devices": {"name": "Дополнительное устройство", "price": 99, "unit": "за устройство",
-                "note": "Снимает лимит устройств на тарифе — подключайте больше телефонов и ПК"},
-    "traffic": {"name": "Дополнительный трафик", "price": 199, "unit": "за 100 ГБ",
-                "note": "Доливаем к лимиту месяца, когда своего не хватает"},
-    "months": {"name": "Продление на месяц", "price": 299, "unit": "за 30 дней",
-               "note": "Продлевает подписку без смены тарифа"},
-    "vless": {"name": "Внешний VLESS Reality", "price": 399, "unit": "разово",
-              "note": "Личный вход извне на :8443 с маскировкой под обычный сайт"},
-    "mesh": {"name": "Узел меш-сети", "price": 499, "unit": "разово",
-             "note": "Свой узел в общей сети: доступ к ресурсам других участников"},
-    "priority": {"name": "Приоритетная поддержка", "price": 199, "unit": "в месяц",
-                 "note": "Живой чат с мастером, ответ по приоритету 24/7"},
-}
+# A-109: цены и описания витрины задаёт ТОЛЬКО головной сервер.
+# Клиентский дефолт пуст — реальный прайс приходит по меш-политике
+# (mesh._policy_loop) и хранится в data/extras.json.
+SUBS_EXTRAS = {}
+_EXTRAS_SOURCE = "local"
+_EXTRAS_GOOD = {}
+_EXTRAS_LOCK = threading.RLock()
+_EXTRAS_ID_RE = re.compile(r"^[a-z0-9_-]{1,40}$")
+
+
+def extras_source():
+    """Откуда взят текущий прайс витрины: local (заглушка) или master."""
+    return _EXTRAS_SOURCE
+
+
+def _validate_extras(raw):
+    """Строгая проверка каталога витрины: dict позиций, максимум 32 штуки."""
+    if not isinstance(raw, dict):
+        return None
+    out = {}
+    for key, value in list(raw.items())[:32]:
+        if not isinstance(key, str) or not isinstance(value, dict):
+            return None
+        kid = key.strip().lower()
+        if not _EXTRAS_ID_RE.match(kid):
+            return None
+        name = str(value.get("name") or "").strip()
+        if not name or len(name) > 120:
+            return None
+        try:
+            price = int(value.get("price") or 0)
+        except (TypeError, ValueError):
+            return None
+        if price < 0 or price > 1000000:
+            return None
+        out[kid] = {"name": name,
+                    "price": price,
+                    "unit": str(value.get("unit") or "").strip()[:40],
+                    "note": str(value.get("note") or "").strip()[:400]}
+    return out or None
+
+
+def save_extras(extras, buy_url=None):
+    """Принять каталог витрины от головного сервера и сохранить его локально."""
+    global SUBS_EXTRAS, BUY_URL, _EXTRAS_SOURCE, _EXTRAS_GOOD
+    valid = _validate_extras(extras)
+    if valid is None:
+        log("extras: каталог мастера отклонён (неверный формат)")
+        return False
+    with _EXTRAS_LOCK:
+        SUBS_EXTRAS.clear()
+        SUBS_EXTRAS.update(valid)
+        _EXTRAS_GOOD = {k: dict(v) for k, v in valid.items()}
+        _EXTRAS_SOURCE = "master"
+        payload = {"extras": {k: dict(v) for k, v in valid.items()}, "source": "master"}
+        if isinstance(buy_url, str) and buy_url.strip():
+            BUY_URL = buy_url.strip()[:200]
+            payload["buy_url"] = BUY_URL
+        try:
+            import crypt
+            crypt.save_json(SUBS_EXTRAS_FILE, payload)
+        except Exception as exc:
+            log("extras: не удалось сохранить каталог: %s" % exc)
+            return False
+    log("extras: прайс принят от мастера (%d позиций)" % len(SUBS_EXTRAS))
+    return True
+
+
+def load_extras():
+    """Поднять сохранённый прайс мастера из data/extras.json при старте."""
+    global SUBS_EXTRAS, BUY_URL, _EXTRAS_SOURCE, _EXTRAS_GOOD
+    try:
+        import crypt
+        raw = crypt.load_bytes(SUBS_EXTRAS_FILE)
+    except Exception:
+        return False
+    data = None
+    if isinstance(raw, dict):
+        data = raw
+    elif isinstance(raw, (bytes, bytearray)):
+        try:
+            data = json.loads(raw.decode("utf-8"))
+        except Exception:
+            data = None
+    if not isinstance(data, dict):
+        return False
+    source = data.get("extras")
+    valid = _validate_extras(source if isinstance(source, dict) else data)
+    if valid is None:
+        with _EXTRAS_LOCK:
+            SUBS_EXTRAS.clear()
+            SUBS_EXTRAS.update(_EXTRAS_GOOD)
+        return False
+    with _EXTRAS_LOCK:
+        SUBS_EXTRAS.clear()
+        SUBS_EXTRAS.update(valid)
+        _EXTRAS_GOOD = {k: dict(v) for k, v in valid.items()}
+        _EXTRAS_SOURCE = str(data.get("source") or "master")
+        if isinstance(data.get("buy_url"), str) and data["buy_url"].strip():
+            BUY_URL = data["buy_url"].strip()[:200]
+    return True
+
+
+def save_catalog(plans=None, extras=None, buy_url=None):
+    """Принять каталог мастера целиком: тарифы, витрина и ссылка оплаты."""
+    ok = False
+    if isinstance(plans, dict) and plans:
+        ok = bool(save_plans(plans)) or ok
+    if isinstance(extras, dict):
+        ok = bool(save_extras(extras, buy_url)) or ok
+    return ok
 
 # --- порты (привязаны к клиентским устройствам, НЕ менять без запроса) ---
 UI_PORT = int(os.environ.get("AURORA_UI_PORT", "8890"))  # панель Aurora
@@ -186,6 +298,35 @@ RU_BYPASS = os.environ.get("AURORA_RU_BYPASS", "1").strip().lower() not in (
     "0", "false", "no", "off", "нет", "выкл")
 RULES_VERSION = (os.environ.get("AURORA_RULES_VERSION", "1").strip() or "1")[:32]
 EXT_HOST = os.environ.get("AURORA_EXT_HOST", "").strip()
+
+# --- A-111: лицензионный гейт PRO-функций (цены и доступ - у мастера) ---
+def _ext_int_env(name, default):
+    """Целое из окружения, мусор и пусто -> значение по умолчанию."""
+    try:
+        value = int(str(os.environ.get(name, "") or default).strip())
+    except (TypeError, ValueError):
+        return default
+    return value if value > 0 else default
+
+
+EXT_MASTER_URL = os.environ.get("AURORA_EXT_MASTER", "http://10.1.0.238:8890").rstrip("/")
+EXT_TOKEN = os.environ.get("AURORA_EXT_TOKEN", "").strip()          # token из device-ссылки
+EXT_CREDENTIAL = os.environ.get("AURORA_EXT_CREDENTIAL", "").strip()  # credential из device-ссылки
+EXT_CHECK_INTERVAL_S = _ext_int_env("AURORA_EXT_CHECK_INTERVAL", 3600)
+EXT_OFFLINE_MAX_S = _ext_int_env("AURORA_EXT_OFFLINE_MAX_S", 72 * 3600)
+EXT_TIMEOUT = _ext_int_env("AURORA_EXT_TIMEOUT", 10)
+EXT_PRO_PLANS = os.environ.get("AURORA_EXT_PRO_PLANS", "").strip()  # пусто = все, кроме free
+
+# --- A-161: архивы браузерного расширения (PRO-фича) ---
+# Лежат в assets/ рядом с кодом; раздаёт их панель. Имя файла - только из
+# белого списка ниже, путь из запроса никогда не подставляется.
+EXT_ASSETS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+EXT_PACKAGES = {
+    "chrome": "aurora-extension-chrome-0.1.0.zip",
+    "edge": "aurora-extension-edge-0.1.0.zip",
+}
+
+
 
 
 def ext_proxy_host():
@@ -462,6 +603,7 @@ _SETTINGS_DEFAULTS = {
     "auto_recovery": True,   # авто-восстановление канала через агента
     "continue_text": "",     # текст при отправке continue
     "ui_token": "",          # X-Auth-токен панели (пусто = как раньше, секреты видны в LAN)
+    "mesh_tunnel": False,      # A-151: релей-туннель меш (по умолчанию выключен)
     # --- v1.4.0: сервер / меш / безопасность ---
     "server_name": "Home",       # имя сервера (хаб меша)
     "auto_refresh": True,        # автообновление github-ключей фоновым циклом
@@ -1093,4 +1235,25 @@ def state_fields():
 
 
 # Переопределение тарифов из data/plans.json — в конце модуля (после log()).
+
+# --- A-151: релей-туннель между узлами меш (роль/адреса - из env) ---
+# По умолчанию выключен: включается только приказом владельца.
+# Секрет сети (AURORA_MESH_SECRET) в лог/конфиг/панель не попадает.
+def _read_mesh_flag(name):
+    v = (os.environ.get(name, "") or "").strip().lower()
+    return v in ("1", "true", "yes", "on")
+
+
+MESH_TUNNEL_ENV = _read_mesh_flag("AURORA_MESH_TUNNEL")
+MESH_SECRET = (os.environ.get("AURORA_MESH_SECRET", "") or "").strip()
+MESH_PUBLIC_ADDR = (os.environ.get("AURORA_MESH_PUBLIC_ADDR", "") or "").strip()
+MESH_MASTER_ADDR = (os.environ.get("AURORA_MESH_MASTER_ADDR", "") or "").strip()
+if MESH_TUNNEL_ENV:
+    # env-переключатель для владельца сервера; значение всё равно живёт в settings.
+    try:
+        set("mesh_tunnel", True)
+    except Exception:
+        pass
+
 _load_plans_override()
+load_extras()

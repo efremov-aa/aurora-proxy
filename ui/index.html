@@ -7,7 +7,7 @@
   <link rel="icon" href="/favicon.ico">
   <link rel="stylesheet" href="/style.css">
 </head>
-<body>
+<body class="pre-lang">
 <div class="app">
 
   <!-- ============================================================
@@ -27,7 +27,7 @@
         <div class="ngroup-title" data-short="🏠">🏠 <span data-i18n="nav.group.home">Домашний прокси</span></div>
         <button data-t="dashboard" class="on"><span class="ic">📊</span><span class="lb" data-i18n="nav.dash">Обзор</span></button>
         <button data-t="keys"><span class="ic">🔑</span><span class="lb" data-i18n="nav.keys">Ключи</span></button>
-        <button data-t="devices"><span class="ic">📱</span><span class="lb" data-i18n="nav.devices">Устройства</span></button>
+        <button data-t="devices"><span class="ic">📱</span><span class="lb" data-i18n="nav.conn">Устройства</span></button>
         <button data-t="connect"><span class="ic">🌐</span><span class="lb" data-i18n="nav.connect">Внешний доступ</span></button>
         <button data-t="rusegment"><span class="ic">🇷🇺</span><span class="lb" data-i18n="nav.rusegment">Ру-сегмент</span></button>
         <button data-t="tgws"><span class="ic">✈️</span><span class="lb" data-i18n="nav.tgws">TG-WS</span></button>
@@ -43,7 +43,7 @@
       <div class="ngroup" id="g-shop">
         <div class="ngroup-title" data-short="🛒">🛒 <span data-i18n="nav.shop">Магазин</span></div>
         <button data-t="shop-plans"><span class="ic">💎</span><span class="lb" data-i18n="nav.shop-plans">Тарифы VPN</span><span class="tag gold" id="tag-plan">basic</span></button>
-        <button data-t="shop-features"><span class="ic">🧩</span><span class="lb" data-i18n="nav.shop-features">Функции</span><span class="tag" id="tag-feat">2</span></button>
+        <button data-t="shop-features"><span class="ic">🧩</span><span class="lb" data-i18n="nav.shop-features">Дополнительные возможности Aurora</span><span class="tag" id="tag-feat">2</span></button>
         <button data-t="shop-billing"><span class="ic">💳</span><span class="lb" data-i18n="nav.shop-billing">Платежи</span></button>
       </div>
 
@@ -136,13 +136,14 @@
                 <span class="mono" id="du-cur">—</span>
                 <span class="arrow">→</span>
                 <span class="mono new-ver" id="du-new">—</span>
-                <span class="badge gold" style="font-size:10px" data-i18n="upd.avail">доступно</span>
+                <span class="badge gold" style="font-size:10px" id="du-state-b">–</span>
               </div>
               <div class="usub" id="du-msg">—</div>
             </div>
             <div class="uact" style="display:flex;gap:8px">
               <button class="btn ghost" data-act="nav" data-tab="update" data-i18n="upd.details">Подробнее</button>
-              <button class="btn primary" data-act="update-start" data-i18n="upd.now">Обновить</button>
+              <button class="btn primary" id="du-btn-upd" data-act="update-start" data-i18n="upd.now">Обновить</button>
+              <button class="btn ghost" id="du-btn-chk" data-act="update-check" data-i18n="upd.check-now" style="display:none">Проверить сейчас</button>
             </div>
           </div>
         </div>
@@ -174,7 +175,7 @@
             <div class="widget-body" id="w-plan-body">—</div>
             <div class="widget-foot">
               <button class="btn small" data-act="nav" data-tab="shop-plans">💎 <span data-i18n="nav.shop-plans">Тарифы VPN</span></button>
-              <button class="btn small" data-act="nav" data-tab="shop-features">🧩 <span data-i18n="nav.shop-features">Функции</span></button>
+              <button class="btn small" data-act="nav" data-tab="shop-features">🧩 <span data-i18n="nav.shop-features">Дополнительные возможности Aurora</span></button>
             </div>
           </div>
 
@@ -223,7 +224,7 @@
            ================================================== -->
       <section class="tab" id="t-keys">
         <div class="card">
-          <h2><span class="ic">🔑</span><span data-i18n="nav.keys">Ключи</span><span class="count" id="keyinfo" data-i18n="k.keys">ключей: 0</span></h2>
+          <h2><span class="ic">🔑</span><span data-i18n="nav.keys-proxy">Ключи прокси</span><span class="count" id="keyinfo" data-i18n="k.keys">ключей: 0</span></h2>
           <div class="cmd-row" style="margin-top:0">
             <input type="text" id="keyuri" data-i18n-placeholder="keys.uri-ph" placeholder="vless://… вставьте свою ссылку (Reality)">
             <button class="btn primary" data-act="key-add">➕ <span data-i18n="keys.add">Свой ключ</span></button>
@@ -247,7 +248,7 @@
            ================================================== -->
       <section class="tab" id="t-devices">
         <div class="card">
-          <h2><span class="ic">📱</span><span data-i18n="dev.head">Устройства в сети</span></h2>
+          <h2><span class="ic">📱</span><span data-i18n="dev.conn">Устройства в сети</span></h2>
           <div class="tbl-wrap">
             <table>
               <thead><tr><th data-i18n="th.device">Устройство</th><th>IP</th><th data-i18n="th.conn">Conn</th><th data-i18n="th.dl">↓ Скачано</th><th data-i18n="th.ul">↑ Отдано</th></tr></thead>
@@ -461,6 +462,7 @@
       <section class="tab" id="t-mesh-routes">
         <div class="card">
           <h2><span class="ic">🧭</span><span data-i18n="nav.mesh-routes">Маршруты</span></h2>
+          <p class="hint" data-i18n="routes.master"></p>
           <p class="hint" data-i18n="mrt.hint">Правила, какой трафик через какой узел выходит в интернет. Порядок — сверху вниз.</p>
           <div class="tbl-wrap">
             <table>
@@ -477,7 +479,7 @@
       <section class="tab" id="t-shop-plans">
         <div class="card">
           <h2><span class="ic">💎</span><span data-i18n="sp.head">Тарифные планы VPN</span></h2>
-          <p class="hint" data-i18n="sp.hint">Тарифные планы VPN — для тех, у кого серый IP: нужен обход блокировок. Оплата и продление — через Telegram-бота, тариф подключается сразу.</p>
+          <p class="hint" data-i18n="sp.hint">Для тех, у кого серый IP: для тех, у кого серый IP: нужен обход блокировок. Оплата и продление — через Telegram-бота, тариф подключается сразу.</p>
           <div class="plan-st" id="plans-loading"><span class="empty"><span class="ic">🐾</span><span data-i18n="sp.loading">загрузка тарифов…</span></span></div>
           <div class="plans" id="plans-grid"></div>
         </div>
@@ -503,7 +505,15 @@
             <span class="spacer" style="flex:1"></span>
             <span class="badge gold" data-i18n="sf.instant">+ оплата в Telegram-боте, активация мгновенно</span>
           </div>
-          <div class="feature-list" id="feat-list"></div>
+                <div class="ext-card" id="ext-card">
+        <div class="f-ic" id="ext-badge">&#128038;</div>
+        <div class="f-body">
+          <div class="f-name" data-i18n="ext.head">PRO-&#1092;&#1091;&#1085;&#1082;&#1094;&#1080;&#1080; Aurora</div>
+          <div class="f-desc" id="ext-text" data-i18n="ext.locked">&#1055;&#1088;&#1086;&#1074;&#1077;&#1088;&#1103;&#1077;&#1084; &#1082;&#1072;&#1082; &#1079;&#1072;&#1082;&#1088;&#1099;&#1072;&#1077;&#1090;&#1089;&#1103;...&#1103;</div>
+          <button class="btn small gold" style="margin-top:8px" id="ext-buy" data-act="ext-buy" data-i18n="ext.buy">&#1054;&#1087;&#1083;&#1072;&#1090;&#1080;&#1090;&#1100; &#1074; Telegram</button>
+        </div>
+      </div>
+      <div class="feature-list" id="feat-list"></div>
         </div>
       </section>
 
@@ -525,18 +535,9 @@
           <div class="actions" style="margin-top:0">
             <button class="btn gold" data-act="plan-buy">💳 <span data-i18n="sb.buy">Оплатить в Telegram</span></button>
           </div>
-          <h3 style="font-size:13px;font-weight:800;margin:14px 0 8px"><span data-i18n="sb.form">Записать оплату или продление</span></h3>
-          <div class="cmd-row" style="margin-top:0">
-            <select id="pay-clients" style="flex:1;min-width:170px"></select>
-            <input type="text" id="pay-uid" autocomplete="off" placeholder="uid клиента" data-i18n-placeholder="sb.ph-uid">
-          </div>
-          <div class="cmd-row" style="margin-top:8px">
-            <input type="text" id="pay-name" autocomplete="off" placeholder="Имя нового клиента" data-i18n-placeholder="sb.ph-name">
-            <select id="pay-plan" style="flex:1;min-width:170px"></select>
-          </div>
-          <div class="actions tight">
-            <button class="btn" data-act="subs-pay">🐾 <span data-i18n="sb.submit">Записать оплату</span></button>
-          </div>
+          <h3 style="font-size:13px;font-weight:800;margin:14px 0 8px"><span data-i18n="myk.head">Мои ключи</span><span class="count mono" id="mykeys-count">0</span></h3>
+          <p class="hint" data-i18n="myk.hint">Устройство = купленный ключ 🐾 Тариф, срок и трафик — по каждому ключу.</p>
+          <div class="feature-list" id="mykeys-list"></div>
           <h3 style="font-size:13px;font-weight:800;margin:14px 0 8px"><span data-i18n="sb.hist">История платежей</span></h3>
           <div class="tbl-wrap">
             <table>
@@ -564,7 +565,8 @@
               <div class="usub" id="upd-msg">—</div>
             </div>
             <div class="uact" style="display:flex;gap:8px;flex-wrap:wrap">
-              <button class="btn primary" data-act="update-start">⬆️ <span data-i18n="upd.apply">Обновить сейчас</span></button>
+              <button class="btn primary" id="upd-btn-upd" data-act="update-start">⬆️ <span data-i18n="upd.apply">Обновить сейчас</span></button>
+              <button class="btn ghost" id="upd-btn-chk" data-act="update-check" style="display:none">🔍 <span data-i18n="upd.check-now">Проверить сейчас</span></button>
             </div>
           </div>
         </div>
@@ -658,7 +660,8 @@
           <p class="hint" data-i18n="sec.hint">Admin-токен панели и Reality-ключи внешнего доступа. Меняется на живой конфиг.</p>
           <div style="font-size:11px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:var(--muted-2);margin:16px 0 8px" data-i18n="sec.panel">Панель</div>
           <div class="cmd-row">
-            <input type="password" id="sec-token" data-i18n-placeholder="sec.tok-ph" placeholder="Admin-токен (Bearer) — нужен для POST /api/*" autocomplete="off">
+            <input type="password" id="sec-token" data-i18n-placeholder="sec.tok-ph" placeholder="Admin-токен (Bearer) — нужен для POST /api/*" autocomplete="off"
+                   data-i18n-placeholder="sec.tok-ph">
             <button class="btn primary" data-act="sec-login">🔑 <span data-i18n="btn.login">Войти</span></button>
             <button class="btn ghost" id="sec-logout" style="display:none" data-act="sec-logout" data-i18n="btn.logout">Выйти</button>
           </div>
@@ -669,8 +672,8 @@
            </div>
            <div class="cmd-row">
              <input type="password" id="sec-pin" placeholder="PIN 2FA" autocomplete="off">
-             <button class="btn small" data-act="sec-2fa-on">Включить 2FA</button>
-             <button class="btn ghost" data-act="sec-2fa-off">Выключить 2FA</button>
+             <button class="btn small" id="sec-2fa-on-b" data-act="sec-2fa-on" data-i18n="sec.2fa-on">Включить 2FA</button>
+             <button class="btn ghost" id="sec-2fa-off-b" data-act="sec-2fa-off" data-i18n="sec.2fa-off" style="display:none">Выключить 2FA</button>
            </div>
            <div style="font-size:11px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:var(--muted-2);margin:16px 0 8px" data-i18n="sec.reality">Reality</div>
           <div class="cmd-row">

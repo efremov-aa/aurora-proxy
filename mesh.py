@@ -39,6 +39,9 @@ _POLICY_STARTED = False
 INVITE_TTL_S = 300
 MAX_INVITE_CHALLENGES = 1024
 MAX_POLICY_BYTES = 64 * 1024
+MAX_CATALOG_BYTES = 32 * 1024  # A-109: каталог цен и описаний от мастера
+_CATALOG_FIELDS = ("catalog", "buy_url", "master_id")
+_CATALOG_MARK = ""
 _POLICY_MAX_NONCES = 256
 _POLICY_NONCES = {}
 _POLICY_NONCES_LOCK = threading.Lock()
@@ -947,6 +950,46 @@ def _fetch_policy(host, port, timeout=3.0):
     return value if isinstance(value, dict) else None
 
 
+def _catalog_signature(catalog, buy_url, master_id, key=None):
+    """Подпись каталога мастера: цены и описания защищены тем же ключом, что и политика."""
+    secret = key or _policy_key()
+    if not secret or not isinstance(catalog, dict):
+        return ""
+    body = _signed_bytes({"catalog": catalog, "buy_url": buy_url,
+                          "master_id": master_id}, _CATALOG_FIELDS)
+    return _hmac_hex(secret, body)
+
+
+def _catalog_valid(value):
+    """Каталог мастера: тарифы, прайс витрины и ссылка оплаты.
+    Проверка идёт отдельно от политики, поэтому подписи флагов не ломаются."""
+    if not isinstance(value, dict):
+        return None
+    catalog = value.get("catalog")
+    if not isinstance(catalog, dict):
+        return None
+    key = _policy_key()
+    master_id = _policy_master_id()
+    if not key or not master_id or value.get("master_id") != master_id:
+        return None
+    buy_url = catalog.get("buy_url")
+    if not isinstance(buy_url, str) or not buy_url.strip() or len(buy_url) > 200:
+        return None
+    signature = value.get("catalog_signature")
+    if not _is_hex(signature, 64):
+        return None
+    if not hmac.compare_digest(signature,
+                               _catalog_signature(catalog, buy_url, master_id, key)):
+        return None
+    plans = catalog.get("plans")
+    extras = catalog.get("extras")
+    if not isinstance(plans, dict) or not plans or len(plans) > 32:
+        return None
+    if not isinstance(extras, dict) or not extras or len(extras) > 32:
+        return None
+    return {"plans": plans, "extras": extras, "buy_url": buy_url.strip()}
+
+
 def _policy_loop():
     """Фоновый опрос мастера: узел применяет подписанные show_mesh/show_subs."""
     while True:
@@ -957,7 +1000,8 @@ def _policy_loop():
                 port = _policy_port(node)
                 if not port:
                     continue
-                core = _policy_valid(_fetch_policy(node.get("host"), port))
+                raw = _fetch_policy(node.get("host"), port)
+                core = _policy_valid(raw)
                 if not core:
                     continue
                 changed = False
@@ -968,6 +1012,17 @@ def _policy_loop():
                 if changed:
                     config.log("mesh: применена политика мастера %s:%d" % (
                         node.get("host"), port))
+                catalog = _catalog_valid(raw)
+                if catalog:
+                    mark = "%s|%s|%s" % (
+                        sorted(catalog["plans"].keys()),
+                        sorted(catalog["extras"].keys()), catalog["buy_url"])
+                    if mark != _CATALOG_MARK:
+                        globals()["_CATALOG_MARK"] = mark
+                        if config.save_catalog(catalog["plans"], catalog["extras"],
+                                               catalog.get("buy_url")):
+                            config.log("mesh: каталог мастера принят (тарифов %d, позиций %d)" % (
+                                len(catalog["plans"]), len(catalog["extras"])))
                 break
         except Exception:
             pass

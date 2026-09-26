@@ -120,6 +120,55 @@ def _master_source_ip():
         return None
 
 
+# --- A-145: исходящий relay-туннель меш-сети (по подписке клиента) ---
+def _mesh_outbound():
+    """A-145: исходящий relay-туннель (SOCKS5 меш-релея на loopback).
+
+    Выключено по умолчанию: пока mesh_tunnel выключен, конфиг xray
+    не меняется ни на байт."""
+    if not config.get("mesh_tunnel", False):
+        return None
+    try:
+        import meshtunnel
+    except Exception:
+        return None
+    try:
+        if not meshtunnel.enabled():
+            return None
+        port = int(meshtunnel.MESH_PORT) + 1
+    except Exception:
+        return None
+    if port <= 0 or port > 65535:
+        return None
+    return {"tag": "mesh", "protocol": "socks",
+            "settings": {"servers": [{"address": "127.0.0.1", "port": port}]}}
+
+
+def _vless_emails(cfg):
+    """A-145: email-адреса клиентов VLESS (якорь для маршрутизации)."""
+    out = []
+    for inbound in (cfg.get("inbounds") or []):
+        if not isinstance(inbound, dict) or inbound.get("tag") != "vless-in":
+            continue
+        clients = ((inbound.get("settings") or {}).get("clients") or [])
+        for client in clients:
+            if not isinstance(client, dict):
+                continue
+            email = str(client.get("email") or "").strip()
+            if email and email not in out:
+                out.append(email)
+    return out[:64]
+
+
+def _mesh_rule_position(rules):
+    """Позиция для mesh-правила: после block/direct-правил, но до inboundTag
+    (RU-байпас и http-правило идут в туннель)."""
+    for idx, rule in enumerate(rules):
+        if isinstance(rule, dict) and rule.get("inboundTag"):
+            return idx
+    return len(rules)
+
+
 def build_xray_config(final_tag):
     """Полный xray-конфиг. outbounds: [пул vless..., direct, block]."""
     if final_tag == "direct":
@@ -220,7 +269,16 @@ def build_xray_config(final_tag):
                 },
             },
         })
-        http_rule["inboundTag"] = ["http-in", "vless-in"]
+        # A-145: подписочные клиенты -> relay-туннель меш-сети (по email)
+    mesh_ob = _mesh_outbound()
+    if mesh_ob:
+        mesh_emails = _vless_emails(cfg)
+        if mesh_emails:
+            cfg["outbounds"].append(mesh_ob)
+            rules.insert(_mesh_rule_position(rules),
+                         {"type": "field", "inboundTag": ["vless-in"],
+                          "email": mesh_emails, "outboundTag": "mesh"})
+    http_rule["inboundTag"] = ["http-in", "vless-in"]
     if master_locked:
         master_ip = _master_source_ip()
         if master_ip:
@@ -243,6 +301,14 @@ def build_xray_config(final_tag):
 def _authoritative_config(cfg, target):
     import copy
     allowed = {k.get("tag", "") for k in pool.get_keys() if k.get("tag")}
+    # A-146: релей-туннель меш-сети не считаем «чужим» outbound: иначе
+    # автосинхронизация вычистит и outbound, и правило маршрутизации.
+    allowed.add("mesh")
+    # A-146: возвращаем outbound mesh, если правила по нему остались
+    mesh_ob = _mesh_outbound()
+    if mesh_ob and not any(isinstance(o, dict) and o.get("tag") == "mesh"
+                           for o in (cfg.get("outbounds") or [])):
+        cfg.setdefault("outbounds", []).append(mesh_ob)
     allowed.update(("direct", "block"))
     outbounds = []
     used = set()

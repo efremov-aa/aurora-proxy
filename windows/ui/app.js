@@ -10,7 +10,7 @@
     { c: 'de', n: 'Deutsch' }, { c: 'fr', n: 'Français' }, { c: 'tr', n: 'Türkçe' },
     { c: 'pt', n: 'Português' }, { c: 'zh', n: '中文' }, { c: 'ar', n: 'العربية' }, { c: 'hi', n: 'हिन्दी' }
   ];
-  var I18N = {
+  var I18N = {  
     ru: {
       'pol.head': 'Политика сервиса', 'pol.readOnly': 'Просмотр', 'pol.accept': 'Принимаю условия', 'ru.regions': 'Сегменты', 'ru.custom-ph': 'Свои домены через запятую (необязательно)',
       'dash.manage': 'Управление', 'pool.refresh-btn': 'Обновить ключи', 'pool.check-btn': 'Проверить ключи', 'mesh.ping-btn': 'Пинг меш',
@@ -88,15 +88,9 @@
       'mj.master': 'Cервер — головной, управляет видимостью у клиентов', 'mj.show-mesh': 'Показывать клиентам вкладку «Меш-сеть»', 'mj.show-subs': 'Показывать клиентам вкладку «Магазин»',
       'mt.hint': 'Ваш прокси (в центре) и узлы других участников меша. Соединения активны, если трафик ходит через них.',
       'mrt.hint': 'Правила, какой трафик через какой узел выходит в интернет. Порядок — сверху вниз.', 'th.what': 'Что', 'th.via': 'Куда', 'th.proto': 'Протокол',
-      'sp.head': 'Тарифные планы VPN', 'sp.hint': 'Тарифные планы VPN — для тех, у кого серый IP: нужен обход блокировок. Оплата и продление — через Telegram-бота, тариф подключается сразу.', 'sp.loading': 'загрузка тарифов…', 'sp.comp': 'Состав тарифов', 'th.func': 'Функция', 'th.val': 'Значение',
+      'sp.head': 'Тарифные планы VPN', 'sp.hint': 'Для тех, у кого серый IP: нужен обход блокировок. Оплата и продление — через Telegram-бота, тариф подключается сразу.', 'sp.loading': 'загрузка тарифов…', 'sp.comp': 'Состав тарифов', 'th.func': 'Функция', 'th.val': 'Значение',
       'sf.instant': '+ оплата в Telegram-боте, активация мгновенно',
       'sb.head': 'Оплата и продление', 'sb.hint': 'Активный план, срок действия и история платежей. Продление — в один клик.', 'sb.plan': 'Текущий план', 'sb.until': 'Активен до', 'sb.buy': 'Оплатить в Telegram', 'btn.buy-tg': '💬 Купить в Telegram', 'sb.hist': 'История платежей', 'sb.active': 'Активных', 'sb.income': 'Доход за месяц', 'sb.traffic-month': 'Трафик за месяц',
-      'sb.form': 'Записать оплату или продление',
-      'sb.ph-uid': 'uid клиента',
-      'sb.ph-name': 'Имя нового клиента',
-      'sb.submit': 'Записать оплату',
-      'sb.need': 'Укажите клиента (uid) или имя нового',
-      'sb.ok': 'Оплата записана',
       'th.date': 'Дата', 'th.desc': 'Описание', 'th.sum': 'Сумма',
       'upd.apply': 'Обновить сейчас', 'upd.auto': 'Автообновление', 'upd.auto-hint': 'Обновление производится из GitHub-релизов. Бинарник скачивается, проверяется, заменяется атомарно — прокси перезапускается за пару секунд.',
       'upd.src': 'Источник обновлений', 'th.param': 'Параметр', 'upd.repo': 'Репозиторий', 'upd.sig': 'Проверка подписи', 'upd.rollback': 'Откат при сбое',
@@ -108,8 +102,33 @@
       'sec.hint': 'Admin-токен панели и Reality-ключи внешнего доступа. Меняется на живой конфиг.', 'sec.panel': 'Панель', 'sec.tok-ph': 'Admin-токен (Bearer) — нужен для POST /api/*', 'sec.acc-v': 'Access', 'sec.pbk-ph': 'public key', 'sec.rotate': 'Ротация ключей',
       'log.head': 'Системный лог', 'log.loading': 'загрузка…', 'log.refresh': 'Обновить', 'log.download': 'Скачать', 'rclog.head': 'Журнал recovery',
       'th.node': 'Узел', 'th.region': 'Регион', 'th.route': 'Маршрут', 'sec.tok': 'Admin-токен', 'sec.reality': 'Reality',
-      'theme.sun': '🌙', 'theme.moon': '☀️'
-    },
+        'theme.sun': '🌙', 'theme.moon': '☀️',
+  'rec.hint': 'Recovery на связи: котик сам следит за ключами (лимит, регион, соединения) и переключит канал, если ключ отвалится. Здесь появятся записи о каждом переключении.', 'mesh.id-hint': 'Приглашение (invite) выдаёт головной сервер. Пока его нет — показан идентификатор вашего узла.', 'routes.master': 'Маршруты задаёт головной сервер: здесь видно, куда уходит трафик. Добавить или убрать правило в клиентской сборке нельзя — попросите хозяина сети 🐾', 'sec.tok-hint': 'Админ-токен — это ваш пароль панели. Он задаётся при первом запуске (мастер) и хранится в data/settings.json или переменной AURORA_UI_TOKEN. Введите его здесь один раз — и кнопки заработают.', 'sec.2fa-on': 'Включить 2FA', 'sec.2fa-off': 'Выключить 2FA',
+      'feat.master': 'Цены и описания товаров прислает головной сервер — этот узел получит его цены и описание по мешу',
+    'myk.head': 'Мои ключи',
+    'myk.hint': 'Устройство = купленный ключ 🐾 Тариф, срок и трафик — по каждому ключу.',
+    'myk.until': 'Срок',
+    'myk.traffic': 'Трафик',
+    'myk.devices': 'Ключи',
+    'myk.how': 'Инструкция',
+    'myk.copy': 'Скопировать ссылку',
+    'myk.copy-ok': 'Ссылка скопирована 🐾',
+    'myk.empty': 'Ключей пока нет — купите тариф в Telegram-боте',
+    'myk.unlim': 'безлимит',
+    'dev.conn': 'Подключения к прокси',
+    'nav.conn': 'Подключения',
+    'nav.keys-proxy': 'Ключи прокси',      'ext.head': 'PRO-функции Aurora',
+      'ext.locked': 'Пока подписка не активна, PRO-функции закрыты. VPN и прокси работают как обычно.',
+      'ext.pro': 'PRO открыт: котик доволен 🐾',
+      'ext.expired': 'Подписка не активна - купить можно в Telegram-боте',
+      'ext.na': 'Лицензия недоступна: сервер не ответил. Прокси работает 🐾',
+      'ext.buy': 'Купить PRO',
+      'ext.offline': 'Работаем на кэше лицензии',
+        'ext.trial': 'Триал активен: расширение и блок реклам уже открыты 🐱',
+        'ext.dl-chrome': 'Скачать для Chrome',
+        'ext.dl-edge': 'Скачать для Edge',
+
+    },  
     en: {
       'pol.head': 'Service policy', 'pol.readOnly': 'View', 'pol.accept': 'I accept the terms', 'ru.regions': 'Segments', 'ru.custom-ph': 'Custom domains, comma separated (optional)',
       'dash.manage': 'Manage', 'pool.refresh-btn': 'Refresh keys', 'pool.check-btn': 'Check keys', 'mesh.ping-btn': 'Mesh ping',
@@ -190,12 +209,6 @@
       'sp.head': 'VPN plans', 'sp.hint': 'VPN plans for those with a grey IP who need to bypass blocking. Payment and renewal go through the Telegram bot, the plan is applied instantly.', 'sp.loading': 'loading plans…', 'sp.comp': 'Plan contents', 'th.func': 'Feature', 'th.val': 'Value',
       'sf.instant': '+ paid via the Telegram bot, instant activation',
       'sb.head': 'Billing and renewal', 'sb.hint': 'Active plan, validity and payment history. Renewal — in one click.', 'sb.plan': 'Current plan', 'sb.until': 'Active until', 'sb.buy': 'Pay via Telegram', 'btn.buy-tg': '💬 Buy via Telegram', 'sb.hist': 'Payment history',
-      'sb.form': 'Record payment or renewal',
-      'sb.ph-uid': 'client uid',
-      'sb.ph-name': 'New client name',
-      'sb.submit': 'Record payment',
-      'sb.need': 'Enter a client uid or a new client name',
-      'sb.ok': 'Payment recorded',
       'th.date': 'Date', 'th.desc': 'Description', 'th.sum': 'Amount',
       'upd.apply': 'Update now', 'upd.auto': 'Auto-update', 'upd.auto-hint': 'Update is performed from GitHub releases. Binary is downloaded, verified, replaced atomically — proxy restarts in a couple of seconds.',
       'upd.src': 'Update source', 'th.param': 'Parameter', 'upd.repo': 'Repository', 'upd.sig': 'Signature check', 'upd.rollback': 'Rollback on failure',
@@ -207,8 +220,33 @@
       'sec.hint': 'Admin panel token and external Reality keys. Changes live config.', 'sec.panel': 'Panel', 'sec.tok-ph': 'Admin token (Bearer) — needed for POST /api/*', 'sec.acc-v': 'Access', 'sec.pbk-ph': 'public key', 'sec.rotate': 'Rotate keys',
       'log.head': 'System log', 'log.loading': 'loading…', 'log.refresh': 'Refresh', 'log.download': 'Download', 'rclog.head': 'Recovery journal',
       'th.node': 'Node', 'th.region': 'Region', 'th.route': 'Route', 'sec.tok': 'Admin token', 'sec.reality': 'Reality',
-      'theme.sun': '🌙', 'theme.moon': '☀️'
-    },
+        'theme.sun': '🌙', 'theme.moon': '☀️',
+  'rec.hint': 'Recovery is on duty: the cat watches the keys (limit, region, connections) and switches the tunnel itself if a key drops. Every switch is logged here.', 'mesh.id-hint': 'The head server issues the invite. Until then your node id is shown.', 'routes.master': 'Routes are set by the head server: here you see where traffic goes. A client build cannot add or remove rules — ask the network owner 🐾', 'sec.tok-hint': 'The admin token is your panel password. It is set on first run (wizard) and stored in data/settings.json or the AURORA_UI_TOKEN env var. Enter it once here and the buttons will work.', 'sec.2fa-on': 'Enable 2FA', 'sec.2fa-off': 'Disable 2FA',
+      'feat.master': 'Prices and descriptions are set by the master server — this node picks them up after joining the mesh',
+    'myk.head': 'My keys',
+    'myk.hint': 'A device = a purchased key 🐾 Plan, expiry and traffic per key.',
+    'myk.until': 'Expiry',
+    'myk.traffic': 'Traffic',
+    'myk.devices': 'Keys',
+    'myk.how': 'Instructions',
+    'myk.copy': 'Copy link',
+    'myk.copy-ok': 'Link copied 🐾',
+    'myk.empty': 'No keys yet — buy a plan in the Telegram bot',
+    'myk.unlim': 'unlimited',
+    'dev.conn': 'Proxy connections',
+    'nav.conn': 'Connections',
+    'nav.keys-proxy': 'Proxy keys',      'ext.head': 'Aurora PRO features',
+      'ext.locked': 'Until the subscription is active, PRO features are locked. VPN and proxy work as usual.',
+      'ext.pro': 'PRO is open: the cat is happy 🐾',
+      'ext.expired': 'Subscription is not active - buy it in the Telegram bot',
+      'ext.na': 'License unavailable: no answer from the master. Proxy works 🐾',
+      'ext.buy': 'Buy PRO',
+      'ext.offline': 'Running on the cached license',
+        'ext.trial': 'Trial active: the extension and ad blocking are already open 🐱',
+        'ext.dl-chrome': 'Download for Chrome',
+        'ext.dl-edge': 'Download for Edge',
+
+    },  
     es: {
       'pol.head': 'Política del servicio', 'pol.readOnly': 'Ver', 'pol.accept': 'Acepto los términos', 'ru.regions': 'Segmentos', 'ru.custom-ph': 'Dominios propios separados por comas (opcional)',
       'dash.manage': 'Gestión', 'pool.refresh-btn': 'Actualizar claves', 'pool.check-btn': 'Comprobar claves', 'mesh.ping-btn': 'Ping mesh',
@@ -286,15 +324,9 @@
       'mj.master': 'El servidor es hub, controla la visibilidad de los clientes', 'mj.show-mesh': 'Mostrar la pestaña “Red mesh” a los clientes', 'mj.show-subs': 'Mostrar la pestaña “Tienda” a los clientes',
       'mt.hint': 'Tu proxy (en el centro) y los nodos de otros miembros del mesh. Las conexiones están activas si el tráfico pasa por ellos.',
       'mrt.hint': 'Reglas de qué tráfico sale a internet por cada nodo. Orden de arriba a abajo.', 'th.what': 'Qué', 'th.via': 'Dónde', 'th.proto': 'Protocolo',
-      'sp.head': 'Planes VPN', 'sp.hint': 'Planes VPN para quien tiene IP gris y necesita saltar el bloqueo. El pago y la renovación se hacen en el bot de Telegram, el plan se activa al instante.', 'sp.loading': 'cargando planes…', 'sp.comp': 'Contenido del plan', 'th.func': 'Función', 'th.val': 'Valor',
+      'sp.head': 'Planes VPN', 'sp.hint': 'Para quien tiene IP gris y necesita saltar el bloqueo. El pago y la renovación se hacen en el bot de Telegram, el plan se activa al instante.', 'sp.loading': 'cargando planes…', 'sp.comp': 'Contenido del plan', 'th.func': 'Función', 'th.val': 'Valor',
       'sf.instant': '+ pago en el bot de Telegram, activación inmediata',
       'sb.head': 'Pago y renovación', 'sb.hint': 'Plan activo, vigencia e historial de pagos. Renovación con un clic.', 'sb.plan': 'Plan actual', 'sb.until': 'Válido hasta', 'sb.buy': 'Pagar por Telegram', 'btn.buy-tg': '💬 Comprar en Telegram', 'sb.hist': 'Historial de pagos',
-      'sb.form': 'Registrar pago o renovación',
-      'sb.ph-uid': 'uid del cliente',
-      'sb.ph-name': 'Nombre del nuevo cliente',
-      'sb.submit': 'Registrar pago',
-      'sb.need': 'Indique el uid del cliente o un nombre nuevo',
-      'sb.ok': 'Pago registrado',
       'th.date': 'Fecha', 'th.desc': 'Descripción', 'th.sum': 'Importe',
       'upd.apply': 'Actualizar ahora', 'upd.auto': 'Auto-actualización', 'upd.auto-hint': 'La actualización se realiza desde los lanzamientos de GitHub. El binario se descarga, verifica y reemplaza atómicamente — el proxy se reinicia en un par de segundos.',
       'upd.src': 'Fuente de actualización', 'th.param': 'Parámetro', 'upd.repo': 'Repositorio', 'upd.sig': 'Verificación de firma', 'upd.rollback': 'Reversión en fallo',
@@ -306,8 +338,33 @@
       'sec.hint': 'Token de administración y claves Reality externas. Cambia la configuración en vivo.', 'sec.panel': 'Panel', 'sec.tok-ph': 'Token admin (Bearer) — necesario para POST /api/*', 'sec.acc-v': 'Acceso', 'sec.pbk-ph': 'clave pública', 'sec.rotate': 'Rotar claves',
       'log.head': 'Registro del sistema', 'log.loading': 'cargando…', 'log.refresh': 'Actualizar', 'log.download': 'Descargar', 'rclog.head': 'Registro de recovery',
       'th.node': 'Nodo', 'th.region': 'Región', 'th.route': 'Ruta', 'sec.tok': 'Token admin', 'sec.reality': 'Reality',
-      'theme.sun': '🌙', 'theme.moon': '☀️'
-    },
+        'theme.sun': '🌙', 'theme.moon': '☀️',
+  'rec.hint': 'Recovery en marcha: el gato vigila las claves (limite, region, conexiones) y cambia el tunel si una cae. Aqui veras cada cambio.', 'mesh.id-hint': 'El servidor principal emite la invitación. Mientras no exista, se muestra el id de tu nodo.', 'routes.master': 'Las rutas las define el servidor principal: aquí ves adónde va el tráfico. Una compilación de cliente no puede añadir ni quitar reglas — pide al dueño de la red 🐾', 'sec.tok-hint': 'El token de admin es tu contraseña del panel. Se define en el primer arranque (asistente) y se guarda en data/settings.json o en la variable AURORA_UI_TOKEN. Introdúcelo una vez aquí.', 'sec.2fa-on': 'Activar 2FA', 'sec.2fa-off': 'Desactivar 2FA',
+      'feat.master': 'Los precios y las descripciones los fija el servidor maestro: este nodo los recibe al unirse a la malla',
+    'myk.head': 'Mis claves',
+    'myk.hint': 'Un dispositivo = una clave comprada 🐾 Plan, caducidad y tráfico por clave.',
+    'myk.until': 'Caduca',
+    'myk.traffic': 'Tráfico',
+    'myk.devices': 'Claves',
+    'myk.how': 'Instrucciones',
+    'myk.copy': 'Copiar enlace',
+    'myk.copy-ok': 'Enlace copiado 🐾',
+    'myk.empty': 'Aún no hay claves — compra un plan en el bot de Telegram',
+    'myk.unlim': 'ilimitado',
+    'dev.conn': 'Conexiones al proxy',
+    'nav.conn': 'Conexiones',
+    'nav.keys-proxy': 'Claves del proxy',      'ext.head': 'Funciones PRO de Aurora',
+      'ext.locked': 'Hasta que la suscripcion este activa, las funciones PRO estan bloqueadas. VPN y proxy funcionan igual.',
+      'ext.pro': 'PRO abierto: el gato esta contento 🐾',
+      'ext.expired': 'La suscripcion no esta activa - comprala en el bot de Telegram',
+      'ext.na': 'Licencia no disponible: el maestro no responde. El proxy funciona 🐾',
+      'ext.buy': 'Comprar PRO',
+      'ext.offline': 'Funcionando con la licencia en cache',
+        'ext.trial': 'Prueba activa: la extensión y el bloqueo de anuncios ya están abiertos 🐱',
+        'ext.dl-chrome': 'Descargar para Chrome',
+        'ext.dl-edge': 'Descargar para Edge',
+
+    },  
     de: {
       'pol.head': 'Dienstrichtlinie', 'pol.readOnly': 'Ansehen', 'pol.accept': 'Ich akzeptiere die Bedingungen', 'ru.regions': 'Segmente', 'ru.custom-ph': 'Eigene Domains, durch Komma getrennt (optional)',
       'dash.manage': 'Verwaltung', 'pool.refresh-btn': 'Schlüssel aktualisieren', 'pool.check-btn': 'Schlüssel prüfen', 'mesh.ping-btn': 'Mesh-Ping',
@@ -385,15 +442,9 @@
       'mj.master': 'Server ist Hub, steuert Sichtbarkeit der Clients', 'mj.show-mesh': 'Den Tabs „Mesh-Netzwerk“ für Clients zeigen', 'mj.show-subs': 'Den Tab „Shop“ für Clients zeigen',
       'mt.hint': 'Dein Proxy (in der Mitte) und die Knoten anderer Teilnehmer. Verbindungen sind aktiv, wenn der Datenverkehr darüber läuft.',
       'mrt.hint': 'Regeln, welcher Datenverkehr über welchen Knoten ins Internet geht. Reihenfolge von oben nach unten.', 'th.what': 'Was', 'th.via': 'Wohin', 'th.proto': 'Protokoll',
-      'sp.head': 'VPN-Tarife', 'sp.hint': 'VPN-Tarife für alle mit grauer IP, die Sperren umgehen müssen. Zahlung und Verlängerung laufen über den Telegram-Bot, der Tarif startet sofort.', 'sp.loading': 'Tarife laden…', 'sp.comp': 'Tarifinhalt', 'th.func': 'Funktion', 'th.val': 'Wert',
+      'sp.head': 'VPN-Tarife', 'sp.hint': 'Für alle mit grauer IP, die Sperren umgehen müssen. Zahlung und Verlängerung laufen über den Telegram-Bot, der Tarif startet sofort.', 'sp.loading': 'Tarife laden…', 'sp.comp': 'Tarifinhalt', 'th.func': 'Funktion', 'th.val': 'Wert',
       'sf.instant': '+ Bezahlung per Telegram-Bot, sofortige Aktivierung',
       'sb.head': 'Zahlung und Verlängerung', 'sb.hint': 'Aktiver Tarif, Laufzeit und Zahlungshistorie. Verlängerung mit einem Klick.', 'sb.plan': 'Aktueller Tarif', 'sb.until': 'Gültig bis', 'sb.buy': 'Per Telegram bezahlen', 'btn.buy-tg': '💬 Per Telegram kaufen', 'sb.hist': 'Zahlungshistorie',
-      'sb.form': 'Zahlung oder Verlängerung erfassen',
-      'sb.ph-uid': 'Kunden-uid',
-      'sb.ph-name': 'Name des neuen Kunden',
-      'sb.submit': 'Zahlung erfassen',
-      'sb.need': 'Kunden-uid oder neuen Namen angeben',
-      'sb.ok': 'Zahlung erfasst',
       'th.date': 'Datum', 'th.desc': 'Beschreibung', 'th.sum': 'Betrag',
       'upd.apply': 'Jetzt aktualisieren', 'upd.auto': 'Auto-Update', 'upd.auto-hint': 'Das Update kommt aus den GitHub-Releases. Der Binär wird heruntergeladen, verifiziert, atomar ersetzt — der Proxy startet in wenigen Sekunden neu.',
       'upd.src': 'Update-Quelle', 'th.param': 'Parameter', 'upd.repo': 'Repository', 'upd.sig': 'Signaturprüfung', 'upd.rollback': 'Rollback bei Fehler',
@@ -405,8 +456,33 @@
       'sec.hint': 'Admin-Token des Panels und externe Reality-Schlüssel. Änderung am laufenden Konfig.', 'sec.panel': 'Panel', 'sec.tok-ph': 'Admin-Token (Bearer) — nötig für POST /api/*', 'sec.acc-v': 'Zugriff', 'sec.pbk-ph': 'öffentlicher Schlüssel', 'sec.rotate': 'Schlüssel rotieren',
       'log.head': 'Systemlog', 'log.loading': 'laden…', 'log.refresh': 'Aktualisieren', 'log.download': 'Herunterladen', 'rclog.head': 'Recovery-Journal',
       'th.node': 'Knoten', 'th.region': 'Region', 'th.route': 'Route', 'sec.tok': 'Admin-Token', 'sec.reality': 'Reality',
-      'theme.sun': '🌙', 'theme.moon': '☀️'
-    },
+        'theme.sun': '🌙', 'theme.moon': '☀️',
+  'rec.hint': 'Recovery im Dienst: die Katze beobachtet die Keys (Limit, Region, Verbindungen) und schaltet selbst um. Jeder Wechsel steht hier.', 'mesh.id-hint': 'Das Hauptserver stellt die Einladung aus. Bis dahin wird die Knoten-ID gezeigt.', 'routes.master': 'Routen legt der Hauptserver fest: hier siehst du, wohin der Traffic geht. Ein Client-Build kann keine Regeln ändern — bitte den Netzbetreiber 🐾', 'sec.tok-hint': 'Das Admin-Token ist dein Panel-Passwort. Es wird beim ersten Start (Assistent) gesetzt und in data/settings.json bzw. AURORA_UI_TOKEN gespeichert. Einmal hier eintragen.', 'sec.2fa-on': '2FA aktivieren', 'sec.2fa-off': '2FA deaktivieren',
+      'feat.master': 'Preise und Beschreibungen setzt der Master-Server — dieser Knoten holt sie sich nach dem Beitritt zum Mesh',
+    'myk.head': 'Meine Schlüssel',
+    'myk.hint': 'Ein Gerät = ein gekaufter Schlüssel 🐾 Tarif, Ablauf und Traffic je Schlüssel.',
+    'myk.until': 'Gültig bis',
+    'myk.traffic': 'Traffic',
+    'myk.devices': 'Schlüssel',
+    'myk.how': 'Anleitung',
+    'myk.copy': 'Link kopieren',
+    'myk.copy-ok': 'Link kopiert 🐾',
+    'myk.empty': 'Noch keine Schlüssel — Tarif im Telegram-Bot kaufen',
+    'myk.unlim': 'unbegrenzt',
+    'dev.conn': 'Proxy-Verbindungen',
+    'nav.conn': 'Verbindungen',
+    'nav.keys-proxy': 'Proxy-Schlüssel',      'ext.head': 'Aurora-PRO-Funktionen',
+      'ext.locked': 'Solange das Abo nicht aktiv ist, sind PRO-Funktionen gesperrt. VPN und Proxy laufen normal.',
+      'ext.pro': 'PRO offen: die Katze ist gluecklich 🐾',
+      'ext.expired': 'Abo ist nicht aktiv - im Telegram-Bot kaufen',
+      'ext.na': 'Lizenz nicht verfuegbar: keine Antwort. Proxy laeuft 🐾',
+      'ext.buy': 'PRO kaufen',
+      'ext.offline': 'Arbeitet mit zwischengespeicherter Lizenz',
+        'ext.trial': 'Testphase aktiv: Erweiterung und Werbeblocker sind schon offen 🐱',
+        'ext.dl-chrome': 'Für Chrome herunterladen',
+        'ext.dl-edge': 'Für Edge herunterladen',
+
+    },  
     fr: {
       'pol.head': 'Politique du service', 'pol.readOnly': 'Voir', 'pol.accept': 'J\'accepte les conditions', 'ru.regions': 'Segments', 'ru.custom-ph': 'Domaines personnalisés séparés par des virgules (optionnel)',
       'dash.manage': 'Gestion', 'pool.refresh-btn': 'Actualiser les clés', 'pool.check-btn': 'Vérifier les clés', 'mesh.ping-btn': 'Ping mesh',
@@ -484,15 +560,9 @@
       'mj.master': 'Le serveur est hub, contrôle la visibilité des clients', 'mj.show-mesh': 'Afficher l\'onglet « Réseau mesh » aux clients', 'mj.show-subs': 'Afficher l\'onglet « Boutique » aux clients',
       'mt.hint': 'Votre proxy (au centre) et les nœuds d\'autres membres du mesh. Les connexions sont actives si le trafic passe par eux.',
       'mrt.hint': 'Règles de quel trafic sort vers internet via quel nœud. Ordre de haut en bas.', 'th.what': 'Quoi', 'th.via': 'Où', 'th.proto': 'Protocole',
-      'sp.head': 'Forfaits VPN', 'sp.hint': 'Forfaits VPN pour les IP grises qui doivent contourner le blocage. Paiement et renouvellement passent par le bot Telegram, le forfait est actif aussitôt.', 'sp.loading': 'chargement des forfaits…', 'sp.comp': 'Contenu du forfait', 'th.func': 'Fonction', 'th.val': 'Valeur',
+      'sp.head': 'Forfaits VPN', 'sp.hint': 'Pour les IP grises qui doivent contourner le blocage. Paiement et renouvellement passent par le bot Telegram, le forfait est actif aussitôt.', 'sp.loading': 'chargement des forfaits…', 'sp.comp': 'Contenu du forfait', 'th.func': 'Fonction', 'th.val': 'Valeur',
       'sf.instant': '+ paiement dans le bot Telegram, activation immédiate',
       'sb.head': 'Paiement et prolongation', 'sb.hint': 'Forfait actif, validité et historique des paiements. Prolongation en un clic.', 'sb.plan': 'Forfait actuel', 'sb.until': 'Valable jusqu\'au', 'sb.buy': 'Payer via Telegram', 'btn.buy-tg': '💬 Acheter via Telegram', 'sb.hist': 'Historique des paiements',
-      'sb.form': 'Enregistrer un paiement ou un renouvellement',
-      'sb.ph-uid': 'uid du client',
-      'sb.ph-name': 'Nom du nouveau client',
-      'sb.submit': 'Enregistrer le paiement',
-      'sb.need': 'Indiquez un uid client ou un nouveau nom',
-      'sb.ok': 'Paiement enregistré',
       'th.date': 'Date', 'th.desc': 'Description', 'th.sum': 'Montant',
       'upd.apply': 'Mettre à jour maintenant', 'upd.auto': 'Mise à jour auto', 'upd.auto-hint': 'La mise à jour provient des releases GitHub. Le binaire est téléchargé, vérifié, remplacé atomiquement — le proxy redémarre en quelques secondes.',
       'upd.src': 'Source de mise à jour', 'th.param': 'Paramètre', 'upd.repo': 'Dépôt', 'upd.sig': 'Vérification de signature', 'upd.rollback': 'Restauration en cas d\'échec',
@@ -504,8 +574,33 @@
       'sec.hint': 'Jeton du panneau admin et clés Reality externes. Change la config en direct.', 'sec.panel': 'Panneau', 'sec.tok-ph': 'Jeton admin (Bearer) — requis pour POST /api/*', 'sec.acc-v': 'Accès', 'sec.pbk-ph': 'clé publique', 'sec.rotate': 'Rotation des clés',
       'log.head': 'Journal système', 'log.loading': 'chargement…', 'log.refresh': 'Actualiser', 'log.download': 'Télécharger', 'rclog.head': 'Journal recovery',
       'th.node': 'Nœud', 'th.region': 'Région', 'th.route': 'Itinéraire', 'sec.tok': 'Jeton admin', 'sec.reality': 'Reality',
-      'theme.sun': '🌙', 'theme.moon': '☀️'
-    },
+        'theme.sun': '🌙', 'theme.moon': '☀️',
+  'rec.hint': 'Recovery en service : le chat surveille les cles (limite, region, connexions) et bascule tout seul. Chaque bascule est notee ici.', 'mesh.id-hint': 'Le serveur principal délivre l\'invitation. D\'ici là, l\'identifiant du nœud est affiché.', 'routes.master': 'Les routes sont définies par le serveur principal : vous voyez ici où part le trafic. Un build client ne peut pas ajouter ni supprimer de règle — demandez au propriétaire du réseau 🐾', 'sec.tok-hint': 'Le jeton admin est votre mot de passe du panneau. Il est défini au premier démarrage (assistant) et stocké dans data/settings.json ou la variable AURORA_UI_TOKEN. Saisissez-le une fois ici.', 'sec.2fa-on': 'Activer la 2FA', 'sec.2fa-off': 'Désactiver la 2FA',
+      'feat.master': 'Les prix et les descriptions sont définis par le serveur maître — ce nœud les recupere en rejoignant le maillage',
+    'myk.head': 'Mes clés',
+    'myk.hint': 'Un appareil = une clé achetée 🐾 Forfait, expiration et trafic par clé.',
+    'myk.until': 'Expire le',
+    'myk.traffic': 'Trafic',
+    'myk.devices': 'Clés',
+    'myk.how': 'Instructions',
+    'myk.copy': 'Copier le lien',
+    'myk.copy-ok': 'Lien copié 🐾',
+    'myk.empty': 'Aucune clé — achetez un forfait dans le bot Telegram',
+    'myk.unlim': 'illimité',
+    'dev.conn': 'Connexions au proxy',
+    'nav.conn': 'Connexions',
+    'nav.keys-proxy': 'Clés du proxy',      'ext.head': 'Fonctions PRO Aurora',
+      'ext.locked': "Tant que l'abonnement n'est pas actif, les fonctions PRO sont bloquees. VPN et proxy fonctionnent normalement.",
+      'ext.pro': 'PRO ouvert : le chat est content 🐾',
+      'ext.expired': 'Abonnement inactif - achetez-le dans le bot Telegram',
+      'ext.na': 'Licence indisponible : pas de reponse. Le proxy fonctionne 🐾',
+      'ext.buy': 'Acheter PRO',
+      'ext.offline': 'Fonctionne avec la licence en cache',
+        'ext.trial': 'Essai actif : l’extension et le bloqueur de pubs sont déjà ouverts 🐱',
+        'ext.dl-chrome': 'Télécharger pour Chrome',
+        'ext.dl-edge': 'Télécharger pour Edge',
+
+    },  
     tr: {
       'pol.head': 'Hizmet politikası', 'pol.readOnly': 'Görüntüle', 'pol.accept': 'Koşulları kabul ediyorum', 'ru.regions': 'Segmentler', 'ru.custom-ph': 'Virgülle ayrılmış özel alan adları (isteğe bağlı)',
       'dash.manage': 'Yönetim', 'pool.refresh-btn': 'Anahtarları güncelle', 'pool.check-btn': 'Anahtarları kontrol et', 'mesh.ping-btn': 'Mesh ping',
@@ -583,15 +678,9 @@
       'mj.master': 'Sunucu hub\'dır, istemci görünürlüğünü kontrol eder', 'mj.show-mesh': 'İstemcilere «Mesh ağı» sekmesini göster', 'mj.show-subs': 'İstemcilere «Mağaza» sekmesini göster',
       'mt.hint': 'Proxy\'nuz (merkezde) ve diğer mesh katılımcılarının düğümleri. Trafik onlardan geçiyorsa bağlantılar aktiftir.',
       'mrt.hint': 'Hangi trafiğin hangi düğümden internete çıktığı kuralları. Sıra yukarıdan aşağıya.', 'th.what': 'Ne', 'th.via': 'Nereye', 'th.proto': 'Protokol',
-      'sp.head': 'VPN planları', 'sp.hint': 'Gri IP nedeniyle engellenmeleri aşması gerekenler için VPN planları. Ödeme ve yenileme Telegram botunda yapılır, plan anında açılır.', 'sp.loading': 'tarifeler yükleniyor…', 'sp.comp': 'Tarife içeriği', 'th.func': 'İşlev', 'th.val': 'Değer',
+      'sp.head': 'VPN planları', 'sp.hint': 'Gri IP nedeniyle engellenmeleri aşması gerekenler için. Ödeme ve yenileme Telegram botunda yapılır, plan anında açılır.', 'sp.loading': 'tarifeler yükleniyor…', 'sp.comp': 'Tarife içeriği', 'th.func': 'İşlev', 'th.val': 'Değer',
       'sf.instant': '+ Telegram botunda ödeme, anında etkinleşir',
       'sb.head': 'Ödeme ve uzatma', 'sb.hint': 'Aktif tarife, süre ve ödeme geçmişi. Tek tıkla uzatma.', 'sb.plan': 'Mevcut tarife', 'sb.until': 'Geçerlilik', 'sb.buy': 'Telegram ile öde', 'btn.buy-tg': '💬 Telegram\'dan satın al', 'sb.hist': 'Ödeme geçmişi',
-      'sb.form': 'Ödeme veya yenileme kaydı',
-      'sb.ph-uid': 'istemci uid',
-      'sb.ph-name': 'Yeni istemci adı',
-      'sb.submit': 'Ödemeyi kaydet',
-      'sb.need': 'İstemci uid veya yeni ad girin',
-      'sb.ok': 'Ödeme kaydedildi',
       'th.date': 'Tarih', 'th.desc': 'Açıklama', 'th.sum': 'Tutar',
       'upd.apply': 'Şimdi güncelle', 'upd.auto': 'Otomatik güncelleme', 'upd.auto-hint': 'Güncelleme GitHub sürümlerinden yapılır. İkili indirilir, doğrulanır, atomik değiştirilir — proxy birkaç saniyede yeniden başlar.',
       'upd.src': 'Güncelleme kaynağı', 'th.param': 'Parametre', 'upd.repo': 'Depo', 'upd.sig': 'İmza kontrolü', 'upd.rollback': 'Hata durumunda geri dönüş',
@@ -603,8 +692,33 @@
       'sec.hint': 'Panel admin tokeni ve harici Reality anahtarları. Canlı konfigürasyonu değiştirir.', 'sec.panel': 'Panel', 'sec.tok-ph': 'Admin tokeni (Bearer) — POST /api/* için gerekli', 'sec.acc-v': 'Erişim', 'sec.pbk-ph': 'genel anahtar', 'sec.rotate': 'Anahtar döndür',
       'log.head': 'Sistem günlüğü', 'log.loading': 'yükleniyor…', 'log.refresh': 'Yenile', 'log.download': 'İndir', 'rclog.head': 'Recovery günlüğü',
       'th.node': 'Düğüm', 'th.region': 'Bölge', 'th.route': 'Güzergâh', 'sec.tok': 'Admin tokeni', 'sec.reality': 'Reality',
-      'theme.sun': '🌙', 'theme.moon': '☀️'
-    },
+        'theme.sun': '🌙', 'theme.moon': '☀️',
+  'rec.hint': 'Recovery görevde: kedi anahtarları izler (limit, bölge, bağlantı) ve bir anahtar düşerse tüneli kendisi değiştirir. Her değişim burada.', 'mesh.id-hint': 'Daveti ana sunucu verir. O ana kadar düğüm kimliğiniz gösterilir.', 'routes.master': 'Rotaları ana sunucu belirler: burada trafiğin nereye gittiğini görürsün. İstemci sürümü kural ekleyemez veya kaldıramaz — ağ sahibinden iste 🐾', 'sec.tok-hint': 'Yönetici jetonu panel parolanızdır. İlk çalıştırmada (sihirbaz) ayarlanır ve data/settings.json ya da AURORA_UI_TOKEN değişkeninde saklanır. Buraya bir kez girin.', 'sec.2fa-on': '2FA\'yı aç', 'sec.2fa-off': '2FA\'yı kapat',
+      'feat.master': 'Fiyat ve aciklamalari ana sunucu belirler — bu dugum mesh agina katilirca alir',
+    'myk.head': 'Anahtarlarım',
+    'myk.hint': 'Cihaz = satın alınan anahtar 🐾 Anahtar başına paket, bitiş ve trafik.',
+    'myk.until': 'Bitiş',
+    'myk.traffic': 'Trafik',
+    'myk.devices': 'Anahtarlar',
+    'myk.how': 'Talimat',
+    'myk.copy': 'Bağlantıyı kopyala',
+    'myk.copy-ok': 'Bağlantı kopyalandı 🐾',
+    'myk.empty': 'Henüz anahtar yok — Telegram botundan paket al',
+    'myk.unlim': 'sınırsız',
+    'dev.conn': 'Proxy bağlantıları',
+    'nav.conn': 'Bağlantılar',
+    'nav.keys-proxy': 'Proxy anahtarları',      'ext.head': 'Aurora PRO ozellikleri',
+      'ext.locked': 'Abonelik aktif olana kadar PRO ozellikleri kilitli. VPN ve proxy normal calisir.',
+      'ext.pro': 'PRO acik: kedi mutlu 🐾',
+      'ext.expired': 'Abonelik aktif degil - Telegram botunda satin alin',
+      'ext.na': 'Lisans yok: sunucu yanit vermedi. Proxy calisiyor 🐾',
+      'ext.buy': 'PRO satin al',
+      'ext.offline': 'Onbelleklenmis lisans ile calisiyor',
+        'ext.trial': 'Deneme aktif: eklenti ve reklam engelleme zaten açık 🐱',
+        'ext.dl-chrome': 'Chrome için indir',
+        'ext.dl-edge': 'Edge için indir',
+
+    },  
     pt: {
       'pol.head': 'Política do serviço', 'pol.readOnly': 'Ver', 'pol.accept': 'Aceito os termos', 'ru.regions': 'Segmentos', 'ru.custom-ph': 'Domínios personalizados separados por vírgulas (opcional)',
       'dash.manage': 'Gestão', 'pool.refresh-btn': 'Atualizar chaves', 'pool.check-btn': 'Verificar chaves', 'mesh.ping-btn': 'Ping mesh',
@@ -682,15 +796,9 @@
       'mj.master': 'Servidor é hub, controla a visibilidade dos clientes', 'mj.show-mesh': 'Mostrar a aba “Rede mesh” aos clientes', 'mj.show-subs': 'Mostrar a aba “Loja” aos clientes',
       'mt.hint': 'Seu proxy (no centro) e os nós de outros membros do mesh. As conexões estão ativas se o tráfego passa por eles.',
       'mrt.hint': 'Regras de qual tráfego sai para a internet via qual nó. Ordem de cima para baixo.', 'th.what': 'O quê', 'th.via': 'Onde', 'th.proto': 'Protocolo',
-      'sp.head': 'Planos VPN', 'sp.hint': 'Planos VPN para quem tem IP cinza e precisa contornar bloqueios. Pagamento e renovação são feitos no bot do Telegram, o plano é ativado na hora.', 'sp.loading': 'carregando planos…', 'sp.comp': 'Conteúdo do plano', 'th.func': 'Função', 'th.val': 'Valor',
+      'sp.head': 'Planos VPN', 'sp.hint': 'Para quem tem IP cinza e precisa contornar bloqueios. Pagamento e renovação são feitos no bot do Telegram, o plano é ativado na hora.', 'sp.loading': 'carregando planos…', 'sp.comp': 'Conteúdo do plano', 'th.func': 'Função', 'th.val': 'Valor',
       'sf.instant': '+ pagamento no bot do Telegram, ativação na hora',
       'sb.head': 'Pagamento e renovação', 'sb.hint': 'Plano ativo, validade e histórico de pagamentos. Renovação em um clique.', 'sb.plan': 'Plano atual', 'sb.until': 'Válido até', 'sb.buy': 'Pagar via Telegram', 'btn.buy-tg': '💬 Comprar via Telegram', 'sb.hist': 'Histórico de pagamentos',
-      'sb.form': 'Registar pagamento ou renovação',
-      'sb.ph-uid': 'uid do cliente',
-      'sb.ph-name': 'Nome do novo cliente',
-      'sb.submit': 'Registar pagamento',
-      'sb.need': 'Indique o uid do cliente ou um novo nome',
-      'sb.ok': 'Pagamento registado',
       'th.date': 'Data', 'th.desc': 'Descrição', 'th.sum': 'Valor',
       'upd.apply': 'Atualizar agora', 'upd.auto': 'Auto-atualização', 'upd.auto-hint': 'A atualização vem dos releases do GitHub. O binário é baixado, verificado, substituído atomicamente — o proxy reinicia em alguns segundos.',
       'upd.src': 'Origem da atualização', 'th.param': 'Parâmetro', 'upd.repo': 'Repositório', 'upd.sig': 'Verificação de assinatura', 'upd.rollback': 'Reversão em falha',
@@ -702,8 +810,33 @@
       'sec.hint': 'Token do painel admin e chaves Reality externas. Muda a config ao vivo.', 'sec.panel': 'Painel', 'sec.tok-ph': 'Token admin (Bearer) — necessário para POST /api/*', 'sec.acc-v': 'Acesso', 'sec.pbk-ph': 'chave pública', 'sec.rotate': 'Rotacionar chaves',
       'log.head': 'Log do sistema', 'log.loading': 'carregando…', 'log.refresh': 'Atualizar', 'log.download': 'Baixar', 'rclog.head': 'Diário do recovery',
       'th.node': 'Nó', 'th.region': 'Região', 'th.route': 'Rota', 'sec.tok': 'Token admin', 'sec.reality': 'Reality',
-      'theme.sun': '🌙', 'theme.moon': '☀️'
-    },
+        'theme.sun': '🌙', 'theme.moon': '☀️',
+  'rec.hint': 'Recovery em serviço: o gato vigia as chaves (limite, região, conexões) e troca o túnel sozinho. Cada troca fica registrada aqui.', 'mesh.id-hint': 'O servidor principal emite o convite. Até lá mostramos o id do seu nó.', 'routes.master': 'As rotas são definidas pelo servidor principal: aqui você vê para onde vai o tráfego. Um build cliente não adiciona nem remove regras — peça ao dono da rede 🐾', 'sec.tok-hint': 'O token de admin é a senha do painel. É definido na primeira execução (assistente) e guardado em data/settings.json ou na variável AURORA_UI_TOKEN. Digite-o aqui uma vez.', 'sec.2fa-on': 'Ativar 2FA', 'sec.2fa-off': 'Desativar 2FA',
+      'feat.master': 'Os precos e as descricoes sao definidos pelo servidor mestre — este no recebe ao entrar na malha',
+    'myk.head': 'Minhas chaves',
+    'myk.hint': 'Um dispositivo = uma chave comprada 🐾 Plano, validade e tráfego por chave.',
+    'myk.until': 'Válido até',
+    'myk.traffic': 'Tráfego',
+    'myk.devices': 'Chaves',
+    'myk.how': 'Instruções',
+    'myk.copy': 'Copiar link',
+    'myk.copy-ok': 'Link copiado 🐾',
+    'myk.empty': 'Ainda sem chaves — compre um plano no bot do Telegram',
+    'myk.unlim': 'ilimitado',
+    'dev.conn': 'Conexões do proxy',
+    'nav.conn': 'Conexões',
+    'nav.keys-proxy': 'Chaves do proxy',      'ext.head': 'Recursos PRO do Aurora',
+      'ext.locked': 'Enquanto a assinatura nao estiver ativa, os recursos PRO ficam bloqueados. VPN e proxy funcionam normal.',
+      'ext.pro': 'PRO aberto: o gato feliz 🐾',
+      'ext.expired': 'A assinatura nao esta ativa - compre no bot do Telegram',
+      'ext.na': 'Licenca indisponivel: sem resposta. O proxy funciona 🐾',
+      'ext.buy': 'Comprar PRO',
+      'ext.offline': 'Trabalhando com a licenca em cache',
+        'ext.trial': 'Teste ativo: a extensão e o bloqueador de anúncios já estão abertos 🐱',
+        'ext.dl-chrome': 'Baixar para o Chrome',
+        'ext.dl-edge': 'Baixar para o Edge',
+
+    },  
     zh: {
       'pol.head': '服务政策', 'pol.readOnly': '查看', 'pol.accept': '我接受条款', 'ru.regions': '分段', 'ru.custom-ph': '自定义域名，逗号分隔（可选）',
       'dash.manage': '管理', 'pool.refresh-btn': '更新密钥', 'pool.check-btn': '检查密钥', 'mesh.ping-btn': '网格ping',
@@ -784,12 +917,6 @@
       'sp.head': 'VPN 套餐', 'sp.hint': '面向需要绕过封锁的灰 IP 用户。付款与续费在 Telegram 机器人中完成，套餐立即开通。', 'sp.loading': '加载中…', 'sp.comp': '套餐内容', 'th.func': '功能', 'th.val': '数值',
       'sf.instant': '+ 通过 Telegram 机器人付款，即时开通',
       'sb.head': '支付与续费', 'sb.hint': '当前套餐、有效期和支付记录。一键续费。', 'sb.plan': '当前套餐', 'sb.until': '有效至', 'sb.buy': '通过 Telegram 支付', 'btn.buy-tg': '💬 通过 Telegram 购买', 'sb.hist': '支付记录',
-      'sb.form': '登记付款或续费',
-      'sb.ph-uid': '客户 uid',
-      'sb.ph-name': '新客户名称',
-      'sb.submit': '登记付款',
-      'sb.need': '请填写客户 uid 或新客户名称',
-      'sb.ok': '付款已登记',
       'th.date': '日期', 'th.desc': '描述', 'th.sum': '金额',
       'upd.apply': '立即更新', 'upd.auto': '自动更新', 'upd.auto-hint': '更新来自 GitHub 发布版。二进制下载、验证、原子替换 — 代理几秒后重启。',
       'upd.src': '更新来源', 'th.param': '参数', 'upd.repo': '仓库', 'upd.sig': '签名验证', 'upd.rollback': '失败时回滚',
@@ -801,8 +928,33 @@
       'sec.hint': '面板管理员令牌和外部 Reality 密钥。修改会作用于实时配置。', 'sec.panel': '面板', 'sec.tok-ph': '管理员令牌（Bearer）— POST /api/* 需要', 'sec.acc-v': '访问', 'sec.pbk-ph': '公钥', 'sec.rotate': '轮换密钥',
       'log.head': '系统日志', 'log.loading': '加载中…', 'log.refresh': '刷新', 'log.download': '下载', 'rclog.head': '恢复日志',
       'th.node': '节点', 'th.region': '地区', 'th.route': '路由', 'sec.tok': '管理员令牌', 'sec.reality': 'Reality',
-      'theme.sun': '🌙', 'theme.moon': '☀️'
-    },
+        'theme.sun': '🌙', 'theme.moon': '☀️',
+  'rec.hint': 'Recovery 值班中：猫咪自己盯钥匙（限额、地区、连接），钥匙掉线会自动切换线路。每次切换都会记录在这里。', 'mesh.id-hint': '邀请码由主服务器发放。在此之前显示您的节点 ID。', 'routes.master': '路由由主服务器设定：这里能看到流量走向。客户端版不能增删规则——请找网络管理员 🐾', 'sec.tok-hint': '管理员令牌就是面板密码：首次启动向导中设置，保存在 data/settings.json 或环境变量 AURORA_UI_TOKEN。在此输入一次即可。', 'sec.2fa-on': '开启 2FA', 'sec.2fa-off': '关闭 2FA',
+      'feat.master': '价格和描述由主服务器设定 — 本节点加入网络后自动获取',
+    'myk.head': '我的密钥',
+    'myk.hint': '设备 = 已购买的密钥 🐾 每个密钥的套餐、到期时间和流量。',
+    'myk.until': '到期',
+    'myk.traffic': '流量',
+    'myk.devices': '密钥',
+    'myk.how': '使用说明',
+    'myk.copy': '复制链接',
+    'myk.copy-ok': '链接已复制 🐾',
+    'myk.empty': '还没有密钥 — 在 Telegram 机器人购买套餐',
+    'myk.unlim': '不限',
+    'dev.conn': '代理连接',
+    'nav.conn': '连接',
+    'nav.keys-proxy': '代理密钥',      'ext.head': 'Aurora PRO 功能',
+      'ext.locked': '订阅未激活前，PRO 功能锁定。VPN 和代理照常工作。',
+      'ext.pro': 'PRO 已开通：猫咪满意 🐾',
+      'ext.expired': '订阅未激活 — 可在 Telegram 机器人中购买',
+      'ext.na': '许可证不可用：服务器无响应。代理仍正常工作 🐾',
+      'ext.buy': '购买 PRO',
+      'ext.offline': '使用缓存的许可证运行',
+        'ext.trial': '试用中：扩展和广告拦截已开放 🐱',
+        'ext.dl-chrome': '下载 Chrome 版',
+        'ext.dl-edge': '下载 Edge 版',
+
+    },  
     ar: {
       'pol.head': 'سياسة الخدمة', 'pol.readOnly': 'عرض', 'pol.accept': 'أوافق على الشروط', 'ru.regions': 'القطاعات', 'ru.custom-ph': 'نطاقات مخصصة مفصولة بفواصل (اختياري)',
       'dash.manage': 'إدارة', 'pool.refresh-btn': 'تحديث المفاتيح', 'pool.check-btn': 'فحص المفاتيح', 'mesh.ping-btn': 'بنج الشبكة',
@@ -880,15 +1032,9 @@
       'mj.master': 'الخادم هو المحور ويتحكم في رؤية العملاء', 'mj.show-mesh': 'إظهار تبويب "شبكة mesh" للعملاء', 'mj.show-subs': 'إظهار تبويب "المتجر" للعملاء',
       'mt.hint': 'بروكسيك (في المركز) وعقد أعضاء mesh الآخرين. الاتصالات نشطة إذا مرت الحركة عبرها.',
       'mrt.hint': 'قواعد أي حركة تخرج للإنترنت عبر أي عقدة. الترتيب من الأعلى للأسفل.', 'th.what': 'ماذا', 'th.via': 'إلى أين', 'th.proto': 'البروتوكول',
-      'sp.head': 'خطط VPN', 'sp.hint': 'خطط VPN لمن لديه IP رمادي ويحتاج إلى تجاوز الحظر. الدفع والتجديد عبر بوت تيليجرام، ويُفعَّل الخطة فورًا.', 'sp.loading': 'جارٍ تحميل الخطط…', 'sp.comp': 'محتوى الخطة', 'th.func': 'الوظيفة', 'th.val': 'القيمة',
+      'sp.head': 'خطط VPN', 'sp.hint': 'لمن لديه IP رمادي ويحتاج إلى تجاوز الحظر. الدفع والتجديد عبر بوت تيليجرام، ويُفعّل الخطة فورًاً.', 'sp.loading': 'جارٍ تحميل الخطط…', 'sp.comp': 'محتوى الخطة', 'th.func': 'الوظيفة', 'th.val': 'القيمة',
       'sf.instant': '+ الدفع عبر بوت تيليجرام، تفعيل فوري',
       'sb.head': 'الدفع والتجديد', 'sb.hint': 'الخطة النشطة وصلاحيتها وسجل الدفعات. التجديد بنقرة واحدة.', 'sb.plan': 'الخطة الحالية', 'sb.until': 'صالحة حتى', 'sb.buy': 'الدفع عبر Telegram', 'btn.buy-tg': '💬 الشراء عبر Telegram', 'sb.hist': 'سجل الدفعات',
-      'sb.form': 'تسجيل الدفع أو التجديد',
-      'sb.ph-uid': 'معرّف العميل',
-      'sb.ph-name': 'اسم العميل الجديد',
-      'sb.submit': 'تسجيل الدفع',
-      'sb.need': 'أدخل معرّف العميل أو اسمًا جديدًا',
-      'sb.ok': 'تم تسجيل الدفع',
       'th.date': 'التاريخ', 'th.desc': 'الوصف', 'th.sum': 'المبلغ',
       'upd.apply': 'تحديث الآن', 'upd.auto': 'تحديث تلقائي', 'upd.auto-hint': 'يتم التحديث من إصدارات GitHub. يُنزل الملف، يُتحقق منه، يُستبدل ذرياً — يعاد تشغيل البروكسي خلال ثوانٍ.',
       'upd.src': 'مصدر التحديث', 'th.param': 'المعامل', 'upd.repo': 'المستودع', 'upd.sig': 'التحقق من التوقيع', 'upd.rollback': 'تراجع عند الفشل',
@@ -900,8 +1046,33 @@
       'sec.hint': 'رمز لوحة الإدارة ومفاتيح Reality الخارجية. يغيّر الإعداد الحي.', 'sec.panel': 'اللوحة', 'sec.tok-ph': 'رمز المسؤول (Bearer) — مطلوب لـ POST /api/*', 'sec.acc-v': 'الوصول', 'sec.pbk-ph': 'المفتاح العام', 'sec.rotate': 'تدوير المفاتيح',
       'log.head': 'سجل النظام', 'log.loading': 'جارٍ التحميل…', 'log.refresh': 'تحديث', 'log.download': 'تنزيل', 'rclog.head': 'سجل الاسترداد',
       'th.node': 'العقدة', 'th.region': 'المنطقة', 'th.route': 'المسار', 'sec.tok': 'رمز المسؤول', 'sec.reality': 'Reality',
-      'theme.sun': '🌙', 'theme.moon': '☀️'
-    },
+        'theme.sun': '🌙', 'theme.moon': '☀️',
+  'rec.hint': 'Recovery في الخدمة: القطة تراقب المفاتيح (الحدود، المنطقة، الاتصالات) وتبدّل النفق تلقائيا عند سقوط مفتاح. كل تبديل يسجل هنا.', 'mesh.id-hint': 'يصدر الخادم الرئيسي الدعوة. حتى ذلك الحين نعرض معرّف العقدة الخاصة بك.', 'routes.master': 'المسارات يحددها الخادم الرئيسي: هنا ترى إلى أين يذهب الاتصال. نسخة العميل لا تضيف ولا تحذف قواعد — اطلب من مالك الشبكة 🐾', 'sec.tok-hint': 'رمز المشرف هو كلمة مرور اللوحة: يضبط عند التشغيل الأول (المعالج) ويحفظ في data/settings.json أو المتغير AURORA_UI_TOKEN. أدخله هنا مرة واحدة.', 'sec.2fa-on': 'تفعيل 2FA', 'sec.2fa-off': 'تعطيل 2FA',
+      'feat.master': 'الأسعار والأوصاف يحددها الخادم — هذا العقدة ستأخذها عند الانضماف إلى الشبكة',
+    'myk.head': 'مفاتحي',
+    'myk.hint': 'جهاز = مفتاح مشترى 🐾 الخطة ونهاية المدة والبيانات لكل مفتاح.',
+    'myk.until': 'تنتهي في',
+    'myk.traffic': 'البيانات',
+    'myk.devices': 'المفاتيح',
+    'myk.how': 'تعليمات',
+    'myk.copy': 'نسخ الرابط',
+    'myk.copy-ok': 'تم نسخ الرابط 🐾',
+    'myk.empty': 'لا مفاتيح بعد — اشترِ خطة من بوت تيليجرام',
+    'myk.unlim': 'غير محدود',
+    'dev.conn': 'اتصالات البروكسي',
+    'nav.conn': 'الاتصالات',
+    'nav.keys-proxy': 'مفاتيح البروكسي',      'ext.head': 'ميزات Aurora PRO',
+      'ext.locked': 'حتى تفعيل الاشتراك تبقى ميزات PRO مقفلة. يعمل الوكيل كالمعتاد.',
+      'ext.pro': 'PRO مفتوح: القطة سعيدة 🐾',
+      'ext.expired': 'الاشتراك غير نشط - اشتره من بوت تيليجرام',
+      'ext.na': 'الترخيص غير متاح: لا رد. الوكيل يعمل 🐾',
+      'ext.buy': 'شراء PRO',
+      'ext.offline': 'يعمل بذاكرة التخزين المؤقت',
+        'ext.trial': 'التجربة نشطة: الإمدادات وحظر الإعلانات مفتوحة 🐱',
+        'ext.dl-chrome': 'تنزيل للكروم',
+        'ext.dl-edge': 'تنزيل للإدج',
+
+    },  
     hi: {
       'pol.head': 'सेवा नीति', 'pol.readOnly': 'देखें', 'pol.accept': 'मैं शर्तें स्वीकार करता हूँ', 'ru.regions': 'सेगमेंट', 'ru.custom-ph': 'कस्टम डोमेन, अल्पविराम से अलग (वैकल्पिक)',
       'dash.manage': 'प्रबंधन', 'pool.refresh-btn': 'कुंजियाँ अपडेट करें', 'pool.check-btn': 'कुंजियाँ जाँचें', 'mesh.ping-btn': 'मेश पिंग',
@@ -979,15 +1150,9 @@
       'mj.master': 'सर्वर हब है, क्लाइंट की दृश्यता नियंत्रित करता है', 'mj.show-mesh': 'क्लाइंट्स को “Mesh नेटवर्क” टैब दिखाएँ', 'mj.show-subs': 'क्लाइंट्स को “स्टोर” टैब दिखाएँ',
       'mt.hint': 'आपका प्रॉक्सी (केंद्र में) और अन्य mesh सदस्यों के नोड। कनेक्शन सक्रिय हैं यदि ट्रैफ़िक उनसे होकर जाता है।',
       'mrt.hint': 'नियम कि कौन-सा ट्रैफ़िक किस नोड से इंटरनेट जाता है। क्रम ऊपर से नीचे।', 'th.what': 'क्या', 'th.via': 'कहाँ', 'th.proto': 'प्रोटोकॉल',
-      'sp.head': 'VPN प्लान', 'sp.hint': 'ग्रे IP वालों के लिए VPN प्लान — ब्लॉक हटाने के लिए। भुगतान और नवीनीकरण Telegram बॉट में, प्लान तुरंत सक्रिय।', 'sp.loading': 'प्लान लोड हो रहे…', 'sp.comp': 'प्लान सामग्री', 'th.func': 'सुविधा', 'th.val': 'मान',
+      'sp.head': 'VPN प्लान', 'sp.hint': 'ग्रे IP वालों के लिट — ब्लॉक हटाने के लिए। भुगतान और नवीनीकरण Telegram बॉट में, प्लान तुरंत सक्रिय।', 'sp.loading': 'प्लान लोड हो रहे…', 'sp.comp': 'प्लान सामग्री', 'th.func': 'सुविधा', 'th.val': 'मान',
       'sf.instant': '+ टेलीग्राम बॉट में भुगतान, तुरंत सक्रिय',
       'sb.head': 'भुगतान और नवीनीकरण', 'sb.hint': 'सक्रिय प्लान, अवधि और भुगतान इतिहास। एक क्लिक में नवीनीकरण।', 'sb.plan': 'वर्तमान प्लान', 'sb.until': 'मान्य तक', 'sb.buy': 'Telegram से भुगतान', 'btn.buy-tg': '💬 Telegram से खरीदें', 'sb.hist': 'भुगतान इतिहास',
-      'sb.form': 'भुगतान या नवीनीकरण दर्ज करें',
-      'sb.ph-uid': 'क्लाइंट uid',
-      'sb.ph-name': 'नए क्लाइंट का नाम',
-      'sb.submit': 'भुगतान दर्ज करें',
-      'sb.need': 'क्लाइंट uid या नया नाम दर्ज करें',
-      'sb.ok': 'भुगतान दर्ज हो गया',
       'th.date': 'दिनांक', 'th.desc': 'विवरण', 'th.sum': 'राशि',
       'upd.apply': 'अभी अपडेट करें', 'upd.auto': 'ऑटो-अपडेट', 'upd.auto-hint': 'अपडेट GitHub रिलीज़ से होता है। बाइनरी डाउनलोड, सत्यापित, परमाणु रूप से बदली जाती है — प्रॉक्सी कुछ सेकंड में पुनः आरंभ हो जाता है।',
       'upd.src': 'अपडेट स्रोत', 'th.param': 'पैरामीटर', 'upd.repo': 'रिपॉज़िटरी', 'upd.sig': 'हस्ताक्षर जाँच', 'upd.rollback': 'विफलता पर रोलबैक',
@@ -999,8 +1164,34 @@
       'sec.hint': 'पैनल admin टोकन और बाहरी Reality कुंजियाँ। लाइव कॉन्फ़िग बदलता है।', 'sec.panel': 'पैनल', 'sec.tok-ph': 'Admin टोकन (Bearer) — POST /api/* के लिए आवश्यक', 'sec.acc-v': 'पहुँच', 'sec.pbk-ph': 'सार्वजनिक कुंजी', 'sec.rotate': 'कुंजी रोटेट',
       'log.head': 'सिस्टम लॉग', 'log.loading': 'लोड हो रहा…', 'log.refresh': 'रिफ़्रेश', 'log.download': 'डाउनलोड', 'rclog.head': 'रिकवरी जर्नल',
       'th.node': 'नोड', 'th.region': 'क्षेत्र', 'th.route': 'रूट', 'sec.tok': 'Admin टोकन', 'sec.reality': 'Reality',
-      'theme.sun': '🌙', 'theme.moon': '☀️'
-    }
+        'theme.sun': '🌙', 'theme.moon': '☀️',
+  'rec.hint': 'Recovery कर्तव्य पर: बिल्ली खुद कुंजियाँ देखती है (सीमा, क्षेत्र, कनेक्शन) और कुंजी गिरने पर टनल बदल देती है। हर बदलाव यहाँ दर्ज होगा।', 'mesh.id-hint': 'निमंत्रण मुख्य सर्वर देता है। तब तक आपके नोड की आईडी दिखाई जाती है।', 'routes.master': 'मार्ग मुख्य सर्वर तय करता है: यहाँ आपको ट्रैफ़िक कहाँ जा रहा है दिखता है। क्लाइंट बिल्ड में नियम नहीं बदले जा सकते — नेटवर्क मालिक से कहें 🐾', 'sec.tok-hint': 'एडमिन टोकन आपका पैनल पासवर्ड है: पहली बार के विज़ार्ड में सेट होता है और data/settings.json या AURORA_UI_TOKEN में रहता है। इसे यहाँ एक बार डालें।', 'sec.2fa-on': '2FA चालू करें', 'sec.2fa-off': '2FA बंद करें',
+      'feat.master': 'कीमत और विवरण मास्टर सर्वर तैर करता है — यह नोड मेश मेश जुडिने के बाद लेलेगा',
+    'myk.head': 'मेरी कुंजियाँ',
+    'myk.hint': 'डिवाइस = खरीदी गई कुंजी 🐾 हर कुंजी के लिए प्लान, समय-सीमा और ट्रैफ़िक।',
+    'myk.until': 'समाप्त',
+    'myk.traffic': 'ट्रैफ़िक',
+    'myk.devices': 'कुंजियाँ',
+    'myk.how': 'निर्देश',
+    'myk.copy': 'लिंक कॉपी करें',
+    'myk.copy-ok': 'लिंक कॉपी हो गया 🐾',
+    'myk.empty': 'अभी कोई कुंजी नहीं — टेलीग्राम बॉट में प्लान लें',
+    'myk.unlim': 'असीमित',
+    'dev.conn': 'प्रॉक्सी कनेक्शन',
+    'nav.conn': 'कनेक्शन',
+    'nav.keys-proxy': 'प्रॉक्सी कुंजियाँ',      'ext.head': 'Aurora PRO सुविधाएँ',
+      'ext.locked': 'सदस्यता सक्रिय होने तक PRO सुविधाएँ बंद हैं। VPN और प्रॉक्सी सामान्य रूप से चलते हैं।',
+      'ext.pro': 'PRO खुला है: बिल्ली खुश है 🐾',
+      'ext.expired': 'सदस्यता सक्रिय नहीं — टेलीग्राम बॉट में खरीदें',
+      'ext.na': 'लाइसेंस उपलब्ध नहीं: सर्वर ने जवाब नहीं दिया। प्रॉक्सी चल रहा है 🐾',
+      'ext.buy': 'PRO खरीदें',
+      'ext.offline': 'कैश लाइसेंस के साथ चल रहा है',
+        'ext.trial': 'ट्राइल चालू: विस्तरण और बेलिंग ब्लॉकर दोनों के लेडा हैं 🐱',
+        'ext.dl-chrome': 'Chrome के लिए डाउनलोड',
+        'ext.dl-edge': 'Edge के लिए डाउनलोड',
+
+    },
+  
   };
   function langNow() {
     var l = 'ru';
@@ -1027,6 +1218,8 @@
     renderAll(V.S || {});
     var theme = document.documentElement.getAttribute('data-theme');
     $('theme-btn').textContent = (theme === 'dark' ? _t('theme.sun') : _t('theme.moon'));
+    // Подписи переведены — открываем их (до этого они скрыты, чтобы не мигало сырое название).
+    if (document.body) document.body.classList.remove('pre-lang');
   }
   function setLang(l) {
     if (!I18N[l]) l = 'ru';
@@ -1123,6 +1316,7 @@
   }
 
   function renderAll(soft) {
+    try { applyExtGate(); } catch (e) { }  // A-111: гейт PRO
     var S = V.S || {};
     if (!Object.keys(S).length) return;
     applyFlags(S);
@@ -1239,8 +1433,7 @@
     var q = $('cx-qr');
     q.innerHTML = '';
     if (link) {
-      if (typeof qrcode !== 'undefined') { var c = document.createElement('canvas'); c.width = 150; c.height = 150; q.appendChild(c); try { qrcode.toCanvas(c, link); } catch (e) { q.innerHTML = '<div class="qr-ph">' + _t('c.qr-na') + '</div>'; } }
-      else { q.innerHTML = '<div class="qr-ph">' + _t('c.qr-na-off') + '</div>'; }
+      qrRender(q, link);
     } else {
       q.innerHTML = '<div class="qr-ph">' + _t('c.secret-hint') + '</div>';
     }
@@ -1321,7 +1514,7 @@
     getJSON('/api/update/status').then(function (j) {
       j = j || {};
       V.UPD = j;
-      var avail = j.update === true || (j.latest && j.current && j.latest !== j.current);
+      var avail = !!(j.update === true || (j.latest && j.current && j.latest !== j.current));
       var s = j.state || '';
       var stateText = _t('upd.cur');
       var stateCls = 'badge on';
@@ -1332,12 +1525,23 @@
       $('du-cur').textContent = j.current || '—';
       $('du-new').textContent = j.latest || '—';
       $('du-msg').textContent = msgText;
-      // Карточка обновления видна всегда: кнопка «Обновить сейчас» нужна и когда
-      // новой версии ещё нет (проверить и поставить), и когда она уже вышла.
+      // Бейдж виджета — тот же, что и в карточке: «доступно» только когда
+      // версия реально новее установленной, иначе «актуально».
+      var duBadge = $('du-state-b');
+      if (duBadge) { duBadge.textContent = stateText; duBadge.className = stateCls; }
+      // Виджет виден всегда, но кнопка честная: обновлять нечего → «Проверить
+      // сейчас», есть новая версия → «Обновить». Раньше тут всегда горело
+      // «доступно» и «Обновить» даже при 1.9.3 → 1.9.3.
       $('dash-update').style.display = '';
       $('side-upd').style.display = '';
       var updTag = $('tag-upd');
       if (updTag) { updTag.style.display = avail ? '' : 'none'; }
+      var duUpd = $('du-btn-upd'), duChk = $('du-btn-chk');
+      if (duUpd) { duUpd.style.display = avail ? '' : 'none'; }
+      if (duChk) { duChk.style.display = avail ? 'none' : ''; }
+      var upUpd = $('upd-btn-upd'), upChk = $('upd-btn-chk');
+      if (upUpd) { upUpd.style.display = avail ? '' : 'none'; }
+      if (upChk) { upChk.style.display = avail ? 'none' : ''; }
       $('upd-cur').textContent = j.current || '—';
       $('upd-new').textContent = j.latest || '—';
       $('upd-state-b').textContent = stateText;
@@ -1345,6 +1549,9 @@
       $('upd-msg').textContent = msgText;
       $('upd-repo').textContent = j.repo || '–';
       $('upd-last').textContent = _t('upd.checked') + fmtDate(j.ts);
+    }).catch(function (e) {
+      var m = $('du-msg');
+      if (m) m.textContent = _t('upd.check-err') + ' ' + String(e && e.message ? e.message : e || '');
     });
   }
   function renderUpdateDash() { loadUpdate(); }
@@ -1359,7 +1566,12 @@
       if (!box) return;
       var cur = j.current || '';
       var upd = (V.UPD && (V.UPD.latest || V.UPD.update)) ? (V.UPD.latest || '') : '';
-      box.innerHTML = arr.map(function (x) {
+      var chron = j.chronicle || {};
+      var chronHtml = chron.title
+        ? '<div class="chron"><h3>' + esc(chron.title) + '</h3>'
+          + (chron.sub ? '<p>' + esc(chron.sub) + '</p>' : '') + '</div>'
+        : '';
+      box.innerHTML = chronHtml + (arr.map(function (x) {
         var notes = x.desc || '';
         return '<div class="ver-item" style="padding:10px 18px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:flex-start;font-size:13px">'
           + '<span class="badge' + (x.v === cur ? ' on' : '') + '">v' + esc(x.v || '') + '</span>'
@@ -1372,7 +1584,7 @@
           + '</div>'
           + (notes ? '<div class="muted" style="font-size:12px;margin-top:3px">' + esc(notes) + '</div>' : '')
           + '</div></div>';
-      }).join('') || '<div class="empty" style="padding:18px;color:var(--muted);font-size:13px">' + _t('log.empty') + '</div>';
+      }).join('') || '<div class="empty" style="padding:18px;color:var(--muted);font-size:13px">' + _t('log.empty') + '</div>');
     });
   }
 
@@ -1380,7 +1592,7 @@
   function renderWidgets(S) {
     var s = V.MESH;
     if (s && s.nodes) {
-      var on = s.nodes.filter(function (n) { return n.status === 'online' || n.on; }).length;
+      var on = s.nodes.filter(function (n) { return n.status === 'online' || n.on || n.ok === true; }).length;
       $('w-mesh-st').textContent = s.nodes.length ? (on + '/' + s.nodes.length + ' ' + _t('status.online')) : '—';
       $('w-mesh-body').innerHTML = s.nodes.length ? (_t('w.mesh-nodes') + ' <b>' + s.nodes.length + '</b> · ' + _t('w.mesh-exit') + ' <b>' + esc(s.hub_name || (s.name || _t('w.hub'))) + '</b>') : _t('w.mesh-none');
       $('w-mesh-st').className = 'badge ' + (s.nodes.length ? 'on' : 'warn');
@@ -1419,7 +1631,15 @@
       $('mi-nodes').textContent = fmtNum(nodes.length);
       $('mi-ping').textContent = hub && hub.ping_ms ? Math.round(hub.ping_ms) + ' мс' : '–';
       $('mi-enc').textContent = 'Reality';
-      $('meshid').value = j.invite || '';
+      /* A-103: invite у клиента может быть null - тогда показываем id узла,
+         иначе поле «Меш id» всегда пустое и выглядит поломкой. */
+      var inv = j.invite || '';
+      var mi = $('meshid');
+      if (mi) {
+        if (inv) { mi.value = inv; mi.title = ''; }
+        else if (hub) { mi.value = (hub.id || '—') + ' · ' + (hub.name || hub.host || ''); mi.title = _t('mesh.id-hint'); }
+        else { mi.value = ''; mi.title = _t('mesh.id-hint'); }
+      }
       $('mesh-topo-name').textContent = esc((hub && hub.name) || j.name || 'меш');
       renderMeshNodes(nodes, hub);
       renderMeshSvg(nodes, hub);
@@ -1432,14 +1652,14 @@
     if (!nodes.length) { rows.innerHTML = '<tr><td colspan="5"><div class="empty"><span class="ic">🕸️</span>' + _t('mesh.no-nodes') + '</div></td></tr>'; return; }
     var h = '';
     nodes.forEach(function (n) {
-      var on = n.status === 'online' || n.on;
+      var on = n.status === 'online' || n.on || n.ok === true;
       var stCls = on ? 'st-ok' : (n.status === 'warn' ? 'st-slow' : 'st-dim');
       var stTxt = on ? _t('status.on') : (n.status === 'warn' ? _t('status.warn') : _t('status.off'));
       h += '<tr>'
         + '<td><span class="dot' + (on ? ' on' : '') + '"></span>' + esc(n.name || n.id || '—') + ' <span class="chip st-act">' + esc(n.region || '—') + '</span></td>'
         + '<td class="mono">' + esc((n.role === 'hub' || n.id === 'hub') ? _t('mesh.hub') : '') + '</td>'
         + '<td><span class="chip ' + stCls + '">' + stTxt + '</span></td>'
-        + '<td class="mono">' + (n.ping_ms ? Math.round(n.ping_ms) + ' мс' : '–') + '</td>'
+        + '<td class="mono">' + (n.ping_ms ? Math.round(n.ping_ms) + ' мс' : '–') + (n.ping_port ? ' <span class="muted">:' + esc(n.ping_port) + '</span>' : '') + (n.reason ? ' <span class="muted">' + esc(n.reason) + '</span>' : '') + '</td>'
         + '<td><button class="btn small ghost" data-act="nav" data-tab="mesh-routes">🧭</button></td>'
         + '</tr>';
     });
@@ -1456,7 +1676,7 @@
     others.forEach(function (n, i) {
       var a = -Math.PI / 2 + (i / Math.max(others.length, 1)) * 2 * Math.PI;
       var x = cx + R * Math.cos(a), y = cy + R * Math.sin(a);
-      var on = n.status === 'online' || n.on;
+      var on = n.status === 'online' || n.on || n.ok === true;
       h += '<path class="mesh-link' + (on ? ' active' : '') + '" d="M' + cx + ',' + cy + ' L' + x + ',' + y + '"/>';
       var col = on ? 'var(--ok)' : 'var(--bad)';
       var lbl = (n.name || n.id || _t('mesh.node')) + (n.region ? ' · ' + n.region : '');
@@ -1483,7 +1703,7 @@
       var rows = $('mesh-routes');
       if (!rows) return;
       var rr = j.rows || [];
-      if (!rr.length) { rows.innerHTML = '<tr><td colspan="6"><div class="empty"><span class="ic">🧭</span>' + _t('routes.empty') + '</div></td></tr>'; return; }
+      if (!rr.length) { rows.innerHTML = '<tr><td colspan="6"><div class="empty"><span class="ic">🧭</span>' + _t('routes.master') + '</div></td></tr>'; return; }
       var h = '';
       rr.forEach(function (r, i) {
         var stCls = r.status === 'final' ? 'st-act' : (r.status === 'active' ? 'st-ok' : 'st-dim');
@@ -1511,6 +1731,7 @@
       renderExtras(j);
       renderBilling(j);
       renderPlanWidget(j);
+      renderMyKeys(j);
       if (j.error) {
         V.STATS = { error: j.error };
         renderBilling(j);
@@ -1520,7 +1741,6 @@
         V.STATS = s && !s.error ? s : { error: (s && s.error) || 'stats' };
         renderBilling(j);
         renderPlanWidget(j);
-        renderPayForm(j);
       });
       var d = document.querySelector('#subs-count');
       if (d && j.total !== undefined) d.textContent = j.total;
@@ -1607,70 +1827,41 @@
     }).join('');
   }
   /* Дополнительные возможности Aurora: витрина из config.SUBS_EXTRAS */
+  /* A-111: витрина помечает PRO-фичи, гейт их прячет честно */
+  var extFeature = { whitelist: 'whitelist', adblock: 'adblock', extension: 'extension', devices: 'unlimited', traffic: 'unlimited' };
   function renderExtras(j) {
     var box = $('feat-list');
     if (!box) return;
     var ex = (j && j.extras) || {};
     var ids = Object.keys(ex);
     if (!ids.length) {
-      box.innerHTML = '<div class="empty"><span class="ic">🎁</span>' + _t('feat.admin') + '</div>';
+      /* A-109: пустой прайс - это не поломка, его пришлёт головной сервер. */
+      box.innerHTML = '<div class="empty"><span class="ic">🐾</span>' + _t('feat.master') + '</div>';
       return;
     }
     box.innerHTML = ids.map(function (id) {
       var e = ex[id] || {};
       var price = e.price != null ? (e.price === 0 ? _t('plans.free') : fmtNum(e.price) + ' ₽') : '—';
-      return '<div class="feature">'
+      var feat = extFeature[id] ? ' data-ext-feature="' + extFeature[id] + '"' : '';
+      return '<div class="feature"' + feat + '>'
         + '<div class="f-ic">✨</div>'
         + '<div class="f-body">'
         + '<div class="f-name">' + esc(e.name || id) + '</div>'
         + (e.note ? '<div class="f-desc">' + esc(e.note) + '</div>' : '')
         + '<button class="btn small" style="margin-top:8px" data-act="feature-buy" data-feature-id="' + esc(id) + '">' + _t('btn.buy-tg') + '</button>'
+        /* A-161: расширение отдаёт сервер по подписке (триал или PRO) */
+        + (id === 'extension' ? '<div class="ext-dl">'
+          + '<button class="btn small" data-ext-download data-act="ext-download" data-target="chrome" style="display:none">'
+          + '⬇️ ' + _t('ext.dl-chrome') + '</button>'
+          + '<button class="btn small" data-ext-download data-act="ext-download" data-target="edge" style="display:none">'
+          + '⬇️ ' + _t('ext.dl-edge') + '</button></div>' : '')
         + '</div>'
+        + '<span class="pro-tag" style="display:none">' + _t('ext.head') + '</span>'
         + '<div class="f-price">' + esc(price) + (e.unit ? '<br><small>' + esc(e.unit) + '</small>' : '') + '</div>'
         + '</div>';
     }).join('');
   }
   /* Оплата и продление: форма владельца (контракт мастер-панели) */
-  function renderPayForm(j) {
-    var uidBox = $('pay-uid');
-    if (!uidBox || uidBox.dataset.filled) return;
-    uidBox.dataset.filled = '1';
-    var sel = $('pay-plan');
-    var pl = (j && j.plans) || {};
-    var ids = Object.keys(pl).sort();
-    if (sel) {
-      sel.innerHTML = ids.map(function (id) {
-        var p = pl[id] || {};
-        return '<option value="' + esc(id) + '">' + esc(p.name || id) + '</option>';
-      }).join('') || '<option value="free">free</option>';
-    }
-    var list = $('pay-clients');
-    if (list) {
-      var subs = (j && j.subs) || [];
-      list.innerHTML = subs.map(function (s) {
-        return '<option value="' + esc(s.uid || '') + '">' + esc((s.name || s.uid || '—') + ' · ' + (s.plan || '')) + '</option>';
-      }).join('');
-      /* Выбор клиента из списка подставляет uid в поле — платить проще */
-      list.onchange = function () {
-        var u = $('pay-uid');
-        if (u && list.value) u.value = list.value;
-      };
-    }
-  }
-  function payFormSubmit() {
-    var uid = ($('pay-uid') && $('pay-uid').value || '').trim();
-    var name = ($('pay-name') && $('pay-name').value || '').trim();
-    var plan = $('pay-plan') ? $('pay-plan').value : 'free';
-    if (!uid && !name) { toast(_t('sb.need')); return; }
-    postJSON('/api/subs/purchase', { uid: uid || undefined, name: name || undefined, plan: plan }, authHdr()).then(function (r) {
-      if (r && r.error) { toast(r.error); return; }
-      toast((r && r.msg) || _t('sb.ok'));
-      var u = $('pay-uid'); var n = $('pay-name');
-      if (u) { u.value = ''; delete u.dataset.filled; }
-      if (n) n.value = '';
-      loadSubs();
-    }).catch(function (e) { toast(String((e && e.message) || e)); });
-  }
   function renderPlanWidget(j) {
     var cur = j.default || 'free';
     if (j.plans) { $('plan-st').textContent = cur; var pn = (j.plans[cur] || {}).name || cur; $('plan-name').textContent = pn; $('pill-plan').textContent = '💎 ' + cur; }
@@ -1710,8 +1901,195 @@
     }).join('');
   }
 
+  /* ================= MY KEYS (A-110: устройство = купленный ключ) ========== */
+  function renderMyKeys(j) {
+    var box = $('mykeys-list');
+    if (!box) return;
+    var rows = (j && j.subs) || [];
+    var cnt = $('mykeys-count');
+    if (cnt) cnt.textContent = String(rows.length);
+    if (!rows.length) {
+      box.innerHTML = '<div class="empty"><span class="ic">🔑</span>' + _t('myk.empty') + '</div>';
+      return;
+    }
+    var plans = (j && j.plans) || {};
+    var h = '';
+    rows.forEach(function (s, idx) {
+      var keys = s.keys || [];
+      var lim = s.limit_devices || 0;
+      var planName = (plans[s.plan] || {}).name || s.plan || '—';
+      var ok = s.access_ok === true;
+      var traffic;
+      if (s.limit_bytes) traffic = fmtB(s.used_bytes) + ' / ' + fmtB(s.limit_bytes);
+      else if (s.used_bytes) traffic = fmtB(s.used_bytes) + ' · ' + _t('myk.unlim');
+      else traffic = _t('myk.unlim');
+      var why = ok ? '' : ' <span class="chip st-dim">' + esc(s.access_reason || s.access_state || '—') + '</span>';
+      h += '<div class="feature">'
+        + '<div class="f-ic">' + (ok ? '🔑' : '⏳') + '</div>'
+        + '<div class="f-body">'
+        + '<div class="f-name">' + esc(planName) + (s.name ? ' · ' + esc(s.name) : '') + why + '</div>'
+        + '<div class="f-desc">' + _t('myk.until') + ': <b>' + (s.expires ? fmtDate(s.expires) : '—') + '</b>'
+        + ' · ' + _t('myk.traffic') + ': <b>' + esc(traffic) + '</b>'
+        + ' · ' + _t('myk.devices') + ': <b>' + keys.length + (lim ? ' / ' + lim : '') + '</b></div>'
+        + '<div class="cmd-row" style="margin-top:8px">'
+        + '<select data-plat="' + idx + '" style="flex:1;min-width:150px">'
+        + '<option value="iphone">iPhone / iPad</option>'
+        + '<option value="android">Android</option>'
+        + '<option value="pc">ПК · v2rayN / Nekoray</option>'
+        + '<option value="router">Роутер</option></select>'
+        + '<button class="btn small" data-act="sub-how" data-sub-idx="' + idx + '">📋 <span data-i18n="myk.how">Инструкция</span></button>'
+        + '</div>'
+        + '<div class="how-box" id="how-' + idx + '" style="display:none;margin-top:8px"></div>'
+        + '</div>'
+        + '<div class="f-price">' + (s.expires ? esc(fmtDate(s.expires)) : '') + '</div>'
+        + '</div>';
+    });
+    box.innerHTML = h;
+  }
+  function subCopy(which) {
+    var el = which === 'sub' ? $('how-sub-' + CFG._howIdx) : $('how-link-' + CFG._howIdx);
+    var v = el ? (el.value || el.textContent || '') : '';
+    if (!v) { toast(_t('copy.link-na'), false); return; }
+    var done = function () { toast(_t('myk.copy-ok'), true); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(v).then(done).catch(function () { legacyCopy(v, done); });
+    } else { legacyCopy(v, done); }
+  }
+  window.subCopy = subCopy;
+  window.subHow = function (t) {
+    var idx = t.getAttribute('data-sub-idx') || '0';
+    CFG._howIdx = idx;
+    var j = V.SUBS || {};
+    var s = (j.subs || [])[Number(idx)];
+    var box = $('how-' + idx);
+    if (!s || !box) { toast(_t('myk.empty'), false); return; }
+    var sel = document.querySelector('[data-plat="' + idx + '"]');
+    var platform = sel ? sel.value : 'pc';
+    box.style.display = '';
+    box.innerHTML = '<span class="muted">' + _t('log.loading') + '</span>';
+    postJSON('/api/subs/device/instructions', {
+      uid: s.uid || '',
+      key_handle: (s.keys && s.keys[0] && s.keys[0].key_handle) || '',
+      platform: platform
+    }, authHdr()).then(function (r) {
+      if (!r || r.ok === false) {
+        box.innerHTML = '<span class="muted">' + esc((r && r.error) || _t('t.err-gen')) + '</span>';
+        return;
+      }
+      var link = r.vless || r.sub_url || '';
+      var html = '<pre class="logbox" style="white-space:pre-wrap;margin:0 0 8px">' + esc(r.text || '') + '</pre>';
+      if (link) {
+        html += '<div class="cmd-row">'
+          + '<input type="text" readonly class="mono" id="how-link-' + idx + '" value="' + esc(link) + '">'
+          + '<button class="btn small ghost" data-act="sub-copy" data-copy-what="link">📋 <span data-i18n="myk.copy">Скопировать ссылку</span></button>'
+          + '</div><div class="qr-box" id="how-qr-' + idx + '"></div>';
+      }
+      box.innerHTML = html;
+      if (link) qrRender($('how-qr-' + idx), r.qr || link, 2);
+    }).catch(function (e) {
+      box.innerHTML = '<span class="muted">' + esc(String((e && e.message) || e)) + '</span>';
+    });
+  };
+
+  /* ================= PRO-GATE (A-111) =================
+     Сервер и прокси открыты всегда. Гейт прячет только PRO-фичи:
+     обход «Белого списка», безлимитные устройства/трафик, блок рекламы. */
+  function extInfo() { return (V.S && V.S.ext) || {}; }
+  function extBuy() {
+    var e = extInfo();
+    var url = e.buy_url || (V.S && V.S.buy_url) || '';
+    if (!url) { toast(_t('ext.na'), false); return; }
+    if (url.indexOf('t.me/') < 0 && url.indexOf('http') !== 0) url = 'https://t.me/' + url.replace(/^[@\/]+/, '');
+    window.open(url, '_blank', 'noopener');
+  }
+  function applyExtGate() {
+    var e = extInfo();
+    var pro = !!e.is_pro;
+    /* A-161: триал (free, активная подписка) открывает расширение
+       и блок рекламы, но не «Белый список» и безлимиты. */
+    var trial = !pro && !!e.ok && (e.state === 'ok' || e.state === 'free');
+    Array.prototype.forEach.call(document.querySelectorAll('[data-ext-feature]'), function (el) {
+      var f = el.getAttribute('data-ext-feature') || '';
+      var open = pro || (trial && (f === 'extension' || f === 'adblock'));
+      var b = el.querySelector('.pro-tag');
+      if (open) {
+        el.classList.remove('pro-lock');
+        if (b) b.style.display = 'none';
+      } else {
+        el.classList.add('pro-lock');
+        if (b) b.style.display = '';
+        el.setAttribute('title', _t('ext.locked'));
+      }
+      /* A-161: кнопки «Скачать» — только при активной подписке */
+      Array.prototype.forEach.call(el.querySelectorAll('[data-ext-download]'), function (d) {
+        d.style.display = open ? '' : 'none';
+      });
+    });
+    /* A-161: карточка статуса лицензии — её было недало статья
+       вообще после A-112 (карточка осталась статичной). */
+    var card = $('ext-card');
+    if (!card) return;
+    card.style.display = '';
+    var badge = $('ext-badge'), text = $('ext-text'), buy = $('ext-buy');
+    var st = e.state || 'unknown';
+    if (badge) {
+      badge.textContent = pro ? '🐱' : (trial ? '🐈' : (st === 'expired' ? '😻' : '🐾'));
+      badge.className = 'f-ic' + (pro || trial ? '' : ' dim');
+    }
+    if (text) {
+      if (pro) text.textContent = _t('ext.pro');
+      else if (trial) text.textContent = _t('ext.trial');
+      else if (st === 'expired') text.textContent = _t('ext.expired');
+      else if (st === 'blocked' || st === 'unknown' || st === 'slow_down') text.textContent = _t('ext.locked');
+      else text.textContent = _t('ext.na');
+      if (e.offline) text.textContent += ' ' + _t('ext.offline');
+    }
+    if (buy) buy.style.display = (pro || trial) ? 'none' : '';
+  }
+  /* A-161: скачивание архива расширения по подписке (сервер сам проверяет гейт) */
+  function extDownload(target) {
+    var t = (target || 'chrome').toLowerCase();
+    if (t !== 'chrome' && t !== 'edge') { toast(_t('t.err-gen'), false); return; }
+    var a = document.createElement('a');
+    a.href = '/api/ext/download?target=' + encodeURIComponent(t);
+    a.rel = 'noopener';
+    a.download = '';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+  window.extDownload = extDownload;
+  function loadExt() {
+    return getJSON('/api/ext/license').then(function (j) {
+      if (!j) return null;
+      if (V.S) V.S.ext = j;
+      applyExtGate();
+      return j;
+    }).catch(function () { return null; });
+  }
+  window.extBuy = extBuy;
+  window.loadExt = loadExt;
+
   /* ================= TGWS ================= */
-  function loadTG() {
+  /* A-100: qr.js — это qrcode-generator, у него нет toCanvas().
+   Рисуем QR через createSvgTag() — так работает на всех 10 языках и в браузере. */
+function qrRender(box, text, cell) {
+  if (!box) return false;
+  box.innerHTML = '';
+  if (!text) { box.innerHTML = '<div class="qr-ph">' + _t('c.qr-na') + '</div>'; return false; }
+  try {
+    var qr = qrcode(0, 'M');
+    qr.addData(String(text));
+    qr.make();
+    box.innerHTML = qr.createSvgTag({ cellSize: cell || 3, margin: 2, scalable: true });
+    return true;
+  } catch (e) {
+    box.innerHTML = '<div class="qr-ph">' + _t('c.qr-na') + '</div>';
+    return false;
+  }
+}
+
+function loadTG() {
     getJSON('/api/tgws/status').then(function (j) {
       j = j || {};
       V.TG = j;
@@ -1727,8 +2105,7 @@
       var q = $('tg-qr');
       q.innerHTML = '';
       if (j.link) {
-        if (typeof qrcode !== 'undefined') { var c = document.createElement('canvas'); c.width = 150; c.height = 150; q.appendChild(c); try { qrcode.toCanvas(c, j.link); } catch (e) { q.innerHTML = '<div class="qr-ph">' + _t('c.qr-na') + '</div>'; } }
-        else { q.innerHTML = '<div class="qr-ph">' + _t('c.qr-na-off') + '</div>'; }
+      qrRender(q, j.link);
       } else {
         q.innerHTML = '<div class="qr-ph">' + (j.running ? _t('c.qr-na') : _t('c.qr-na-off')) + '</div>';
       }
@@ -1784,6 +2161,10 @@
        $('sec-en').className = j.enabled ? 'ok' : 'bad';
        var tfa = $('sec-2fa');
        if (tfa) { tfa.textContent = j.twofa ? _t('sec.on') : _t('sec.off'); tfa.className = j.twofa ? 'ok' : 'bad'; }
+      /* A-104: показываем только уместную кнопку - «выключить выключенное» не предлагаем */
+      var bOn = $('sec-2fa-on-b'), bOff = $('sec-2fa-off-b');
+      if (bOn) bOn.style.display = j.twofa ? 'none' : '';
+      if (bOff) bOff.style.display = j.twofa ? '' : 'none';
        var a = j.access || {};
       $('sec-acc').textContent = _t('sec.access') + (a.lan_only ? _t('sec.da') : _t('sec.no')) + ' · сканеры: ' + (a.block_scanners ? _t('sec.blk') : _t('sec.no')) + ' · rate-limit: ' + (a.rate_limit ? _t('sec.rat') : _t('sec.rat-off'));
       $('sec-pbk').value = (j.pbk || '–') + (j.sid ? ' · sid=' + j.sid : '');
@@ -1795,6 +2176,9 @@
        $('sec-acc').textContent = '—';
        $('sec-2fa').textContent = '—';
        $('sec-2fa').className = 'v mono';
+      var bOn2 = $('sec-2fa-on-b'), bOff2 = $('sec-2fa-off-b');
+      if (bOn2) bOn2.style.display = '';
+      if (bOff2) bOff2.style.display = 'none';
      });
   }
 
@@ -1815,11 +2199,18 @@
     });
     getJSON('/api/recovery/log').then(function (j) {
       j = j || {};
-      var lines = j.lines || j.log || [];
+      /* A-102: сервер отдаёт готовые строки (lines) и счётчик (count).
+         Раньше UI ждал строки, а получал массив объектов - выходило
+         «[object Object]», а при пустом журнале вечное «восстановлений не было». */
+      var lines = j.lines || (Array.isArray(j.log) ? j.log.map(function (x) {
+        return (x && x.ts ? fmtTs(x.ts) : '') + ' · ' + (x && x.kind ? x.kind : 'info')
+          + ' · ' + (x && x.msg ? x.msg : '');
+      }) : []);
       var box = $('rclog');
-      box.innerHTML = lines.map(function (l) { return esc(l); }).join('\n') || _t('rec.empty');
+      /* A-102: пустая лента - не «мёртвая», а объяснение в стиле маскота. */
+      box.innerHTML = lines.length ? lines.map(function (l) { return esc(l); }).join('\n') : _t('rec.hint');
       box.scrollTop = box.scrollHeight;
-      $('rclog-count').textContent = lines.length;
+      $('rclog-count').textContent = j.count != null ? j.count : lines.length;
     }).catch(function (e) {
       var box = $('rclog');
       if (box) box.innerHTML = '<span class="muted">' + esc(_t('rec.err') + ' ' + String((e && e.message) || e)) + '</span>';
@@ -1861,6 +2252,12 @@
     if (t === 'tgws') loadTG();
   }
 
+  /* A-105: подсказка «нужен токен» вместо молчаливого отказа */
+  function secErr(j, fallback) {
+    var e = (j && (j.error || j.msg)) || fallback || _t('t.err-gen');
+    if (/401|403|token|токен|unauthorized/i.test(String(e))) return _t('sec.tok-hint') + ' (' + e + ')';
+    return String(e);
+  }
   /* ================= ACTIONS (window globals) ================= */
   window.navTo = navTo;
   window.setLang = setLang;
@@ -2017,25 +2414,26 @@
   window.secTwofaEnable = function () {
     var pin = ($('sec-pin').value || '').trim();
     if (!pin) { toast('Введите PIN 2FA', false); return; }
-    if (!secTok()) { toast(_t('sec.need-token'), false); return; }
+    /* A-104: токен больше не обязателен - в LAN панель и так доверенная,
+       а решение всё равно принимает сервер (401/403 покажем честно). */
     postJSON('/api/security/twofa', { pin: pin }).then(function (j) {
       if (j && j.ok) {
         sessionStorage.setItem(LS.tfa, pin);
         $('sec-pin').value = '';
         toast((j.msg || '2FA включена'), true);
         loadSecurity();
-      } else toast((j && j.error) || '2FA не включена', false);
+      } else toast(secErr(j, '2FA не включена'), false);
     });
   };
   window.secTwofaDisable = function () {
-    if (!secTok()) { toast(_t('sec.need-token'), false); return; }
+    /* A-104: см. secTwofaEnable - сервер решает, нужен токен или нет. */
     postJSON('/api/security/twofa', { pin: '' }).then(function (j) {
       if (j && j.ok) {
         sessionStorage.removeItem(LS.tfa);
         $('sec-pin').value = '';
         toast((j.msg || '2FA выключена'), true);
         loadSecurity();
-      } else toast((j && j.error) || '2FA не выключена', false);
+      } else toast(secErr(j, '2FA не выключена'), false);
     });
   };
   window.secLogout = function () {
@@ -2062,7 +2460,9 @@
   };
   window.startUpdate = function () {
     postJSON('/api/update/apply', {}).then(function (j) {
-      toast((j && j.ok) ? _t('upd.apply-ok') : ((j && j.error) || _t('upd.apply-err')), !!(j && j.ok));
+      // Сообщение сервера честнее тоста: «уже актуально» вместо
+      // «Обновление запущено», если новой версии не было.
+      toast((j && j.msg) ? j.msg : ((j && j.ok) ? _t('upd.apply-ok') : ((j && j.error) || _t('upd.apply-err'))), !!(j && j.ok));
       setTimeout(function () { getJSON('/api/update/status').then(loadUpdate); }, 2500);
     });
   };
@@ -2285,8 +2685,11 @@
     'sec-2fa-off': function () { window.secTwofaDisable(); },
     'sec-rotate': function () { window.secRotate(); },
     'feature-buy': function (t) { window.buyFeature(t.getAttribute('data-feature-id') || ''); },
-    'subs-pay': function () { window.payFormSubmit(); },
     'tg-copy': function (t) { window.tgCopy(t.getAttribute('data-copy') || 'link'); },
+    'sub-how': function (t) { window.subHow(t); },
+    'sub-copy': function (t) { subCopy(t.getAttribute('data-copy-what') || 'link'); },
+    'ext-buy': function () { window.extBuy(); },
+    'ext-download': function (t) { window.extDownload(t.getAttribute('data-target') || 'chrome'); },
     'log-load': function () { window.loadLog(); }
   };
   function actTarget(ev) {
@@ -2403,8 +2806,10 @@
     if (subsTask && typeof subsTask.then === 'function') {
       subsTask.then(function () { return 0; });
     }
+    loadExt();  // A-111: лицензия PRO (не блокирует панель)
     loadUpdate();
     setInterval(function () { loadState(true); }, 5000);
+    setInterval(loadExt, 3600000);
     setInterval(function () { loadUpdate(); }, 30000);
     setInterval(function () { if (CFG.tab === 'logs') loadLog(); }, 10000);
     setInterval(function () { if (CFG.tab === 'shop-plans' || CFG.tab === 'shop-billing') loadSubs(); }, 15000);
