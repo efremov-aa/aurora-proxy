@@ -127,6 +127,7 @@
         'ext.trial': 'Триал активен: расширение и блок реклам уже открыты 🐱',
         'ext.dl-chrome': 'Скачать для Chrome',
         'ext.dl-edge': 'Скачать для Edge',
+        'ext.dl-master': 'Пакет выдаёт головной сервер 🐾',
 
     },  
     en: {
@@ -245,6 +246,7 @@
         'ext.trial': 'Trial active: the extension and ad blocking are already open 🐱',
         'ext.dl-chrome': 'Download for Chrome',
         'ext.dl-edge': 'Download for Edge',
+        'ext.dl-master': 'The package comes from the head server 🐾',
 
     },  
     es: {
@@ -363,6 +365,7 @@
         'ext.trial': 'Prueba activa: la extensión y el bloqueo de anuncios ya están abiertos 🐱',
         'ext.dl-chrome': 'Descargar para Chrome',
         'ext.dl-edge': 'Descargar para Edge',
+        'ext.dl-master': 'El paquete lo da el servidor principal 🐾',
 
     },  
     de: {
@@ -481,6 +484,7 @@
         'ext.trial': 'Testphase aktiv: Erweiterung und Werbeblocker sind schon offen 🐱',
         'ext.dl-chrome': 'Für Chrome herunterladen',
         'ext.dl-edge': 'Für Edge herunterladen',
+        'ext.dl-master': 'Paket liefert der Hauptserver 🐾',
 
     },  
     fr: {
@@ -599,6 +603,7 @@
         'ext.trial': 'Essai actif : l’extension et le bloqueur de pubs sont déjà ouverts 🐱',
         'ext.dl-chrome': 'Télécharger pour Chrome',
         'ext.dl-edge': 'Télécharger pour Edge',
+        'ext.dl-master': 'Paquet fourni par le serveur principal 🐾',
 
     },  
     tr: {
@@ -717,6 +722,7 @@
         'ext.trial': 'Deneme aktif: eklenti ve reklam engelleme zaten açık 🐱',
         'ext.dl-chrome': 'Chrome için indir',
         'ext.dl-edge': 'Edge için indir',
+        'ext.dl-master': 'Paketi ana sunucu verir 🐾',
 
     },  
     pt: {
@@ -835,6 +841,7 @@
         'ext.trial': 'Teste ativo: a extensão e o bloqueador de anúncios já estão abertos 🐱',
         'ext.dl-chrome': 'Baixar para o Chrome',
         'ext.dl-edge': 'Baixar para o Edge',
+        'ext.dl-master': 'O pacote vem do servidor principal 🐾',
 
     },  
     zh: {
@@ -953,6 +960,7 @@
         'ext.trial': '试用中：扩展和广告拦截已开放 🐱',
         'ext.dl-chrome': '下载 Chrome 版',
         'ext.dl-edge': '下载 Edge 版',
+        'ext.dl-master': '包由主服务器提供 🐾',
 
     },  
     ar: {
@@ -1071,6 +1079,7 @@
         'ext.trial': 'التجربة نشطة: الإمدادات وحظر الإعلانات مفتوحة 🐱',
         'ext.dl-chrome': 'تنزيل للكروم',
         'ext.dl-edge': 'تنزيل للإدج',
+        'ext.dl-master': 'الحزمة من الخادم الرئيسي 🐾',
 
     },  
     hi: {
@@ -1189,6 +1198,7 @@
         'ext.trial': 'ट्राइल चालू: विस्तरण और बेलिंग ब्लॉकर दोनों के लेडा हैं 🐱',
         'ext.dl-chrome': 'Chrome के लिए डाउनलोड',
         'ext.dl-edge': 'Edge के लिए डाउनलोड',
+        'ext.dl-master': 'पॅकेज मुख्य सर्वर देटा 🐾',
 
     },
   
@@ -1830,6 +1840,24 @@
   /* A-111: витрина помечает PRO-фичи, гейт их прячет честно */
   var extFeature = { whitelist: 'whitelist', adblock: 'adblock', extension: 'extension', devices: 'unlimited', traffic: 'unlimited' };
   function renderExtras(j) {
+  /* A-164: архивы расширения раздаёт только головной сервер, поэтому кнопки
+     «Скачать» рисуем лишь для сборок, что реально есть в этом сервере. */
+  function extDownloadBox() {
+    var pkgs = (extInfo() && extInfo().packages) || [];
+    var h = '<div class="ext-dl">';
+    if (pkgs.indexOf('chrome') >= 0) {
+      h += '<button class="btn small" data-ext-download data-act="ext-download" data-target="chrome" style="display:none">'
+        + '⬇️ ' + _t('ext.dl-chrome') + '</button>';
+    }
+    if (pkgs.indexOf('edge') >= 0) {
+      h += '<button class="btn small" data-ext-download data-act="ext-download" data-target="edge" style="display:none">'
+        + '⬇️ ' + _t('ext.dl-edge') + '</button>';
+    }
+    if (pkgs.indexOf('chrome') < 0 && pkgs.indexOf('edge') < 0) {
+      h += '<small class="muted">' + _t('ext.dl-master') + '</small>';
+    }
+    return h + '</div>';
+  }
     var box = $('feat-list');
     if (!box) return;
     var ex = (j && j.extras) || {};
@@ -1850,11 +1878,7 @@
         + (e.note ? '<div class="f-desc">' + esc(e.note) + '</div>' : '')
         + '<button class="btn small" style="margin-top:8px" data-act="feature-buy" data-feature-id="' + esc(id) + '">' + _t('btn.buy-tg') + '</button>'
         /* A-161: расширение отдаёт сервер по подписке (триал или PRO) */
-        + (id === 'extension' ? '<div class="ext-dl">'
-          + '<button class="btn small" data-ext-download data-act="ext-download" data-target="chrome" style="display:none">'
-          + '⬇️ ' + _t('ext.dl-chrome') + '</button>'
-          + '<button class="btn small" data-ext-download data-act="ext-download" data-target="edge" style="display:none">'
-          + '⬇️ ' + _t('ext.dl-edge') + '</button></div>' : '')
+        + (id === 'extension' ? extDownloadBox() : '')
         + '</div>'
         + '<span class="pro-tag" style="display:none">' + _t('ext.head') + '</span>'
         + '<div class="f-price">' + esc(price) + (e.unit ? '<br><small>' + esc(e.unit) + '</small>' : '') + '</div>'

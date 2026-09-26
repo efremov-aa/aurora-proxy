@@ -330,10 +330,8 @@ EXT_PRO_PLANS = os.environ.get("AURORA_EXT_PRO_PLANS", "").strip()  # пусто
 # Лежат в assets/ рядом с кодом; раздаёт их панель. Имя файла - только из
 # белого списка ниже, путь из запроса никогда не подставляется.
 EXT_ASSETS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
-EXT_PACKAGES = {
-    "chrome": "aurora-extension-chrome-0.1.0.zip",
-    "edge": "aurora-extension-edge-0.1.0.zip",
-}
+EXT_PACKAGES = {}  # A-164: пакеты расширения раздаёт только головной
+# сервер; в клиентской сборке их нет, /api/ext/license вернёт packages=[]
 
 
 

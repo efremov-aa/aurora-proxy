@@ -116,7 +116,9 @@ aurora/
 ├── ui.py             # отдача static-файлов панели
 ├── ui/               # index.html, app.js, style.css, qr.js (локальный QR)
 ├── proxy/            # исходники TG-WS-прокси (Python): tg_ws_proxy.py, bridge.py, balancer.py, ...
-├── tests/            # 35 регрессионных harness-а (test_*.py), запускаются из корня
+tests/            # регрессионные harness-и (test_*.py) - только локально,
+                  # в репозитории папки нет (решение владельца), гоняются
+                  # скриптом-обвязкой _github\run_local_tests.py
 ├── EXTENSION.md      # описание браузерного расширения MV3 + контракт /api/ext/config
 ├── data/             # данные (НЕ в репо): ключи, статусы, блеклист, настройки, .aurora_key
 ├── xray.json         # конфиг xray (генерится автоматически)
@@ -216,26 +218,50 @@ docker compose up -d --build
 
 Ошибки `POST` возвращаются с кодом **400** и полем `error`; UI это учитывает.
 
-## 🧪 Тесты
+## 🧪 Проверки
 
-В репозитории **35 регрессионных harness-а** в папке `tests/` (`tests/test_*.py`), каждый печатает свой маркер
-(`A0xx_…_OK`, `BILLING_REGRESSION_OK`, `BLOCKED_FLOW_OK`, …) и падает с ненулевым кодом при ошибке.
-Запускать из корня репозитория:
+🐾 В репозитории папки с тестами нет — владелец убрал её с сайта,
+чтобы сборка выглядела чистой. Локально проверки остались и гоняются каждую
+правку, так что сломанный контракт не уедет в релиз.
+
+**Что проверяется (по группам):**
+
+- хранилище и шифрование: `test_a031_storage.py`, `test_a029_storage_validation.py`,
+  `test_a030_crypt_storage.py` → `A031_STORAGE_OK`, `A029_STORAGE_VALIDATION_OK`, `A030_CRYPT_STORAGE_OK`;
+- подпись релизов и авто-обновление: `test_a062_update_signature.py` → `A062_UPDATE_SIGNATURE_OK`;
+- контракт Docker-варианта: `test_a035_docker_contract.py` → `A035_DOCKER_PORT_REMOVED_OK`;
+- версия и названия релизов: `test_a042_version.py` → `A042_VERSION_CONTRACT_OK`;
+- границы доступа, CSRF, TLS: `test_a058_boundary.py`, `test_a061_transport.py`,
+  `test_a063_public_host.py`, `test_a073_read_scope.py`;
+- панель без inline-JS: `test_a068_ui_csp.py` → `A068_UI_CSP_OK`;
+- лицензия PRO-функций и её гейт: `test_a111_extgate.py` → `A111_EXTGATE_OK`, `test_a112_gate.py` → `A112_GATE_OK`;
+- устройство = ключ и инструкции подключения: `test_a110_mykeys.py` → `A110_MYKEYS_OK`;
+- релей-туннель между узлами: `test_a160_relay_tunnel.py` → `A160_RELAY_TUNNEL_OK`;
+- расширение браузера как PRO-фича: `test_a161_ext_package.py` → `A161_EXT_PACKAGE_OK`;
+- меш-реестр, ключи, тарифы, биллинг, recovery, телеметрия, RU-сегмент:
+  `test_a064_mesh_invite.py`, `test_a041_vless.py`, `test_a074_subs_contract.py`,
+  `test_billing.py`, `test_a032_recovery.py`, `test_a034_telemetry.py`,
+  `test_a033_direct.py`, `test_a043_bt.py`.
+
+**Полный прогон разом** — обвязкой, которая заканчивается строкой
+`ALL_LOCAL_TEST_SCRIPTS_OK`. Отдельно один скрипт:
 
 ```bash
-python tests/test_a062_update_signature.py   # A062_UPDATE_SIGNATURE_OK — подпись обновлений
-python tests/test_a068_ui_csp.py             # A068_UI_CSP_OK — CSP без inline-JS
-python tests/test_a074_subs_contract.py      # подписки: покупка/продление/очередь/лимиты
-python tests/test_billing.py                 # BILLING_REGRESSION_OK
-python tests/test_comm_flow.py               # COMM_FLOW_ALL_OK (~30 с)
-python tests/test_blocked.py                 # BLOCKED_FLOW_OK — бан-лист ключей
-python tests/test_cleanup.py                 # CLEANUP_FLOW_OK — чистка пула
+python tests/test_a068_ui_csp.py      # A068_UI_CSP_OK
+python tests/test_a042_version.py     # A042_VERSION_CONTRACT_OK
+python tests/test_a160_relay_tunnel.py # A160_RELAY_TUNNEL_OK
 ```
 
-Полный прогон всех harness-ов разом (вспомогательным скриптом-обвязкой) заканчивается строкой
-`ALL_LOCAL_TEST_SCRIPTS_OK`. Перед сборкой релиза прогоняются также `py_compile` всех модулей
-и `node --check` для `ui/app.js` и `ui/qr.js`.
+И быстрая проверка синтаксиса всех модулей и интерфейса:
 
+```bash
+python -m py_compile api.py config.py core.py crypt.py extgate.py mesh.py \
+    meshtunnel.py pool.py recovery.py run.py subs.py telemetry.py tgws.py updater.py
+node --check ui/app.js && node --check ui/qr.js
+```
+
+🛡 Ни одна проверка не ходит в сеть: всё считается офлайн, на заглушках и
+копиях конфигов — живой xray, Aurora и серверы тесты не трогают.
 ## 🧩 Расширение для браузера
 
 Мяу! Котик живёт и в браузере: 🛡 блокирует рекламу (свои списки + YouTube),

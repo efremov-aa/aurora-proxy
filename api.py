@@ -757,6 +757,14 @@ def build_state(local=True):
     # A-111: лицензия PRO-функций приходит с головного сервера; адрес мастера
     # наружу не отдаём (внутренний IP), остальное нужно панели и гейту.
     ext = extgate.state()
+    # A-164: панель спрашивает пакеты расширения (в клиентской сборке пусто).
+    ext["packages"] = _ext_packages()
+    # A-164: панель спрашивает пакеты расширения (в клиентской сборке пусто).
+    ext["packages"] = _ext_packages()
+    # A-164: панель спрашивает пакеты расширения (в клиентской сборке пусто).
+    ext["packages"] = _ext_packages()
+    # A-164: панель спрашивает пакеты расширения (в клиентской сборке пусто).
+    ext["packages"] = _ext_packages()
     if not local:
         ext["master"] = ""
     st["ext"] = ext
@@ -1027,7 +1035,10 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/ext/license":
             # A-111: снимок лицензии (план/PRO/до купки) - панель спрашивает
             # на старте и раз в час, гейт берёт решение на сервере.
-            self._send(*_json(extgate.state()))
+            _lic = extgate.state()
+            # A-164: перечень сборок расширения (пусто: раздаёт мастер).
+            _lic["packages"] = _ext_packages()
+            self._send(*_json(_lic))
             return
         if path == "/api/tgws/status":
             status = tgws.status(include_secret=trusted)
@@ -2088,6 +2099,30 @@ def _node_alive(node, timeout=2.0):
     out["ping_port"] = used
     if not ok:
         out["reason"] = "timeout" if ports else "no-port"
+    return out
+
+
+def _ext_packages():
+    """A-164: какие сборки расширения реально лежат в этом сервере.
+
+    Архивы раздаёт только головной сервер; в клиентской сборке их нет,
+    поэтому список пустой и кнопки «Скачать» не показываются.
+    """
+    out = []
+    names = getattr(config, "EXT_PACKAGES", {}) or {}
+    root = getattr(config, "EXT_ASSETS_DIR", "") or ""
+    if not root:
+        return out
+    for target, name in names.items():
+        try:
+            t = str(target or "").strip().lower()
+            n = os.path.basename(str(name or ""))
+            if not t or not n:
+                continue
+            if os.path.isfile(os.path.join(root, n)):
+                out.append(t)
+        except OSError:
+            continue
     return out
 
 
