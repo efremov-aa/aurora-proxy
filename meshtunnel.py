@@ -15,6 +15,7 @@ nonce-антиреплей и фрагментация с padding.
 
 import hmac
 import hashlib
+import json
 import os
 import re
 import socket
@@ -58,6 +59,10 @@ T_PIPE_OK = 9
 T_PIPE_ERR = 10
 T_PIPE_DATA = 11
 T_PIPE_BYE = 12
+# A-291: политика головного сервера едет по туннелю (тот же 51821), поэтому
+# узлу не нужен доступ к панели мастера. Без подписи клиент её не примет.
+T_POLICY = 13
+MAX_POLICY_PAYLOAD = 16384
 
 _ID_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,64}$")
 
@@ -970,6 +975,47 @@ def _hello_frame(node_id, secret, addr, key):
     return nonce, payload
 
 
+def _send_policy(conn, key):
+    """A-291: мастер кладёт подписанную политику прямо в туннель.
+
+    Узлу не нужен доступ к панели головного сервера: политика приходит по
+    тому же 51821, который уже поднят. Без роли master, без mesh.policy()
+    или без подписи молча ничего не шлём - клиент всё равно применит только
+    валидную политику (см. mesh.apply_policy_raw).
+    """
+    if _STATE.get("started") != "master":
+        return False
+    try:
+        import mesh
+        raw = mesh.policy()
+    except Exception:
+        return False
+    if not isinstance(raw, dict) or not raw.get("signature"):
+        return False
+    body = json.dumps(raw, ensure_ascii=True).encode("utf-8")
+    if len(body) > MAX_POLICY_PAYLOAD:
+        return False
+    _send(conn, T_POLICY, body, key)
+    return True
+
+
+def _apply_tunnel_policy(payload):
+    """A-291: приём политики из туннеля: только разбор и передача в mesh."""
+    if not payload or len(payload) > MAX_POLICY_PAYLOAD:
+        return False
+    try:
+        raw = json.loads(bytes(payload).decode("utf-8", "replace"))
+    except Exception:
+        return False
+    if not isinstance(raw, dict):
+        return False
+    try:
+        import mesh
+        return bool(mesh.apply_policy_raw(raw, "tunnel"))
+    except Exception:
+        return False
+
+
 def _wait_ok(sock, key):
     """Zhdem T_OK ot mastera, inache fail-closed (A-116).
     A-156: nedostatochno dannuh v kadre - etNe OTKAZ, a RAZRYV: nado
@@ -981,6 +1027,10 @@ def _wait_ok(sock, key):
             msg_type, _payload, buf = _unpack(buf, key)
             if msg_type == T_OK:
                 return True
+            if msg_type == T_POLICY:
+                # A-291: политика головного приходит по туннелю, а не по HTTP
+                _apply_tunnel_policy(_payload)
+                continue
             if msg_type is not None:
                 # A-157: drugoy tip kadra (T_HELLO/T_PING/...) - prosto ignorim,
                 # ostatok uzhe lezhit v buf. Ranee my shli v recv i poteryali
@@ -1687,6 +1737,11 @@ def _peer_session(conn, key):
             host, port = _parse_addr(parts[3] if len(parts) > 3 else "")
             if not _known(node_id, proof, nonce):
                 return
+            # A-291: политику шлём ПЕРЕД T_OK. Клиент ждёт T_OK в _wait_ok и
+            # возвращается сразу на нём, поэтому кадр, посланный следом, мог
+            # потеряться вместе с буфером recv. Перед T_OK он гарантированно
+            # разобран и применён тем же fail-closed путём, что и HTTP-политика.
+            _send_policy(conn, key)
             _send(conn, T_OK, hmac.new(_keybytes(key),
                                        b"aurora-mesh-ok" + _keybytes(nonce),
                                        hashlib.sha256).hexdigest().encode("ascii"), key)

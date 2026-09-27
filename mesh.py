@@ -1331,35 +1331,45 @@ def _policy_targets():
     return targets
 
 
+def apply_policy_raw(raw, source=""):
+    """A-291: единая точка применения политики мастера (HTTP или туннель).
+
+    Сначала строгая проверка подписи и master_id (_policy_valid), потом флаги
+    show_mesh/show_subs, потом каталог. Всё fail-closed: невалидная политика
+    не трогает настройки. source - только для честного лога.
+    """
+    core = _policy_valid(raw)
+    if not core:
+        return False
+    changed = False
+    for key in ("show_mesh", "show_subs"):
+        if core[key] != config.get(key):
+            config.set(key, bool(core[key]))
+            changed = True
+    if changed:
+        config.log("mesh: применена политика мастера (%s)" % (source or "http"))
+    catalog = _catalog_valid(raw)
+    if catalog:
+        mark = "%s|%s|%s" % (
+            sorted(catalog["plans"].keys()),
+            sorted(catalog["extras"].keys()), catalog["buy_url"])
+        if mark != _CATALOG_MARK:
+            globals()["_CATALOG_MARK"] = mark
+            if config.save_catalog(catalog["plans"], catalog["extras"],
+                                   catalog.get("buy_url")):
+                config.log("mesh: каталог мастера принят (тарифов %d, позиций %d)" % (
+                    len(catalog["plans"]), len(catalog["extras"])))
+    return True
+
+
 def _policy_loop():
     """Фоновый опрос мастера: узел применяет подписанные show_mesh/show_subs."""
     while True:
         try:
             for host, port in _policy_targets():
-                raw = _fetch_policy(host, port)
-                core = _policy_valid(raw)
-                if not core:
-                    continue
-                changed = False
-                for key in ("show_mesh", "show_subs"):
-                    if core[key] != config.get(key):
-                        config.set(key, bool(core[key]))
-                        changed = True
-                if changed:
-                    config.log("mesh: применена политика мастера %s:%d" % (
-                        host, port))
-                catalog = _catalog_valid(raw)
-                if catalog:
-                    mark = "%s|%s|%s" % (
-                        sorted(catalog["plans"].keys()),
-                        sorted(catalog["extras"].keys()), catalog["buy_url"])
-                    if mark != _CATALOG_MARK:
-                        globals()["_CATALOG_MARK"] = mark
-                        if config.save_catalog(catalog["plans"], catalog["extras"],
-                                               catalog.get("buy_url")):
-                            config.log("mesh: каталог мастера принят (тарифов %d, позиций %d)" % (
-                                len(catalog["plans"]), len(catalog["extras"])))
-                break
+                if apply_policy_raw(_fetch_policy(host, port),
+                                    "http %s:%d" % (host, port)):
+                    break
         except Exception:
             pass
         time.sleep(MESH_POLICY_MS / 1000.0)
