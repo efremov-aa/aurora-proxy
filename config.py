@@ -971,6 +971,21 @@ def _apply_port_overrides(settings):
 
 
 # --- настройки ---
+def _apply_mesh_env():
+    """A-275: env-флаг релея применяется ПОСЛЕ загрузки settings, а не на импорте.
+
+    Раньше set("mesh_tunnel", True) вызывался на уровне модуля, когда _settings ещё
+    был равен _SETTINGS_DEFAULTS: на диск попадали дефолты вместо содержимого файла
+    (терялись ui_token, ui_pin, server_name), а load_settings() затем затирал флаг
+    значением из settings.json. Теперь трогаем только этот один ключ и только в
+    памяти - источник истины по-прежнему env.
+    """
+    if not MESH_TUNNEL_ENV or _settings.get("mesh_tunnel"):
+        return
+    _settings["mesh_tunnel"] = True
+    log("mesh: релей-туннель включён через AURORA_MESH_TUNNEL")
+
+
 def load_settings():
     """Читает data/settings.json (выживают только известные ключи)."""
     global _settings
@@ -985,6 +1000,7 @@ def load_settings():
             _settings = dict(_SETTINGS_DEFAULTS)
             if not _apply_port_overrides(_settings):
                 raise ValueError("ports are invalid")
+            _apply_mesh_env()
             return
         try:
             merged = _validate_settings(raw)
@@ -998,6 +1014,7 @@ def load_settings():
             _storage_failure(_SETTINGS_FILE, "ports are invalid")
             return
         _settings = merged
+        _apply_mesh_env()
 
 
 def _persist_settings(value):
@@ -1249,12 +1266,9 @@ MESH_TUNNEL_ENV = _read_mesh_flag("AURORA_MESH_TUNNEL")
 MESH_SECRET = (os.environ.get("AURORA_MESH_SECRET", "") or "").strip()
 MESH_PUBLIC_ADDR = (os.environ.get("AURORA_MESH_PUBLIC_ADDR", "") or "").strip()
 MESH_MASTER_ADDR = (os.environ.get("AURORA_MESH_MASTER_ADDR", "") or "").strip()
-if MESH_TUNNEL_ENV:
-    # env-переключатель для владельца сервера; значение всё равно живёт в settings.
-    try:
-        set("mesh_tunnel", True)
-    except Exception:
-        pass
+# A-275: флаг из env применяется ПОСЛЕ загрузки settings (load_settings() ->
+# _apply_mesh_env()), а НЕ на импорте - иначе на диск писались бы дефолты,
+# а потом load_settings() затирал бы флаг значением из settings.json.
 
 _load_plans_override()
 load_extras()
