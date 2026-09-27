@@ -1926,6 +1926,15 @@ class Handler(BaseHTTPRequestHandler):
             return
         name = str(data.get("name") or "").strip()
         region = str(data.get("region") or "").strip()
+        # A-265: invitation from own subnet (signed with local key).
+        # A proof in the body means OUR invite, not the master one.
+        if str(data.get("proof") or "").strip():
+            node, err = mesh.join(data)
+            if not node:
+                self._send(*_json({"ok": False, "error": err or "join failed"}, 400))
+                return
+            self._send(*_json({"ok": True, "node": node}))
+            return
         ok, err = mesh.join_via_invite(invite, name or None, region or "RU")
         if not ok:
             self._send(*_json({"ok": False, "error": err or "join failed"}, 400))

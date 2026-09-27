@@ -2,7 +2,6 @@
 
 import os
 import signal
-import os
 import threading
 
 import config
@@ -11,6 +10,7 @@ import extgate
 import meshtunnel
 import mesh
 import pool
+import recovery
 import rusegment
 import security
 import subs
@@ -42,8 +42,6 @@ def _boot():
     mesh.start_policy_loop()
     subs.start_background()
     extgate.start_background()  # A-111: лицензия PRO (прокси не падает при сети)
-
-    extgate.start_background()  # A-111: лицензия PRO (прокси не падает при сети)
     # A-151: релей-туннель меш-сети. По умолчанию выключен (config.mesh_tunnel),
     # роль - из env AURORA_MESH_ROLE. Ошибки не роняют запуск: туннель - это канал,
     # а не условие жизни прокси.
@@ -56,6 +54,12 @@ def _boot():
             config.log("mesh: relay-туннель не запущен: %s" % type(e).__name__)
     pool.cleanup()  # убрать мёртвые github-ключи при старте
     config.log("Aurora v%s boot" % config.VERSION)
+    # A-272: A-102 просил наполнять ленту recovery реальными событиями,
+    # но note() не вызывался нигде - лента вечно показывала "пусто".
+    try:
+        recovery.note("service started (boot)")
+    except Exception as e:
+        config.log("boot: %s" % e)
 
     # проверка/заполнение tgws-секрета и фоновый статус
     tgws.refresh_status()

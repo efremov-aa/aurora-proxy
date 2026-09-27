@@ -10,6 +10,7 @@ import json
 import math
 import os
 import re
+import secrets
 import socket
 import threading
 import time
@@ -51,6 +52,91 @@ _POLICY_FIELDS = ("policy_version", "master_id", "master", "show_mesh",
 _INVITE_FIELDS = ("invite_version", "issuer", "token", "challenge", "host",
                   "port", "policy_port", "name", "issued_at", "expires_at")
 INVITE_USED_FILE = os.path.join(config.DATA_DIR, "mesh_invite_used.json")
+
+
+# --- A-265 (вариант Б): корень своей подсети ---------------------------------
+# Публичная сборка НИКОГДА не бывает головным сервером меша: mesh_master жёстко
+# False, политику мастера она только читает. Но корень своей подсети ей можно:
+# приглашение подписывается ОТДЕЛЬНЫМ локальным ключом, а не мастерским ключом
+# политики, поэтому такой invite не принимает настоящий мастер и не выдаёт узлу
+# прав головного. Ключ и идентификатор лежат в data/mesh_local.json (0600).
+MESH_LOCAL_FILE = os.path.join(config.DATA_DIR, "mesh_local.json")
+_LOCAL_ID_RE = re.compile(r"[a-z0-9][a-z0-9-]{2,63}")
+
+
+def _local_state():
+    """Читает локальный issuer/ключ/токен подсети. Только из зашифрованного хранилища."""
+    import crypt
+    try:
+        data = crypt.load_json(MESH_LOCAL_FILE, default={})
+    except Exception:
+        return {}
+    return dict(data) if isinstance(data, dict) else {}
+
+
+def _local_save(data):
+    import crypt
+    crypt.save_json(MESH_LOCAL_FILE, data)
+
+
+def _local_issuer():
+    """Возвращает (issuer, key) своей подсети или ("", "") - fail-closed."""
+    data = _local_state()
+    issuer = str(data.get("id") or "").strip().lower()
+    key = str(data.get("key") or "")
+    if not _LOCAL_ID_RE.fullmatch(issuer):
+        return "", ""
+    if len(key.encode("utf-8")) < 32:
+        return "", ""
+    return issuer, key
+
+
+def _local_issuer_ensure():
+    """Лениво создаёт локальный issuer/ключ (секреты в лог не пишутся)."""
+    issuer, key = _local_issuer()
+    if issuer and key:
+        return issuer, key
+    issuer = "local-" + secrets.token_hex(6)
+    key = secrets.token_urlsafe(32)
+    data = _local_state()
+    data["id"] = issuer
+    data["key"] = key
+    data["token"] = secrets.token_urlsafe(32)
+    try:
+        _local_save(data)
+    except (OSError, RuntimeError, TypeError, ValueError):
+        return "", ""
+    return issuer, key
+
+
+def _local_token():
+    data = _local_state()
+    token = str(data.get("token") or "")
+    if re.fullmatch(r"[A-Za-z0-9_-]{24,256}", token):
+        return token
+    return ""
+
+
+def _is_master_build():
+    """A-266: в клиентской сборке роли "master" нет (она есть только у
+    мастера). Роль берём из env честно: пусто - узел, и приглашение выпускаем."""
+
+    if str(os.environ.get("AURORA_MESH_MASTER", "") or "").strip():
+        return True
+    return str(os.environ.get("AURORA_ROLE", "") or "").strip().lower() == "master"
+
+
+def _invite_expected_key(issuer):
+    """Ключ подписи по домену: мастерский - для приглашений мастера, локальный - для своих."""
+    issuer = str(issuer or "").strip().lower()
+    if issuer:
+        master_id = _policy_master_id()
+        if master_id and issuer == master_id.strip().lower():
+            return _policy_key()
+        local_id, local_key = _local_issuer()
+        if local_id and issuer == local_id:
+            return local_key
+    return ""
 
 
 def _policy_key():
@@ -750,13 +836,61 @@ def ping_all(timeout=2.0):
 
 
 def invite():
-    """Публичная сборка не может быть головным сервером меша."""
-    return None
+    """Приглашение для СВОЕЙ подсети (A-265).
+
+    Публичная сборка не бывает головным: если вдруг mesh_master стал True,
+    приглашение не выдаётся. Иначе подписывает его локальным ключом подсети -
+    настоящий мастер такое приглашение не примет, и узел не получит прав головного.
+    """
+    if _is_master_build():
+        return None
+    issuer, key = _local_issuer_ensure()
+    if not issuer or not key:
+        return None
+    if not _valid_port(config.XRAY_PORT) or not _valid_port(config.UI_PORT):
+        return None
+    host = _local_host() or str(config.VM_HOST or "").strip()
+    if not host or not _valid_peer_host(host, allow_loopback=True):
+        return None
+    token = _local_token()
+    if not token:
+        return None
+    issued_at = int(time.time())
+    name = str(config.get("server_name") or "").strip()[:64] or "Node"
+    core = {
+        "invite_version": 1,
+        "issuer": issuer,
+        "token": token,
+        "challenge": secrets.token_hex(16),
+        "host": host,
+        "port": int(config.XRAY_PORT),
+        "policy_port": int(config.UI_PORT),
+        "name": name,
+        "issued_at": issued_at,
+        "expires_at": issued_at + INVITE_TTL_S,
+    }
+    signature = _invite_signature(core, key)
+    if not signature:
+        return None
+    from urllib.parse import urlencode
+    return "aurora://invite?" + urlencode(list(core.items()) + [("signature", signature)])
 
 
 def regenerate():
-    """Публичная сборка не может быть головным сервером меша."""
-    return None
+    """Перевыпускает приглашение своей подсети: старый токен и локальный ключ сгорают."""
+    if _is_master_build():
+        return None
+    issuer, _key = _local_issuer()
+    if not issuer:
+        return None
+    data = _local_state()
+    data["token"] = secrets.token_urlsafe(32)
+    data["key"] = secrets.token_urlsafe(32)
+    try:
+        _local_save(data)
+    except (OSError, RuntimeError, TypeError, ValueError):
+        return None
+    return invite()
 
 
 def parse_invite(url):
@@ -782,8 +916,10 @@ def parse_invite(url):
     raw = {field: values[0] for field, values in query.items()}
     if raw.get("invite_version") != "1":
         return None
-    master_id = _policy_master_id()
-    if not master_id or raw.get("issuer") != master_id:
+    issuer = str(raw.get("issuer") or "").strip().lower()
+    if not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", issuer):
+        return None
+    if not _invite_expected_key(issuer):
         return None
     token = raw.get("token")
     if not isinstance(token, str) or not 24 <= len(token) <= 256:
@@ -822,7 +958,7 @@ def parse_invite(url):
         "issued_at": numbers["issued_at"],
         "expires_at": numbers["expires_at"],
     }
-    key = _policy_key()
+    key = _invite_expected_key(issuer)
     if not key:
         return None
     if not hmac.compare_digest(raw.get("signature"), _invite_signature(core, key)):
@@ -851,6 +987,45 @@ def invite_proof(url, node):
 
 
 # --- v1.8.0: авто-имя сервера и авто-вступление в меш головного сервера ---
+
+def join(data):
+    """Принимает узел в СВОЮ подсеть по приглашению (A-265).
+
+    Обратная сторона join_via_invite: узел шлёт нам свой invite+proof, мы проверяем
+    подпись локальным ключом, токен этой подсети и антиреплей, затем добавляем узел.
+    Права головного не выдаются, политику мастера узел не получает.
+    """
+    local_issuer, _local_key = _local_issuer()
+    if not local_issuer:
+        return None, "join unavailable"
+    if not isinstance(data, dict) or set(data) != {
+            "invite", "proof", "name", "region", "host", "port", "policy_port"}:
+        return None, "invalid invite"
+    endpoint = _invite_node({key: data.get(key) for key in
+                             ("name", "region", "host", "port", "policy_port")})
+    parsed = parse_invite(data.get("invite"))
+    proof = data.get("proof")
+    if (not endpoint or not parsed or parsed.get("issuer") != local_issuer
+            or not isinstance(proof, str) or not re.fullmatch(r"[0-9a-f]{64}", proof)):
+        return None, "invalid invite"
+    expected = invite_proof(data.get("invite"), endpoint)
+    if not expected or not hmac.compare_digest(proof, expected):
+        return None, "invalid invite"
+    token = _local_token()
+    if not token or not hmac.compare_digest(parsed["token"], token):
+        return None, "invalid invite"
+    with _LOCK:
+        if parsed["challenge"] in _used_challenges():
+            return None, "invalid invite"
+    node, err = add(endpoint["name"], endpoint["region"], endpoint["host"],
+                    endpoint["port"], "node", auto_name=False,
+                    policy_port=endpoint["policy_port"])
+    if err or not node:
+        return None, "invalid invite"
+    if not _remember_challenge(parsed["challenge"], parsed["expires_at"]):
+        return None, "invalid invite"
+    return node, ""
+
 
 def ensure_unique_name():
     """Если имя сервера пусто/дефолтно/занято нодой меша — присваивает случайное уникальное.
