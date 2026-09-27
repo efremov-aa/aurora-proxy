@@ -51,13 +51,20 @@ T_PING = 4
 T_PONG = 5
 T_BYE = 6
 T_FRAG = 7
+# A-191 (variant B): multepleksirovanie - master prosit pira otkryt
+# potok k celi i peredast trafik po etomu zhe sokety.
+T_PIPE_OPEN = 8
+T_PIPE_OK = 9
+T_PIPE_ERR = 10
+T_PIPE_DATA = 11
+T_PIPE_BYE = 12
 
 _ID_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,64}$")
 
 _LOCK = threading.RLock()
 _STATE = {"peers": {}, "secret": "", "node_id": "", "srv": None,
-           "announce": 0, "last_error": "", "stop": 0, "rtt": 0,
-           "last_pick": {}}
+          "announce": 0, "last_error": "", "stop": 0,
+          "up": {}}
 
 
 def _int_env(name, default, low, high):
@@ -73,6 +80,10 @@ PAD_MAX = _int_env("AURORA_MESH_PAD", FRAG_PAD_MAX, 0, 4096)
 HEARTBEAT = _int_env("AURORA_MESH_HEARTBEAT", HEARTBEAT_S, 5, 300)
 TTL = _int_env("AURORA_MESH_PEER_TTL", PEER_TTL_S, 30, 3600)
 ANNOUNCE = _int_env("AURORA_MESH_ANNOUNCE", ANNOUNCE_S, 10, 3600)
+# A-191: limit odnovremennyh potokov v ODNOM soedinenii pira i
+# pokoi, posle kotorogo masterskoe soedinenie pikaet (povtor).
+MAX_STREAMS = _int_env("AURORA_MESH_MAX_STREAMS", 32, 1, 256)
+PEER_IDLE_S = _int_env("AURORA_MESH_PEER_IDLE", 300, 30, 3600)
 
 
 RTT_S = 30
@@ -336,24 +347,47 @@ def status():
                                  for rid, rw in peers.items()
                                  if _rtt_fresh(rw)),
                 "last_error": str(_STATE.get("last_error", "") or ""),
-                "net": MESH_NET, "frag": FRAG_SIZE, "mode": "relay"}
+                "net": MESH_NET, "frag": FRAG_SIZE, "pipes": _active_pipes(), "peer_conns": _live_conns(), "mode": "relay"}
 
 
-def _peer(node_id, addr=""):
-    """A-128: reestr pirov BEZ soketa. Odnо soedinenie - odin zapros,
-    poetomu derzhat postoyannye sokety v stroke nevozmozhno: dva potoka
-    _recv na odnom sokete lomali parallelnye zaprosy."""
+def _peer(node_id, addr="", sock=None):
+    """A-128: reestr pirov. A-191: teper ryad MOZHET derzhat postoyannoe
+    soedinenie pira (sock) - master ne dialit pira, aProsit potok po nemu.
+    Starye sokety ne lezhim v stroke: dva potoka na odnom sokete lomali
+    parallelnye zaprosy."""
     with _LOCK:
         peers = _STATE.setdefault("peers", {})
         if len(peers) >= MAX_PEERS and node_id not in peers:
             return None
         row = peers.get(node_id)
         if row is None:
-            row = {"node_id": node_id, "addr": "", "seen": 0.0, "rtt_ms": 0}
+            row = {"node_id": node_id, "addr": "", "seen": 0.0, "rtt_ms": 0,
+                   "sock": None, "streams": {}, "waiters": {},
+                   "tx": threading.Lock(), "sid": 0,
+                   # A-200: obratnyy tunnel (variant B) eshche ne nachalsya.
+                   "b_used": False}
             peers[node_id] = row
         value = str(addr or "").strip()
         if value:
             row["addr"] = value[:120]
+        if (sock is not None and row.get("sock") is not None
+                and row.get("b_used")
+                and row.get("sock") is not sock):
+            # A-201: u pira UZHE est zhivoy obratnyy tunnel (b_used).
+            # Odnorazovyy HELLO-announce starogo A1 ne dolzhen ego
+            # podmenyat i zatyvat: soket odnorazovogo soedineniya srazu
+            # umret, a master ostanetsya bez zhivogo kanala (SOCKS otkaz
+            # 05 01), hotya tunnel realno zhiv.
+            pass
+        elif sock is not None and row.get("sock") is not sock:
+            # A-197: staroe soedinenie NE zakryvaem i potoki/waitery NE chistim.
+            # Inache vtoraya sessiya togo zhe uzla ubivaet pervuyu: parallelnye
+            # zaprosy klienta idut cherez RAZNYE TCP-soedineniya odnoi
+            # reestr zapisi, a v A1 kazhdoe soedinenie bylo odnorazovym.
+            # Svoy reader sam zakroet svoy soket, kogda peer ottaynetsya.
+            row["sock"] = sock
+        elif sock is not None:
+            row["sock"] = sock
         row["seen"] = time.time()
         return row
 
@@ -368,9 +402,31 @@ def _touch(node_id):
     return None
 
 
-def _drop(node_id):
+def _drop(node_id, why=""):
+    """A-191: pIR otskazyvaetsya (soedinenie umerlo) - ryad i soedinenie
+    udalyayutsya, a vse ozhidayushchie otkrytiya potokov poluchayut oshibku,
+    chtoby master ne vis beskonechno."""
     with _LOCK:
-        _STATE.get("peers", {}).pop(node_id, None)
+        row = _STATE.get("peers", {}).pop(node_id, None)
+    if row is None:
+        return False
+    stream = row.get("streams") or {}
+    waiters = row.get("waiters") or {}
+    row["streams"] = {}
+    row["waiters"] = {}
+    for waiter in waiters.values():
+        waiter["ok"] = False
+        waiter["error"] = why or "peer connection is gone"
+        waiter["event"].set()
+    for sid in list(stream):
+        _close_stream(row, sid, why or "peer connection is gone")
+    sock = row.get("sock")
+    if sock is not None:
+        try:
+            sock.close()
+        except OSError:
+            pass
+    return True
 
 
 def _socks_read(sock):
@@ -478,6 +534,80 @@ def _forward(src, dst, key):
     except OSError:
         pass
     return True
+
+
+def _socks5_open(sock, dest_host, dest_port):
+    """A-168: SOCKS5 CONNECT cherez lokalnyi socks-inbound xray.
+
+    Govorit tolko s xray, kotoryj zdes zhe na etoi zhe mashine, poetu cel
+    vsegda 127.0.0.1 - nikogda ne podverzhdaem dst-adres iz vneshnego mira.
+    """
+    try:
+        dest_ip = socket.inet_aton(dest_host)
+    except OSError:
+        raise OSError("A-168: dest host must be IPv4 literal")
+    sock.sendall(b"\x05\x01\x00")
+    if _recv_exact(sock, 2) != b"\x05\x00":
+        raise OSError("A-168: socks5 greeting rejected")
+    sock.sendall(b"\x05\x01\x00\x01" + dest_ip
+                 + struct.pack("!H", int(dest_port)))
+    reply = _recv_exact(sock, 4)
+    if len(reply) != 4 or reply[0] != 0x05 or reply[1] != 0x00:
+        raise OSError("A-168: socks5 connect refused")
+    if reply[3] == 0x01:
+        _recv_exact(sock, 4 + 2)
+    elif reply[3] == 0x03:
+        # A-169: LEN chitaem ROVNO odin raz. Bylo `_recv_exact(sock, 1)` +
+        # vtoroe `_recv_exact(sock, 1)[0]` - pervyy bayt (sam LEN) glotalos,
+        # dalee schitalsya sleduyushchiy bayt kak "dlina", i my libo visim na
+        # timeout, libo chitaem chuzhie dannye.
+        raw_len = _recv_exact(sock, 1)
+        _recv_exact(sock, (raw_len[0] if raw_len else 0) + 2)
+    else:
+        _recv_exact(sock, 16 + 2)
+    return sock
+
+
+def _peer_dial_target(node_id):
+    """A-168: (inbound_host, inbound_port, dest_host, dest_port).
+
+    Pusto, esli lokalnyi xray ne podnyal socks-inbound dlya etogo pira.
+    """
+    try:
+        import core
+        peers = core._mesh_peers()
+    except Exception:
+        return (None, 0, "", 0)
+    try:
+        index = None
+        for peer in peers or []:
+            if str(peer.get("node_id") or "") == str(node_id or ""):
+                index = peer.get("index")
+                break
+        if index is None:
+            return (None, 0, "", 0)
+        host, port = core._peer_dial_addr(node_id, index)
+        dest_port = int(core._peer_dial_dest_port())
+    except Exception:
+        return (None, 0, "", 0)
+    if not host or not port or not dest_port:
+        return (None, 0, "", 0)
+    return (host, int(port), "127.0.0.1", dest_port)
+
+
+def _dial_via_socks(host, port, dest_host, dest_port):
+    """A-168: soedinenie k piru cherez SOCKS5-inbound (REALITY-cepochka)."""
+    sock = socket.create_connection((host, int(port)), HANDSHAKE_TIMEOUT_S)
+    try:
+        sock.settimeout(HANDSHAKE_TIMEOUT_S)
+        _socks5_open(sock, dest_host, dest_port)
+    except (OSError, ValueError):
+        try:
+            sock.close()
+        except OSError:
+            pass
+        raise
+    return sock
 
 
 def _recv_exact(sock, size):
@@ -619,10 +749,40 @@ def _self_addr():
     return value[:120]
 
 
+def _bind_addr():
+    """A-185: adres, na kotorom slushayet tunnel. Po umolchaniyu - tolko
+    loopback, kak i ranshe (naru zhe nikogda ne otkryvalsya). Esli vladelets
+    zadast AURORA_MESH_BIND (naprimer, Tailscale-adres 100.x), master
+    slushayet NA E TOM chastnomu adresu: piry dostugayut tonnell napryamuyu,
+    a ne cherez 0.0.0.0. 0.0.0.0 beretsya tolko iz yavnogo zhelaniya
+    vladeltsa (AURORA_MESH_BIND=0.0.0.0) - inache nikogda.
+    Nicheso pokhodit na obshchuyu set - ne prinimaem."""
+    value = str(os.environ.get("AURORA_MESH_BIND", "") or "").strip()
+    if not value:
+        try:
+            value = str(config.get("mesh_bind", "") or "").strip()
+        except Exception:
+            value = ""
+    if not value:
+        return "127.0.0.1"
+    if value == "0.0.0.0":
+        return "0.0.0.0"
+    try:
+        import ipaddress
+
+        parsed = ipaddress.ip_address(value)
+    except Exception:
+        return "127.0.0.1"
+    if parsed.version != 4:
+        # tolko IPv4: _listen() sozdast socket.AF_INET
+        return "127.0.0.1"
+    return str(parsed)
+
+
 def _listen(port):
     listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    listener.bind(("127.0.0.1", port))
+    listener.bind((_bind_addr(), port))
     listener.listen(16)
     return listener
 
@@ -666,9 +826,13 @@ def _serve_dispatch(conn, key, peer_id, master):
 
 
 def _announce_loop(key):
-    """A-147: periodicheskiy anons sebya masteru (registraciya pira)."""
+    """A-147: periodicheskiy anons sebya masteru (registraciya pira).
+    A-191 (variant B): posle T_OK soket NE zakryvaem - po nemu master
+    otkryvaet potoki, a my ih obsluzhivaem (_peer_pump). Peredacha inache
+    trebovala by, chtoby master dostichal 8443 pira (NAT)."""
     while True:
         sock = None
+        handed = False
         try:
             host, port = _master_addr()
             sock = socket.create_connection((host, port),
@@ -677,8 +841,17 @@ def _announce_loop(key):
             _nonce, payload = _hello_frame(_node_id(), _secret(),
                                            _self_addr(), key)
             _send(sock, T_HELLO, payload, key)
-            _wait_ok(sock, key)
+            if not _wait_ok(sock, key):
+                raise OSError("master did not confirm the announcement")
             _STATE["last_error"] = ""
+            _STATE["up"] = {"sock": sock, "at": time.time()}
+            pump = threading.Thread(target=_peer_pump, args=(sock, key),
+                                    name="mesh-up", daemon=True)
+            pump.start()
+            handed = True
+            sock = None
+            while not _STATE.get("stop") and pump.is_alive():
+                time.sleep(0.5)
         except Exception as exc:
             _STATE["last_error"] = "announce: %s" % (exc.__class__.__name__,)
         finally:
@@ -687,9 +860,10 @@ def _announce_loop(key):
                     sock.close()
                 except OSError:
                     pass
+            _STATE["up"] = {}
         if _STATE.get("stop"):
             return
-        time.sleep(max(1, int(ANNOUNCE)))
+        time.sleep(1 if handed else max(1, int(ANNOUNCE)))
 
 
 def _publish_profile():
@@ -849,11 +1023,17 @@ def _client_session(conn, key, peer_id):
 def _dial_peer(row, key):
     """A-128/A-129: master sam iniciruet sootedenie s peerom. Odno
     soedinenie - odin zapros, poetomu sokety v reestre ne khranim."""
-    host, port = _parse_addr(row.get("addr"))
-    if not host:
-        raise OSError("peer address is not reachable")
     node_id = str(row.get("node_id") or "")
-    sock = socket.create_connection((host, port), HANDSHAKE_TIMEOUT_S)
+    # A-168: esli lokalnyi xray podnyal socks-inbound pira - idem cherez nego
+    # (REALITY-cepochka), inache pryamoy dial po announced adresu.
+    in_host, in_port, dest_host, dest_port = _peer_dial_target(node_id)
+    if in_host and in_port:
+        sock = _dial_via_socks(in_host, in_port, dest_host, dest_port)
+    else:
+        host, port = _parse_addr(row.get("addr"))
+        if not host:
+            raise OSError("peer address is not reachable")
+        sock = socket.create_connection((host, port), HANDSHAKE_TIMEOUT_S)
     sock.settimeout(HANDSHAKE_TIMEOUT_S)
     try:
         secret = _peer_secret(node_id) or key
@@ -870,6 +1050,428 @@ def _dial_peer(row, key):
     sock.settimeout(None)
     return sock
 
+
+def _streams(row):
+    """A-191: potoki odnogo soedineniya pira."""
+    if not isinstance(row, dict):
+        return {}
+    value = row.get("streams")
+    if not isinstance(value, dict):
+        value = {}
+        row["streams"] = value
+    return value
+
+
+def _live_conns():
+    with _LOCK:
+        peers = _STATE.get("peers", {})
+        return len([row for row in peers.values()
+                    if isinstance(row, dict) and row.get("sock") is not None])
+
+
+def _active_pipes():
+    total = 0
+    with _LOCK:
+        for row in _STATE.get("peers", {}).values():
+            if isinstance(row, dict):
+                total += len(_streams(row))
+    return total
+
+
+def _send_row(row, msg_type, payload, key):
+    """A-191: otpravka po postoyannomu soedineniyu pira pod ego zapustom
+    - inache dva potoka smeshayut svoi sdalki v odnom TCP."""
+    sock = (row or {}).get("sock")
+    if sock is None:
+        raise OSError("peer has no live connection")
+    with row["tx"]:
+        _send(sock, msg_type, payload, key)
+
+
+def _new_sid(row):
+    with _LOCK:
+        used = _streams(row)
+        for _ in range(0, 65536):
+            row["sid"] = (int(row.get("sid", 0)) + 1) % 0x100000000
+            if row["sid"] != 0 and row["sid"] not in used:
+                return row["sid"]
+    raise OSError("no free stream id")
+
+
+def _close_stream(row, sid, why=""):
+    """A-191: potok zakryt - lokalny soket klienta otpuskaem (SHUT_WR)."""
+    with _LOCK:
+        stream = _streams(row).pop(sid, None)
+    if not isinstance(stream, dict):
+        return False
+    out = stream.get("out")
+    if out is not None:
+        try:
+            out.shutdown(socket.SHUT_WR)
+        except OSError:
+            pass
+        try:
+            out.close()
+        except OSError:
+            pass
+    return True
+
+
+def _pipe_open(row, key, target, out=None, timeout=None):
+    """A-191: masterProsit pira otkryt potok k "host:port". Zhdet T_PIPE_OK
+    ili T_PIPE_ERR. Registriruem potok DO otpravki, inache prislyannye dannye
+    mogut prityti do nashey zapisi v spiske potokov.
+    A-196: "out" peredavaetsya srazu - pir mozhet prislat pervye dannye
+    TSERZ (dlya bystroi celi) do vozvrata, i ranee out byl None => tihaya
+    poterya pervikh baytov otveta."""
+    limit = HANDSHAKE_TIMEOUT_S if timeout is None else float(timeout)
+    sid = _new_sid(row)
+    waiter = {"ok": None, "error": "", "event": threading.Event()}
+    with _LOCK:
+        _streams(row)[sid] = {"out": out, "state": {}}
+        row.setdefault("waiters", {})[sid] = waiter
+    try:
+        text = str(target or "").encode("ascii", "ignore")
+        _send_row(row, T_PIPE_OPEN, struct.pack("!I", sid) + text, key)
+        with _LOCK:
+            row["b_used"] = True
+        if not waiter["event"].wait(limit):
+            raise OSError("peer did not open the stream")
+        if not waiter["ok"]:
+            raise OSError(waiter["error"] or "peer refused the stream")
+        return sid
+    except (OSError, ValueError):
+        with _LOCK:
+            _streams(row).pop(sid, None)
+        raise
+    finally:
+        with _LOCK:
+            row.get("waiters", {}).pop(sid, None)
+
+
+def _pump_frames(local_sock, row, key, sid):
+    """A-191: syrye bayty lokalnoy sessii -> T_PIPE_DATA s id potoka."""
+    while True:
+        try:
+            chunk = local_sock.recv(65536)
+        except OSError:
+            break
+        if not chunk:
+            break
+        for body in _fragment(chunk):
+            _send_row(row, T_PIPE_DATA, struct.pack("!I", sid) + body, key)
+
+
+def _pump_pipe(target, sid, send):
+    """A-191 (storona pira): syrye bayty otkrytoy celi -> T_PIPE_DATA."""
+    try:
+        while True:
+            try:
+                chunk = target.recv(65536)
+            except OSError:
+                break
+            if not chunk:
+                break
+            for body in _fragment(chunk):
+                send(T_PIPE_DATA, struct.pack("!I", sid) + body)
+        try:
+            send(T_PIPE_BYE, struct.pack("!I", sid))
+        except OSError:
+            pass
+    finally:
+        try:
+            target.close()
+        except OSError:
+            pass
+
+
+def _release_peer_sock(node_id, conn):
+    """A-194: osvobodit soket pira, no NE zabyvaet ego metadannye.
+    Nuzhno dlya starykh (A1) ob'yavleniy: pirok posylal odin HELLO i zakryl
+    soket, a v registre emu nuzhno ostat'sya kak kandidat na vyxod
+    (inache _pick_peer ego ne vidit i trafic ne idet nikuda)."""
+    with _LOCK:
+        row = _STATE.get("peers", {}).get(node_id)
+        if not isinstance(row, dict):
+            return False
+        if row.get("sock") is conn:
+            row["sock"] = None
+        else:
+            # A-197: eto sostarеvshee soedinenie, a v reestre uzhe novyi
+            # soket - potoki i waiter'y novogo zabrosa ne trogaem.
+            return False
+        for waiter in (row.get("waiters") or {}).values():
+            if isinstance(waiter, dict) and waiter.get("event") is not None:
+                waiter["ok"] = False
+                waiter["error"] = "peer connection is gone"
+                waiter["event"].set()
+        row["waiters"] = {}
+        for stream in (row.get("streams") or {}).values():
+            if isinstance(stream, dict) and stream.get("target") is not None:
+                try:
+                    stream["target"].close()
+                except OSError:
+                    pass
+        row["streams"] = {}
+        row["seen"] = time.time()
+    return True
+
+
+def _peer_reader(conn, key, node_id):
+    """A-191 (storona mastera): ODIN potok chityaet postoyannoe soedinenie
+    pira i razbirayet potoki po identifikatoru. Nikogda ne chitaet T_PIPE_OK
+    "dlya sebya" - idet v waiter zaprosa, kotoryy zhdet _pipe_open.
+    A-194: esli po soedineniyu ne bylo realnogo trafika - ryad pira
+    ostaetsya v reestre (bez soketa), chtoby ego videl _pick_peer."""
+    with _LOCK:
+        row = _STATE.get("peers", {}).get(node_id)
+    if not isinstance(row, dict):
+        try:
+            conn.close()
+        except OSError:
+            pass
+        return
+    buf = b""
+    last = time.time()
+    used = False
+    try:
+        conn.settimeout(None)
+        while not _STATE.get("stop"):
+            try:
+                chunk = conn.recv(65536)
+            except OSError:
+                break
+            if not chunk:
+                break
+            last = time.time()
+            buf += chunk
+            if _oversize(buf):
+                break
+            while True:
+                msg_type, payload, buf = _unpack(buf, key)
+                if msg_type is None:
+                    break
+                if msg_type == T_BYE:
+                    raise OSError("peer closed the tunnel")
+                if msg_type == T_PING:
+                    used = True
+                    try:
+                        _send_row(row, T_PONG, b"", key)
+                    except OSError:
+                        pass
+                    continue
+                if msg_type == T_DATA:
+                    # A-193: staryi klient (protokol A1) prosit relay.
+                    used = True
+                    try:
+                        _legacy_hub_from_data(conn, key, node_id, payload)
+                    except (OSError, ValueError):
+                        pass
+                    return
+                if msg_type in (T_PIPE_OK, T_PIPE_ERR):
+                    used = True
+                    if len(payload) < 4:
+                        continue
+                    sid = struct.unpack("!I", payload[:4])[0]
+                    with _LOCK:
+                        waiter = (row.get("waiters") or {}).get(sid)
+                    if waiter is not None:
+                        waiter["ok"] = (msg_type == T_PIPE_OK)
+                        if msg_type != T_PIPE_OK:
+                            waiter["error"] = "peer refused the stream"
+                        waiter["event"].set()
+                    continue
+                if msg_type == T_PIPE_DATA:
+                    used = True
+                    if len(payload) < 4:
+                        continue
+                    sid = struct.unpack("!I", payload[:4])[0]
+                    with _LOCK:
+                        stream = _streams(row).get(sid)
+                    if not isinstance(stream, dict):
+                        continue
+                    state = stream.setdefault("state", {})
+                    data = _defrag(state, payload[4:])
+                    if not data:
+                        continue
+                    out = stream.get("out")
+                    if out is None:
+                        continue
+                    try:
+                        out.sendall(data)
+                    except OSError:
+                        _close_stream(row, sid, "client is gone")
+                    continue
+                if msg_type == T_PIPE_BYE:
+                    used = True
+                    if len(payload) < 4:
+                        continue
+                    _close_stream(row, struct.unpack("!I", payload[:4])[0],
+                                 "peer closed the stream")
+                    continue
+            if time.time() - last > PEER_IDLE_S:
+                break
+    except OSError:
+        pass
+    finally:
+        with _LOCK:
+            current = _STATE.get("peers", {}).get(node_id)
+            mine = isinstance(current, dict) and current.get("sock") is conn
+            tunnel = bool(current.get("b_used")) if isinstance(current, dict) else False
+            # A-202: cheстnaya diagnostika v status() - kakim obrazom zavershilsya
+            # reader pira (pomogayet nayti poteryu obratnogo kanala v zhivom teste).
+            _STATE["last_error"] = ("peer-reader end: mine=%s tunnel=%s used=%s"
+                                    % (mine, tunnel, used))
+        if mine and tunnel:
+            # A-199: reshaem po `mine`, a NE po `used`. V variante B
+            # soedinenie pira postoyannoe i mozhet legalno molchat (idle),
+            # a `used` stanovilsya True tolko na T_PING/T_DATA. Iz-za etogo
+            # A-194::_release_peer_sok obrashchal ZHIVOY obratnyy soket
+            # (row['sock'] = None) i master ego terjal: peer_conns: 0,
+            # a variant B vzhivyu ne rabotal. Soedinenie zavershilos -
+            # znachit ono mertvo: snimaem uzhel celikom.
+            _drop(node_id, "peer connection is gone")
+        elif mine:
+            # A-200: odnorazovyy HELLO-announce pira (A1). Zapis pira
+            # NADO sotranit: master dialit pira po adresu iz HELLO.
+            # Tolko osvobozhdaem soket - inache _pick_peer ne vidit pira
+            # i klienty poluchayut otkaz, a zapis myagsko ischezayet.
+            _release_peer_sock(node_id, conn)
+        else:
+            # A-197: sostarеvshee soedinenie - reestr zaniat novym,
+            # nichego v nyom ne trogaem.
+            pass
+        try:
+            conn.close()
+        except OSError:
+            pass
+
+
+def _peer_pump(conn, key):
+    """A-191 (storona pira): zhdem komandu mastera (T_PIPE_OPEN) i kazhdyy
+    potok obsluzhivaem v svoikh dvukh potokakh. Odno masterskoe soedinenie
+    mozhet nest skolko ugodno potokov, no ne bolshe MAX_STREAMS."""
+    streams = {}
+    tx = threading.Lock()
+    buf = b""
+    last = time.time()
+
+    def send(msg_type, payload):
+        with tx:
+            _send(conn, msg_type, payload, key)
+
+    def close_stream(sid):
+        stream = streams.pop(sid, None)
+        if not isinstance(stream, dict):
+            return False
+        target = stream.get("target")
+        if target is not None:
+            try:
+                target.close()
+            except OSError:
+                pass
+        return True
+
+    def open_stream(sid, text):
+        if len(streams) >= MAX_STREAMS:
+            # A-191: chestnyi otkaz, a ne bezkonechnoe nakoplenie potokov.
+            send(T_PIPE_ERR, struct.pack("!I", sid) + b"\x02")
+            return
+        host, _sep, port = str(text or "").rpartition(":")
+        if not host or not port.isdigit():
+            send(T_PIPE_ERR, struct.pack("!I", sid) + b"\x01")
+            return
+        try:
+            target = socket.create_connection((host, int(port)),
+                                              HANDSHAKE_TIMEOUT_S)
+        except (OSError, ValueError):
+            send(T_PIPE_ERR, struct.pack("!I", sid) + b"\x01")
+            return
+        target.settimeout(None)
+        streams[sid] = {"target": target, "state": {}}
+        send(T_PIPE_OK, struct.pack("!I", sid))
+        threading.Thread(target=_pump_pipe, args=(target, sid, send),
+                         name="mesh-pipe-%d" % int(sid), daemon=True).start()
+
+    try:
+        conn.settimeout(None)
+        while not _STATE.get("stop"):
+            try:
+                chunk = conn.recv(65536)
+            except OSError:
+                break
+            if not chunk:
+                break
+            last = time.time()
+            buf += chunk
+            if _oversize(buf):
+                break
+            while True:
+                msg_type, payload, buf = _unpack(buf, key)
+                if msg_type is None:
+                    break
+                if msg_type == T_PING:
+                    send(T_PONG, b"")
+                    continue
+                if msg_type == T_BYE:
+                    raise OSError("master closed the tunnel")
+                if msg_type == T_PIPE_OPEN:
+                    if len(payload) < 4:
+                        continue
+                    open_stream(struct.unpack("!I", payload[:4])[0],
+                                payload[4:].decode("utf-8", "replace"))
+                    continue
+                if msg_type == T_PIPE_DATA:
+                    if len(payload) < 4:
+                        continue
+                    sid = struct.unpack("!I", payload[:4])[0]
+                    stream = streams.get(sid)
+                    if not isinstance(stream, dict):
+                        continue
+                    state = stream.setdefault("state", {})
+                    data = _defrag(state, payload[4:])
+                    if not data:
+                        continue
+                    try:
+                        stream["target"].sendall(data)
+                    except OSError:
+                        close_stream(sid)
+                    continue
+                if msg_type == T_PIPE_BYE:
+                    if len(payload) < 4:
+                        continue
+                    close_stream(struct.unpack("!I", payload[:4])[0])
+                    continue
+            if time.time() - last > PEER_IDLE_S:
+                break
+    except OSError:
+        pass
+    finally:
+        for sid in list(streams):
+            close_stream(sid)
+        try:
+            conn.close()
+        except OSError:
+            pass
+
+
+def _peer_stream(row, key, text, local_sock):
+    """A-191: otkryt potok k "host:port" na pIRE i zalit v nego syrye
+    bayty lokalnoy sessii. Obratnoe napravlenie pishet tot zhe potok cherez
+    _peer_reader, poetomu zdes nichego ne zhdem."""
+    # A-196: "out" peredavaetsya v _pipe_open - pervye bayty otveta mogut
+    # prityti do zaversheniya rukopozhatiya, i nichego ne dolzno byt poteryano.
+    sid = _pipe_open(row, key, text, local_sock)
+    _touch(row.get("node_id"))
+    try:
+        _pump_frames(local_sock, row, key, sid)
+    finally:
+        try:
+            _send_row(row, T_PIPE_BYE, struct.pack("!I", sid), key)
+        except OSError:
+            pass
+        _close_stream(row, sid, "local session is finished")
+    return True
 
 def _relay(sock, key, out_sock=None):
     """A-127/A-128: odna sessiya - odno soedinenie - odin zapros.
@@ -917,57 +1519,28 @@ def _relay(sock, key, out_sock=None):
             _STATE["sessions"] = max(0, int(_STATE.get("sessions", 0) or 0) - 1)
 
 
-def _relay_hub(conn, key, requester_id=""):
-    """A-131: master prinyal T_DATA s celyu ot klenta - peredavaet zapros
-    piru-vyhodu i nakatyvaet trafik T_FRAG v obe storony. Bez pirov nichego
-    ne otkryvaem: fail-closed, klient poluchit obryv."""
-    buf = b""
-    target = b""
-    while True:
-        try:
-            chunk = conn.recv(65536)
-        except OSError:
-            return False
-        if not chunk:
-            return False
-        buf += chunk
-        # A-158: sm. takzhe v _forward/_recv.
-        if _oversize(buf):
-            return False
-        msg_type, payload, buf = _unpack(buf, key)
-        if msg_type is None:
-            if not buf:
-                return False
-            continue
-        if msg_type == T_BYE:
-            return False
-        if msg_type != T_DATA:
-            continue
-        target = payload
-        break
-    row = _pick_peer(exclude=requester_id)
-    if row is None:
-        return False
+def _legacy_hub_stream(client_conn, key, text, row):
+    """A-193: staroe odnorazovoe soedinenie s pirem (protokol A1).
+    Master SAM dialit pira, shlet T_DATA i kachaet dva napravleniya
+    _forward. V variante B eto fallback i obrabotka starykh klientov,
+    kotorye ne umeyut T_PIPE_OPEN."""
+    peer_sock = None
     try:
         peer_sock = _dial_peer(row, key)
     except (OSError, ValueError):
         return False
     _touch(row.get("node_id"))
     try:
-        _send(peer_sock, T_DATA, target, key)
+        _send(peer_sock, T_DATA, text.encode("utf-8"), key)
     except OSError:
         try:
             peer_sock.close()
         except OSError:
             pass
         return False
-    # A-141: obe storony zdes - uzly (kadry), _pipe by perapakoval kadry.
-    # A-143: nuzhny OBA napravleniya. Ranee byl tolko pir -> klient, poetomu
-    # zapros klenta do pira ne dostaval voobshche (test: echo conns=1 got=0):
-    # klient -> pir (zapros) i pir -> klient (otvet).
-    up = threading.Thread(target=_forward, args=(conn, peer_sock, key),
+    up = threading.Thread(target=_forward, args=(client_conn, peer_sock, key),
                           name="mesh-hub-c2p", daemon=True)
-    down = threading.Thread(target=_forward, args=(peer_sock, conn, key),
+    down = threading.Thread(target=_forward, args=(peer_sock, client_conn, key),
                             name="mesh-hub-p2c", daemon=True)
     up.start()
     down.start()
@@ -980,13 +1553,89 @@ def _relay_hub(conn, key, requester_id=""):
     return True
 
 
-def _peer_session(conn, key):
-    """Master prinyal HELLO uzla: proverka, T_OK, dalee - vyhod dlya zaprosa
-    (A-127: ranee soket pira ne chitalsya voobshche, otvety visitali)."""
-    conn.settimeout(HANDSHAKE_TIMEOUT_S)
-    buf = b""
-    node_id = ""
+def _legacy_hub_from_data(client_conn, key, requester_id, payload):
+    """A-193: T_DATA ot uzla v masterskuyu storonu = prosba na relay A1.
+    Soedinenie odnorazovoe: posle obrabotki ego zamykaet vypolnyayushchiy
+    potok. Myi umyashlenno NE predpochitaem zdes _peer_stream: T_DATA -
+    eto staryi protokol, a variant B tseli otkryvaet cherez T_PIPE_OPEN."""
+    text = payload.decode("utf-8", "replace")
+    if ":" not in text:
+        return False
+    row = _pick_peer(exclude=requester_id)
+    if row is None:
+        return False
     try:
+        client_conn.settimeout(None)
+    except OSError:
+        pass
+    return bool(_legacy_hub_stream(client_conn, key, text, row))
+
+
+def _relay_hub(client_conn, key, requester_id=""):
+    """A-191 (variant B): master NE dialit pira. Beret ego postoyannoe
+    soedinenie iz reestra i prosit otkryt potok k celi. A1 sohranen kak
+    fallback (estli u pira net zhivogo soedineniya)."""
+    buf = b""
+    target = b""
+    try:
+        client_conn.settimeout(HANDSHAKE_TIMEOUT_S)
+        while not target:
+            try:
+                chunk = client_conn.recv(65536)
+            except OSError:
+                return False
+            if not chunk:
+                return False
+            buf += chunk
+            if _oversize(buf):
+                return False
+            while True:
+                msg_type, payload, buf = _unpack(buf, key)
+                if msg_type is None:
+                    break
+                if msg_type == T_BYE:
+                    return False
+                if msg_type != T_DATA:
+                    continue
+                target = payload
+                break
+        client_conn.settimeout(None)
+        text = target.decode("utf-8", "replace")
+        if ":" not in text:
+            return False
+        row = _pick_peer(exclude=requester_id)
+        if row is None:
+            return False
+        if row.get("sock") is not None:
+            try:
+                _peer_stream(row, key, text, client_conn)
+            except (OSError, ValueError):
+                _drop(row.get("node_id"), "stream refused")
+                return False
+            return True
+        # A-193: obshchiy legacy-helper vmesto dublirovaniya koda.
+        return bool(_legacy_hub_stream(client_conn, key, text, row))
+    finally:
+        try:
+            client_conn.settimeout(None)
+        except OSError:
+            pass
+        try:
+            client_conn.close()
+        except OSError:
+            pass
+
+
+def _peer_session(conn, key):
+    """A-191 (variant B): soedinenie pira ostaetsya POSTOYANNym. Master
+    registriruet ego s soketom i zapechkivaet ODNIM potokom _peer_reader,
+    a potom prosto vozvrashchaetsya - peredacha idet po etomu zhe kanalu."""
+    node_id = ""
+    host = ""
+    port = 0
+    try:
+        conn.settimeout(HANDSHAKE_TIMEOUT_S)
+        buf = b""
         while True:
             try:
                 chunk = conn.recv(65536)
@@ -996,9 +1645,6 @@ def _peer_session(conn, key):
                 return
             buf += chunk
             if _oversize(buf):
-                # A-159: piryom vsyo, chto prishlo, i "dolit" ochen bolshoy
-                # length v bufer - bufer ros net do beskonechnosti (DoS po
-                # pamyati). Otkaz fail-closed kak v _wait_ok/_recv/_forward.
                 return
             msg_type, payload, rest = _unpack(buf, key)
             buf = rest
@@ -1028,14 +1674,13 @@ def _peer_session(conn, key):
         # A-113: ranee posle "timeout" s pustymi dannymi registralsya pir "".
         conn.close()
         return
-    if _peer(node_id, ("%s:%d" % (host, port)) if host else "") is None:
+    addr = ("%s:%d" % (host, port)) if host else ""
+    if _peer(node_id, addr, sock=conn) is None:
         conn.close()
         return
     if str(_STATE.get("started", "") or "") == "master":
-        # A-131: my - hab. Cel my ne otkryvaem: peredavaem zapros piru i
-        # nakatyvaem trafik T_FRAG v obe storony ("kto blizhe" - po svezhosti).
-        _relay_hub(conn, key, node_id)
-        conn.close()
+        threading.Thread(target=_peer_reader, args=(conn, key, node_id),
+                         name="mesh-peer-%s" % node_id, daemon=True).start()
         return
     if not _relay(conn, key, None):
         conn.close()
@@ -1180,12 +1825,27 @@ def _pick_peer(exclude=None):
 
 
 def _socks_session(conn, key):
+    """A-191: snachala probuem obratnoe soedinenie (potok po zhivomu
+    soedineniyu pira), tolko potom - staruyu shemu A1 s dialom."""
     target = _socks_request(conn)
     if target is None:
         conn.close()
         return
     conn.settimeout(None)
+    text = "%s:%d" % target
     row = _pick_peer()
+    if row is not None and row.get("sock") is not None:
+        try:
+            conn.sendall(b"\x05\x00\x00\x01\x00\x00\x00\x00\x00\x00")
+        except OSError:
+            conn.close()
+            return
+        try:
+            _peer_stream(row, key, text, conn)
+        except (OSError, ValueError):
+            _drop(row.get("node_id"), "stream refused")
+        conn.close()
+        return
     peer_sock = None
     if row is not None:
         try:
@@ -1203,7 +1863,7 @@ def _socks_session(conn, key):
         return
     try:
         conn.sendall(b"\x05\x00\x00\x01\x00\x00\x00\x00\x00\x00")
-        _send(peer_sock, T_DATA, ("%s:%d" % target).encode("utf-8"), key)
+        _send(peer_sock, T_DATA, text.encode("utf-8"), key)
     except OSError:
         conn.close()
         peer_sock.close()
@@ -1224,6 +1884,10 @@ def start(role=None):
         _STATE["started"] = role or "master"
     key = _secret()
     if not key:
+        # A-263: старт не состоялся - снимаем метку, иначе следующий
+        # start() вернул бы True, хотя туннель не поднят.
+        with _LOCK:
+            _STATE.pop("started", None)
         return False
     master = (role or "master") == "master"
     target = _server_serve if master else _client_serve

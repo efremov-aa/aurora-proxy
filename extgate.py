@@ -145,10 +145,16 @@ def _fetch(token, credential, timeout):
     except (ValueError, UnicodeDecodeError):
         value = None
     if not isinstance(value, dict):
-        # Отказ без тела — но код остаться, чтобы панель
-        # сказала правдильную причину (blocked/unknown/
-        # expired/slow_down), а не молчалива без причины.
-        return ({"error": "http-%s" % code} if code else None), (str(code) if code else "bad-json")
+        if not code or code == 200:
+            # A-263: 200 с не-JSON телом - это НЕ ответ лицензии.
+            # Раньше такой ответ затирал хороший кэш (state=unknown,
+            # plan=""), и панель показывала «подписки нет» при живой
+            # подписке. Теперь считаем его «мастер не ответил» и
+            # продолжаем работать на кэше.
+            return None, "bad-json"
+        # Отказ без тела — код остаётся, чтобы панель сказала
+        # правдильную причину (blocked/expired/slow_down).
+        return {"error": "http-%s" % code}, str(code)
     return value, code
 
 
@@ -225,6 +231,12 @@ def check(force=False, timeout=None):
                 "expires": result["expires"], "rules_version": result.get("rules_version"),
                 "buy_url": result["buy_url"], "checked_at": result["checked_at"],
                 "state": result["state"],
+                # A-262: счётчики подписки тоже в кэш - без них панель
+                # показывала трафик и устройства как 0/0 при живой лицензии.
+                "used_bytes": result["used_bytes"],
+                "limit_bytes": result["limit_bytes"],
+                "device_count": result["device_count"],
+                "limit_devices": result["limit_devices"],
             })
             _save_cache()
             previous = (_SNAPSHOT or {}).get("plan")
@@ -255,7 +267,7 @@ def _rebuild(offline_reason=None):
             state = "expired"
         expires = _int(cache.get("expires"), 0)
         days = max(0, (expires - now) // 86400) if expires else 0
-        pro = is_pro(plan) and state in ("ok", "free")
+        pro = is_pro(plan) and state == "ok"
         if state == "ok" and not is_pro(plan):
             state = "free"
         _SNAPSHOT = {

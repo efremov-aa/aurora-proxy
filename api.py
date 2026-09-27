@@ -48,7 +48,11 @@ def _json(data, status=200):
 
 def _configured_hosts():
     values = {"127.0.0.1", "::1", "localhost"}
-    for value in (config.VM_HOST, os.environ.get("AURORA_HOST", "")):
+    # A-264: хост, сохранённый в настройках, тоже разрешён. Раньше гейт знал
+    # только env (AURORA_HOST/VM_HOST), и панель по своему же адресу из
+    # настроек отбивалась: GET 401, POST 403 cross-origin.
+    for value in (config.VM_HOST, os.environ.get("AURORA_HOST", ""),
+                  config.get("host", "")):
         host = str(value or "").strip().lower().rstrip(".")
         if host:
             values.add(host)
@@ -216,7 +220,13 @@ def _scanner_path(path):
 def _host_in_lan(ip):
     try:
         client = ipaddress.ip_address(str(ip))
-        server = ipaddress.ip_address(str(config.VM_HOST))
+        # A-264: если env AURORA_HOST не задан, ориентир берём из сохранённого
+        # адреса панели - иначе при VM_HOST=127.0.0.1 подсеть LAN не угадывалась
+        # и владелец в своей сети получал 401 вместо доступа.
+        anchor = str(config.VM_HOST or "").strip()
+        if anchor in ("", "localhost", "127.0.0.1", "::1"):
+            anchor = str(config.get("host", "") or "").strip() or anchor
+        server = ipaddress.ip_address(anchor)
     except (TypeError, ValueError):
         return _is_local_value(ip)
     if client.is_loopback:
@@ -313,6 +323,12 @@ def _admin_ok(self):
     # Владелец в своей LAN-сети: панель закрыта только снаружи (lan_only),
     # поэтому из LAN доступ к кнопкам (обновить/проверить/оплатить) разрешён.
     if config.get("lan_only", False) and _host_in_lan(self.client_address[0]):
+        return True
+    # A-264: если админ-токен вообще не настроен, панель была мертва для всех
+    # POST (даже с localhost и из браузера владельца) — «не авторизовано».
+    # Loopback и так доверен для чтения, поэтому до настройки токена
+    # разрешаем и запись; как только токен задан, эта ветка больше не работает.
+    if not _UI_TOKEN and _is_local(self):
         return True
     return False
 

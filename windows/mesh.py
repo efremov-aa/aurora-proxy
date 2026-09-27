@@ -9,6 +9,7 @@ import ipaddress
 import json
 import math
 import os
+import re
 import socket
 import threading
 import time
@@ -544,6 +545,109 @@ def get_secret(node_id):
     return None
 
 
+def _valid_node_id(value):
+    """Идентификатор узла: 8/32 hex, ULID или канонический UUID."""
+    if not isinstance(value, str):
+        return False
+    v = value.strip()
+    if not v or len(v) > 64:
+        return False
+    if re.fullmatch(r"[0-9a-f]{8}", v) or re.fullmatch(r"[0-9a-f]{32}", v):
+        return True
+    if re.fullmatch(r"[0-7][0-9A-HJKMNP-TV-Z]{25}", v):
+        return True
+    if len(v) == 36:
+        try:
+            return str(_uuid.UUID(v)) == v.lower()
+        except (AttributeError, TypeError, ValueError):
+            return False
+    return False
+
+
+def _vless_client_valid(value):
+    """Профиль внешнего VLESS узла: ровно шесть полей, каждое проверяется."""
+    if not isinstance(value, dict):
+        return False
+    if set(value.keys()) != {"uuid", "pbk", "short_id", "sni", "host", "port"}:
+        return False
+    uid = value.get("uuid")
+    if not isinstance(uid, str) or len(uid) != 36:
+        return False
+    try:
+        if str(_uuid.UUID(uid)) != uid.lower():
+            return False
+    except (AttributeError, TypeError, ValueError):
+        return False
+    if not re.fullmatch(r"[A-Za-z0-9_-]{43}", str(value.get("pbk") or "")):
+        return False
+    sid = value.get("short_id")
+    if not isinstance(sid, str) or not sid or len(sid) > 16 or len(sid) % 2:
+        return False
+    try:
+        int(sid, 16)
+    except ValueError:
+        return False
+    sni = value.get("sni")
+    if not isinstance(sni, str) or not sni or len(sni) > 253:
+        return False
+    if any(ch.isspace() for ch in sni):
+        return False
+    if not _valid_peer_host(value.get("host"), allow_loopback=False):
+        return False
+    return _valid_port(value.get("port"))
+
+
+def set_vless_client(node_id, value):
+    """Записать или снять профиль внешнего VLESS узла (мастер шлёт, узел читает)."""
+    global _NODES
+    if not _valid_node_id(node_id):
+        return False
+    if value is not None and not _vless_client_valid(value):
+        return False
+    with _LOCK:
+        rows = [dict(n) for n in _NODES]
+        found = False
+        for rec in rows:
+            if rec.get("id") != node_id:
+                continue
+            found = True
+            if value is None:
+                rec.pop("vless_client", None)
+            else:
+                rec["vless_client"] = dict(value)
+            break
+        if not found:
+            return value is None
+        try:
+            rows = _validate_nodes(rows)
+        except (TypeError, ValueError):
+            return False
+        previous = _NODES
+        _NODES = rows
+        try:
+            _save()
+        except Exception:
+            _NODES = previous
+            return False
+    _invalidate_ping_cache()
+    return True
+
+
+def vless_client(node_id):
+    """Копия профиля внешнего VLESS узла (пусто, если профиля нет или он битый)."""
+    if not _valid_node_id(node_id):
+        return {}
+    with _LOCK:
+        for n in _NODES:
+            if n.get("id") != node_id:
+                continue
+            value = n.get("vless_client")
+            if _vless_client_valid(value):
+                return dict(value)
+            return {}
+    return {}
+
+
 def remove(node_id):
     """Удаляет внешнюю ноду по id. Возвращает True при удалении."""
     global _NODES
@@ -972,7 +1076,7 @@ def _catalog_valid(value):
     master_id = _policy_master_id()
     if not key or not master_id or value.get("master_id") != master_id:
         return None
-    buy_url = catalog.get("buy_url")
+    buy_url = value.get("buy_url")
     if not isinstance(buy_url, str) or not buy_url.strip() or len(buy_url) > 200:
         return None
     signature = value.get("catalog_signature")
