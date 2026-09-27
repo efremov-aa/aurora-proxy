@@ -1,7 +1,6 @@
 # Aurora v1.0 — лаунчер: инициализация и запуск всех фоновых циклов.
 
 import os
-import signal
 import threading
 
 import config
@@ -47,7 +46,6 @@ def _boot():
     # а не условие жизни прокси.
     if config.get("mesh_tunnel", False):
         try:
-            import meshtunnel
             if meshtunnel.start(os.environ.get("AURORA_MESH_ROLE", "")):
                 config.log("mesh: relay-туннель запущен")
         except Exception as e:

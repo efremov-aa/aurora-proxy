@@ -272,6 +272,10 @@ def _rebuild(offline_reason=None):
             state = "free"
         _SNAPSHOT = {
             "ok": state == "ok" and is_pro(plan),
+            # A-277: "active" - подписка жива (в т.ч. триал free), независимо от PRO.
+            # Раньше trial_ok() требовал "ok", а "ok" по определению false без PRO,
+            # поэтому триал не получал extension/adblock (конъюнкция была невыполнима).
+            "active": state in ("ok", "free"),
             "state": state,
             "plan": plan,
             "is_pro": bool(pro),
@@ -314,11 +318,16 @@ TRIAL_FEATURES = ("extension", "adblock")
 
 
 def trial_ok():
-    """Подписка активна (в т. ч. триал free), но PRO ещё не куплен."""
+    """Подписка активна (в т.ч. триал free), но PRO ещё не куплен."""
     with STATE_LOCK:
         snap = dict(_SNAPSHOT) if _SNAPSHOT else _rebuild()
+    # A-277: брать признак "подписка жива" из снимка, а не из "ok"
+    # (ok == state=="ok" and is_pro(plan), то есть для триала всегда False).
+    if "active" in snap:
+        return bool(snap.get("active")) and not is_pro(str(snap.get("plan") or ""))
     st = str(snap.get("state") or "")
-    return bool(snap.get("ok")) and st in ("ok", "free")
+    return st == "free" and not is_pro(str(snap.get("plan") or ""))
+
 
 def feature(name):
     """Открыта ли PRO-фича (whitelist/unlimited/adblock/extension)."""

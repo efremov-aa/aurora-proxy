@@ -635,7 +635,6 @@ def _reject_client(writer) -> None:
 
 
 def _admit_client(reader, writer) -> None:
-    global _accepting
     if not _accepting:
         _reject_client(writer)
         return
@@ -727,7 +726,6 @@ async def _run(stop_event: Optional[asyncio.Event] = None):
     else:
         start_cfproxy_domain_refresh()
 
-    secret_bytes = bytes.fromhex(proxy_config.secret)
     server = None
     serve_task = None
     watchdog_task = None

@@ -28,6 +28,7 @@ _MODE_LOCK = threading.Lock()  # сериализация sync/set_direct (го�
 _MODE_STATE_LOCK = threading.RLock()
 _MODE_GENERATION = [0]
 _EGRESS_CACHE = {"ip": "-", "ts": 0.0}
+_EGRESS_INFLIGHT = False   # A-280: single-flight проба egress (сеть вне EGRESS_LOCK)
 _LAST_ROTATE = [0.0]
 _WATCH_STOP = threading.Event()
 _XRAY_FILE_LOCK = threading.RLock()
@@ -337,10 +338,24 @@ def _authoritative_config(cfg, target):
         outbound = rule.get("outboundTag")
         if outbound not in used:
             rule["outboundTag"] = "direct"
-    if not any(rule.get("type") == "field" and rule.get("inboundTag") == ["http-in"]
-               for rule in result.get("routing", {}).get("rules", []) or []):
+    # A-279: build_xray_config() помечает http-правило как ["http-in","vless-in"]
+    # (строка выше), а прежняя проверка ждала ровно ["http-in"] — условие не
+    # выполнялось НИКОГДА, и catch-all вставлялся в позицию 0, перекрывая
+    # RU-байпас и bittorrent->direct (Xray берёт первое совпавшее правило).
+    def _is_http_catch_all(rule):
+        if rule.get("type") != "field":
+            return False
+        tags = rule.get("inboundTag")
+        if not isinstance(tags, list):
+            return False
+        return set(tags) == {"http-in"} or set(tags) == {"http-in", "vless-in"}
+
+    rules = result.get("routing", {}).get("rules", []) or []
+    if not any(_is_http_catch_all(rule) for rule in rules):
+        # A-279: вставляем в КОНЕЦ, а не в начало. Как последнее правило оно
+        # работает честным fallback'ом и не перекрывает RU-байпас/торрент/direct.
         rules = result.setdefault("routing", {}).setdefault("rules", [])
-        rules.insert(0, {
+        rules.append({
             "type": "field", "inboundTag": ["http-in"], "outboundTag": target,
         })
     return result, target
@@ -659,14 +674,32 @@ def egress_probe(timeout=10):
 
 
 def egress_ip(force=False):
-    """Кэш egress (TTL 60с)."""
+    """Кэш egress (TTL 60с).
+
+    A-280: проба сети выполняется ВНЕ EGRESS_LOCK. Раньше egress_probe()
+    (до 10 с сети, а внутри ещё и get_direct_ip с 5 с) выполнялся под локом,
+    а /api/state дергает эту функцию на каждом тике панели - панель вставала
+    на ~10 с из каждой минуты. Теперь лок держится только на чтение/запись
+    кэша, а проба идёт под single-flight: если проба уже идёт, отдаётся текущий
+    кэш немедленно, без ожидания.
+    """
+    global _EGRESS_INFLIGHT
     with EGRESS_LOCK:
         now = time.time()
-        if force or now - _EGRESS_CACHE["ts"] > config.EGRESS_TTL_S:
-            ip = egress_probe() or "-"
+        if not force and now - _EGRESS_CACHE["ts"] <= config.EGRESS_TTL_S:
+            return _EGRESS_CACHE["ip"]
+        if _EGRESS_INFLIGHT:
+            return _EGRESS_CACHE["ip"]
+        _EGRESS_INFLIGHT = True
+    ip = "-"
+    try:
+        ip = egress_probe() or "-"
+    finally:
+        with EGRESS_LOCK:
             _EGRESS_CACHE["ip"] = ip
-            _EGRESS_CACHE["ts"] = now
-        return _EGRESS_CACHE["ip"]
+            _EGRESS_CACHE["ts"] = time.time()
+            _EGRESS_INFLIGHT = False
+    return ip
 
 
 def get_vless_now():

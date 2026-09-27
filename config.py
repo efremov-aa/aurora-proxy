@@ -12,6 +12,7 @@ import time
 import urllib.parse
 import urllib.request
 import uuid
+from collections import deque
 
 VERSION = "1.9.4"
 VERSION_NAME = "Кот-привратник"
@@ -221,7 +222,7 @@ def _validate_extras(raw):
 
 def save_extras(extras, buy_url=None):
     """Принять каталог витрины от головного сервера и сохранить его локально."""
-    global SUBS_EXTRAS, BUY_URL, _EXTRAS_SOURCE, _EXTRAS_GOOD
+    global BUY_URL, _EXTRAS_SOURCE, _EXTRAS_GOOD
     valid = _validate_extras(extras)
     if valid is None:
         log("extras: каталог мастера отклонён (неверный формат)")
@@ -247,7 +248,7 @@ def save_extras(extras, buy_url=None):
 
 def load_extras():
     """Поднять сохранённый прайс мастера из data/extras.json при старте."""
-    global SUBS_EXTRAS, BUY_URL, _EXTRAS_SOURCE, _EXTRAS_GOOD
+    global BUY_URL, _EXTRAS_SOURCE, _EXTRAS_GOOD
     try:
         import crypt
         raw = crypt.load_bytes(SUBS_EXTRAS_FILE)
@@ -343,9 +344,12 @@ WHITE_IP = os.environ.get("AURORA_WHITE_IP", "")        # белый IP пров
 _DIRECT_IP_LOCK = threading.Lock()
 _DIRECT_IP_CACHE = {"ip": "", "ts": 0.0}
 _DIRECT_IP_TTL_S = 300
+_DIRECT_IP_INFLIGHT = False   # A-280: single-flight, сеть выполняется вне _DIRECT_IP_LOCK
 
 
 def get_direct_ip(force=False):
+    """Прямой IP сервера (без VPN). A-280: сетевой запрос - ВНЕ лока."""
+    global _DIRECT_IP_INFLIGHT
     configured = str(WHITE_IP or "").strip()
     if configured:
         try:
@@ -356,16 +360,24 @@ def get_direct_ip(force=False):
     with _DIRECT_IP_LOCK:
         if not force and _DIRECT_IP_CACHE["ip"] and now - _DIRECT_IP_CACHE["ts"] < _DIRECT_IP_TTL_S:
             return _DIRECT_IP_CACHE["ip"]
-        try:
-            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-            with opener.open("http://api.ipify.org?format=json", timeout=5) as response:
-                value = json.loads(response.read().decode("utf-8")).get("ip", "")
-            value = str(ipaddress.ip_address(str(value)))
-            _DIRECT_IP_CACHE["ip"] = value
-            _DIRECT_IP_CACHE["ts"] = time.time()
-            return value
-        except Exception:
-            return ""
+        if _DIRECT_IP_INFLIGHT:
+            return _DIRECT_IP_CACHE["ip"]
+        _DIRECT_IP_INFLIGHT = True
+    value = ""
+    try:
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open("http://api.ipify.org?format=json", timeout=5) as response:
+            value = json.loads(response.read().decode("utf-8")).get("ip", "")
+        value = str(ipaddress.ip_address(str(value)))
+    except Exception:
+        value = ""
+    finally:
+        with _DIRECT_IP_LOCK:
+            if value:
+                _DIRECT_IP_CACHE["ip"] = value
+                _DIRECT_IP_CACHE["ts"] = time.time()
+            _DIRECT_IP_INFLIGHT = False
+    return value
 
 # --- источники github-ключей ---
 # Репо barry-far/V2ray-Config: файлы регенерируются workflow main.yml каждые 15 минут.
@@ -686,6 +698,24 @@ def quarantine_file(path):
 
 
 LOG_LOCK = threading.Lock()
+# A-281: ротация лога. Без неё aurora.log рос бесконечно, а /api/log читал
+# весь файл каждые 10 с (вкладка «Системный лог» поллит 3с/10с).
+LOG_MAX_BYTES = 5 * 1024 * 1024
+LOG_BACKUPS = 2
+LOG_TAIL_BLOCK = 8192
+
+
+def _rotate_log_if_needed():
+    """Переименовать текущий лог в .1/.2, если он перерос порог."""
+    for i in range(LOG_BACKUPS, 0, -1):
+        src = LOG_FILE if i == 1 else "%s.%d" % (LOG_FILE, i - 1)
+        dst = "%s.%d" % (LOG_FILE, i)
+        if not os.path.exists(src):
+            continue
+        try:
+            os.replace(src, dst)
+        except OSError:
+            pass
 
 
 def log(msg):
@@ -693,6 +723,8 @@ def log(msg):
     ts = _ts()
     with LOG_LOCK:
         try:
+            if os.path.exists(LOG_FILE) and os.path.getsize(LOG_FILE) >= LOG_MAX_BYTES:
+                _rotate_log_if_needed()
             with open(LOG_FILE, "a", encoding="utf-8") as f:
                 f.write("[%s] %s\n" % (ts, msg))
         except OSError:
@@ -700,12 +732,22 @@ def log(msg):
 
 
 def log_tail(n=40):
-    """Последние n строк LOG_FILE (для /api/log). Возвращает список строк."""
+    """Последние n строк LOG_FILE (для /api/log). Возвращает список строк.
+
+    A-281: читаем только хвост файла блоками, а не f.read() целиком.
+    """
     try:
         with open(LOG_FILE, "r", encoding="utf-8", errors="replace") as f:
-            lines = f.read().splitlines()
-        return lines[-n:]
-    except OSError:
+            try:
+                f.seek(0, os.SEEK_END)
+                size = f.tell()
+                f.seek(max(0, size - LOG_TAIL_BLOCK), os.SEEK_SET)
+                if size > LOG_TAIL_BLOCK:
+                    f.readline()  # отбросить первую (обрезанную) строку
+            except OSError:
+                f.seek(0)
+            return list(deque(f, maxlen=max(1, int(n))))
+    except (OSError, ValueError, TypeError):
         return []
 
 
@@ -976,9 +1018,8 @@ def _apply_mesh_env():
 
     Раньше set("mesh_tunnel", True) вызывался на уровне модуля, когда _settings ещё
     был равен _SETTINGS_DEFAULTS: на диск попадали дефолты вместо содержимого файла
-    (терялись ui_token, ui_pin, server_name), а load_settings() затем затирал флаг
-    значением из settings.json. Теперь трогаем только этот один ключ и только в
-    памяти - источник истины по-прежнему env.
+    (терялись ui_token, ui_pin, server_name). Теперь трогаем только этот один ключ
+    и только в памяти - источник истины по-прежнему env.
     """
     if not MESH_TUNNEL_ENV or _settings.get("mesh_tunnel"):
         return
@@ -1024,6 +1065,7 @@ def _persist_settings(value):
 
 def save_settings():
     """Атомарно пишет настройки в data/settings.json."""
+    import crypt
     with _LOCK:
         try:
             _persist_settings(_settings)
@@ -1035,7 +1077,7 @@ def save_settings():
 
 def reset_settings():
     """Сброс настроек к значениям по умолчанию (кнопка «Сбросить всё»)."""
-    global _settings
+    import crypt
     with _LOCK:
         candidate = dict(_SETTINGS_DEFAULTS)
         try:
@@ -1266,9 +1308,8 @@ MESH_TUNNEL_ENV = _read_mesh_flag("AURORA_MESH_TUNNEL")
 MESH_SECRET = (os.environ.get("AURORA_MESH_SECRET", "") or "").strip()
 MESH_PUBLIC_ADDR = (os.environ.get("AURORA_MESH_PUBLIC_ADDR", "") or "").strip()
 MESH_MASTER_ADDR = (os.environ.get("AURORA_MESH_MASTER_ADDR", "") or "").strip()
-# A-275: флаг из env применяется ПОСЛЕ загрузки settings (load_settings() ->
-# _apply_mesh_env()), а НЕ на импорте - иначе на диск писались бы дефолты,
-# а потом load_settings() затирал бы флаг значением из settings.json.
+# A-275: флаг НЕ применяется на уровне модуля (стирал бы settings целиком).
+# Его применяет load_settings() -> _apply_mesh_env(), уже после чтения файла.
 
 _load_plans_override()
 load_extras()

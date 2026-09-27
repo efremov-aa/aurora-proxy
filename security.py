@@ -2,16 +2,14 @@
 # Токен: env AURORA_ADMIN_TOKEN либо data/admin_secret.json (генерится при enable).
 # Все POST /api/* без валидного Bearer-токена получают 401, когда токен установлен.
 
-import hashlib
 import hmac
-import json
 import os
 import secrets
 import threading
 import time
 
 import config
-import crypt
+import crypt  # A-284b: модульный импорт (контракт A-071), локальные убраны
 
 _SECRET_FILE = os.path.join(config.DATA_DIR, "admin_secret.json")
 _TOKEN = {"value": ""}          # "" = авторизация выключена
@@ -34,7 +32,6 @@ def _load_secret():
     env_tok = (os.environ.get("AURORA_ADMIN_TOKEN") or "").strip()
     if env_tok:
         return env_tok
-    import crypt
     missing = object()
     try:
         raw = crypt.load_json(_SECRET_FILE, default=missing)
@@ -116,7 +113,6 @@ def rotate():
     """Генерирует новый токен в data/admin_secret.json. Возвращает токен."""
     new_tok = secrets.token_hex(24)
     with _LOCK:
-        import crypt
         payload = {"admin_token": new_tok, "created_at": int(time.time())}
         try:
             crypt.save_json(_SECRET_FILE, payload)
@@ -130,7 +126,6 @@ def rotate():
 def protect_files():
     """chmod 700 data/ и 600 sensitive files (Linux best-effort)."""
     try:
-        import crypt
         crypt.sweep_stale_temps((config.DATA_DIR, getattr(config, "BASE_DIR", config.DATA_DIR)))
     except Exception:
         pass

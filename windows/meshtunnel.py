@@ -1874,14 +1874,23 @@ def _socks_session(conn, key):
     peer_sock.close()
 
 
+MESH_ROLES = ("master", "client")
+
+
 def start(role=None):
     if not enabled():
         return False
-    role = str(role or os.environ.get("AURORA_MESH_ROLE", "") or "").strip()
+    role = str(role or os.environ.get("AURORA_MESH_ROLE", "") or "").strip().lower()
+    # A-278: fail-closed на привилегированную роль. Раньше пустая роль превращалась
+    # в "master", и узел молча поднимал серверную сторону (слушал 51821) для чужих.
+    # Модуль по контракту не пишет в лог (в нём циркулирует секрет сети), поэтому
+    # молча трактуем неизвестную роль как "client" - хуже всего лишний клиент.
+    if role not in MESH_ROLES:
+        role = "client"
     with _LOCK:
         if _STATE.get("started"):
             return True
-        _STATE["started"] = role or "master"
+        _STATE["started"] = role
     key = _secret()
     if not key:
         # A-263: старт не состоялся - снимаем метку, иначе следующий
@@ -1889,7 +1898,7 @@ def start(role=None):
         with _LOCK:
             _STATE.pop("started", None)
         return False
-    master = (role or "master") == "master"
+    master = role == "master"
     target = _server_serve if master else _client_serve
     threading.Thread(target=target, name="mesh-relay", daemon=True).start()
     if master:

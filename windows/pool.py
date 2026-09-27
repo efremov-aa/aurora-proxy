@@ -124,7 +124,10 @@ def _tag_from_uri(uri, host):
     base = "vless-%s" % lbl
     tag = base
     i = 2
-    while tag in [k.get("tag") for k in _KEYS]:
+    # A-282: существующие теги собираем ОДИН раз. Раньше список
+    # пересобирался на каждом проходе цикла - O(N^2) по всему пулу.
+    tags = {k.get("tag") for k in _KEYS}
+    while tag in tags:
         tag = "%s-%d" % (base, i)
         i += 1
     return tag
@@ -386,6 +389,11 @@ def get_keys():
 
 def set_keys(keys):
     """Полная замена пула (например после github-перезагрузки)."""
+    # A-285: global ОБЯЗАТЕЛЬ - ниже выполняется _KEYS = local. Без него
+    # Python создаёт ЛОКАЛЬНУЮ переменную, модульный пул в памяти не
+    # менялся: set_keys() писал только keys.json, а get_keys() и
+    # pick_final() продолжали видеть старый пул. Случайно снято при
+    # зачистке мёртвого кода A-284, здесь возвращается.
     global _KEYS
     local = [_ensure_tag(dict(k)) for k in keys]
     _save_keys(local)
@@ -574,13 +582,20 @@ def _rank(st):
 
 
 def pick_final():
-    """Возвращает ключ с лучшим рангом и реальным egress, либо None."""
+    """Возвращает ключ с лучшим рангом и реальным egress, либо None.
+
+    A-282: blocked() и get_status() брали _LOCK на КАЖДЫЙ ключ - при пуле
+    в 120 ключей это 240 захватов лока на один вызов. Теперь весь снимок
+    (блеклист + статусы + копии ключей) берётся под ОДНИМ захватом.
+    """
     cands = []
-    for k in _KEYS:
-        if blocked(k.get("uri", "")):
-            continue
-        st = get_status(k.get("uri", ""))
-        cands.append((_rank(st), st.get("exit_ip", "-"), k))
+    with _LOCK:
+        for k in _KEYS:
+            uri = k.get("uri", "")
+            if _record_key(_DEAD, uri, "dead") in _DEAD:
+                continue
+            st = _STATUS.get(_record_key(_STATUS, uri, "status"), {})
+            cands.append((_rank(st), st.get("exit_ip", "-"), dict(k)))
     cands.sort(key=lambda t: (t[0], t[1]))
     for rank, ip, k in cands:
         # tier1: ранг 0 (ok с сайтами) и живой egress

@@ -2,7 +2,6 @@
 # Проверка не трогает рабочий xray: temp-конфиг на отдельном порту + реальный egress.
 
 import base64
-import ipaddress
 import os
 import re
 import socket
@@ -13,7 +12,7 @@ import urllib.request
 import uuid
 
 import config
-import crypt
+import crypt  # A-284b: модульный импорт (контракт A-071), локальные убраны
 import pool
 
 KEYTEST_PORT = 19876  # temp-xray для пробы ключей (отдельный, не мешает основному)
@@ -219,7 +218,6 @@ def _gen_keytest_config(key, port):
     """Temp-конфиг: один vless-outbound (только этот ключ) + direct; API на порту."""
     if not _probe_host_allowed(key.get("host")):
         return None
-    import json
     ob = pool.build_outbound(key)
     if not ob:
         return None
@@ -290,7 +288,6 @@ def _xray_bin():
 def _write_keytest_config(path, cfg):
     import json
     import os
-    import crypt
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
     if hasattr(os, "O_BINARY"):
@@ -320,10 +317,7 @@ def _write_keytest_config(path, cfg):
 def keytest(key, timeout=15, port=None):
     """Полный тест: TCP -> keytest через temp-xray -> egress. Возвращает dict.
     port — уникальный temp-порт для xray (важно при параллельной проверке)."""
-    import json
-    import os
     import subprocess
-    import crypt
 
     port = port or KEYTEST_PORT
     host = key.get("host")

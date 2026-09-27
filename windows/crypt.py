@@ -9,7 +9,6 @@ import json
 import os
 import re
 import secrets
-import stat
 import struct
 import subprocess as _subprocess
 from subprocess import SubprocessError

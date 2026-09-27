@@ -42,7 +42,6 @@ def _load():
     with RECOVERY_LOCK:
         if _LOG_LOADED:
             return
-        _LOG_LOADED = True
         data = None
         try:
             with open(RECOVERY_LOG_FILE, "r", encoding="utf-8") as fh:
@@ -56,9 +55,14 @@ def _load():
             for item in items:
                 if not isinstance(item, dict) or not isinstance(item.get("msg"), str):
                     continue
+                # A-276: битый ts не должен ронять /api/recovery/log (было ValueError -> 500)
+                try:
+                    ts = int(item.get("ts") or 0)
+                except (TypeError, ValueError):
+                    ts = 0
                 RECOVERY_LOG.append({
                     "kind": str(item.get("kind") or "info")[:24],
-                    "ts": int(item.get("ts") or 0),
+                    "ts": ts,
                     "msg": item["msg"][:300],
                 })
             del RECOVERY_LOG[:-50]
@@ -69,6 +73,9 @@ def _load():
                     pass
         if not RECOVERY_LOG:
             _log_boot()
+        # A-276: флаг ставим ТОЛЬКО после успешного разбора. Раньше он выставлялся
+        # до парсинга, и одна битая запись навсегда оставляла ленту пустой.
+        _LOG_LOADED = True
         _save()
 
 

@@ -264,6 +264,14 @@ STATIC_NAMES = {
 }
 
 
+def _looks_like_ip(value):
+    """Грубая проверка, что токен - IP-адрес (для разбора вывода getent)."""
+    if ":" in value:
+        return True
+    parts = value.split(".")
+    return len(parts) == 4 and all(p.isdigit() for p in parts)
+
+
 def resolve_names():
     """Имена устройств через ip neigh (MAC) и getent hosts (reverse-DNS .lan).
     На Windows — только статическая база STATIC_NAMES."""
@@ -286,14 +294,26 @@ def resolve_names():
     for ip, mac in mac_by_ip.items():
         names[ip] = "устройство %s" % mac.replace(":", "")
     # reverse-DNS (работает для .lan)
-    for ip in list(mac_by_ip):
-        try:
-            import subprocess
-            r = subprocess.run(["getent", "hosts", ip], capture_output=True, text=True, timeout=4)
-            if r.returncode == 0 and r.stdout.strip():
-                parts = r.stdout.split()
-                if len(parts) >= 2 and parts[1] != ip:
-                    names[ip] = parts[1]
-        except Exception:
-            pass
+    # A-283: раньше на каждого соседа спавнился ОТДЕЛЬНЫЙ `getent hosts <ip>`
+    # с timeout=4 - при 30-50 устройствах в сети это до 200 с на один проход
+    # (resolve_names() зовётся на 1-м цикле и раз в ~5 мин). Теперь выполняется
+    # ОДИН батч `getent hosts` без аргументов (дамп базы hosts) и разбор вывода.
+    try:
+        r = subprocess.run(["getent", "hosts"], capture_output=True, text=True, timeout=8)
+        if r.returncode == 0:
+            for ln in (r.stdout or "").splitlines():
+                parts = ln.split()
+                if len(parts) < 2:
+                    continue
+                # батч-режим печатает "адрес имя", одиночный - "имя адрес"
+                if _looks_like_ip(parts[0]):
+                    ip, host = parts[0], parts[1]
+                elif _looks_like_ip(parts[1]):
+                    ip, host = parts[1], parts[0]
+                else:
+                    continue
+                if ip in mac_by_ip and host != ip:
+                    names[ip] = host
+    except Exception:
+        pass
     DEVICE_NAMES.update(names)
