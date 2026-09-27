@@ -1313,6 +1313,13 @@ def save_settings():
 
 def reset_settings():
     """Сброс настроек к значениям по умолчанию (кнопка «Сбросить всё»)."""
+    # A-286: global ОБЯЗАТЕЛЕН - ниже идёт WHITE_IP = str(candidate...).
+    # Без него присваивание уходило в ЛОКАЛЬНУЮ переменную: settings.json
+    # сбрасывался к дефолтам (white_ip: ""), а модульный WHITE_IP оставался
+    # старым, и get_direct_ip() продолжал фильтровать по нему до рестарта -
+    # память расходилась с файлом. Контракт «память == файл» держит и
+    # set_white_ip() (там global WHITE_IP есть).
+    global WHITE_IP
     import crypt
     with _LOCK:
         candidate = dict(_SETTINGS_DEFAULTS)
