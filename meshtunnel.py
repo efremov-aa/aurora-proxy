@@ -825,6 +825,36 @@ def _serve_dispatch(conn, key, peer_id, master):
     threading.Thread(target=handler, args=args, daemon=True).start()
 
 
+def _master_proxy_port():
+    """A-289: порт mixed-инбаунда xray этого узла. Через него можно достучаться
+    до мастера, даже если прямой маршрут закрыт (NAT, чужой провайдер)."""
+    try:
+        port = int(getattr(config, "XRAY_PORT", 0) or 0)
+    except (TypeError, ValueError):
+        return 0
+    return port if 0 < port < 65536 else 0
+
+
+def _connect_master():
+    """A-289: соединение с мастером - сначала напрямую, потом через собственный
+    прокси Aurora. Раньше был только прямой коннект, поэтому узел без маршрута
+    к адресу мастера не вступал в меш и не видел show_mesh/show_subs."""
+    host, port = _master_addr()
+    if host not in ("127.0.0.1", "::1", "localhost"):
+        try:
+            return socket.create_connection((host, port),
+                                            timeout=HANDSHAKE_TIMEOUT_S)
+        except OSError:
+            pass
+        proxy_port = _master_proxy_port()
+        if proxy_port:
+            try:
+                return _dial_via_socks("127.0.0.1", proxy_port, host, port)
+            except (OSError, ValueError):
+                pass
+    return socket.create_connection((host, port), timeout=HANDSHAKE_TIMEOUT_S)
+
+
 def _announce_loop(key):
     """A-147: periodicheskiy anons sebya masteru (registraciya pira).
     A-191 (variant B): posle T_OK soket NE zakryvaem - po nemu master
@@ -834,9 +864,7 @@ def _announce_loop(key):
         sock = None
         handed = False
         try:
-            host, port = _master_addr()
-            sock = socket.create_connection((host, port),
-                                            timeout=HANDSHAKE_TIMEOUT_S)
+            sock = _connect_master()
             sock.settimeout(HANDSHAKE_TIMEOUT_S)
             _nonce, payload = _hello_frame(_node_id(), _secret(),
                                            _self_addr(), key)
@@ -983,10 +1011,8 @@ def _client_session(conn, key, peer_id):
         conn.close()
         return
     host, port = target
-    upstream = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    upstream.settimeout(HANDSHAKE_TIMEOUT_S)
     try:
-        upstream.connect(_master_addr())
+        upstream = _connect_master()
     except OSError:
         conn.close()
         return

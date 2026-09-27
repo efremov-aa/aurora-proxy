@@ -1058,9 +1058,31 @@ def _host_port_from_url(url):
     return u.scheme, host, port
 
 
-def _fetch_post(scheme, host, port, path, data, timeout=5.0, headers=None):
+def _openers():
+    """A-289: сначала напрямую, потом через собственный прокси Aurora.
+
+    Mixed-инбаунд xray (http+socks) на 127.0.0.1:XRAY_PORT - единственный
+    маршрут узла к мастеру, если прямой доступ закрыт (NAT, чужой провайдер).
+    Без второй попытки узел вообще не может вступить в меш и не видит
+    show_mesh/show_subs от головного сервера."""
+    from urllib.request import ProxyHandler, build_opener
+    out = [build_opener(ProxyHandler({}))]
     try:
-        from urllib.request import ProxyHandler, Request, build_opener
+        port = int(getattr(config, "XRAY_PORT", 0) or 0)
+    except (TypeError, ValueError):
+        port = 0
+    if 0 < port < 65536:
+        url = "http://127.0.0.1:%d" % port
+        try:
+            out.append(build_opener(ProxyHandler({"http": url, "https": url})))
+        except Exception:
+            pass
+    return out
+
+
+def _fetch_post(scheme, host, port, path, data, timeout=5.0, headers=None):
+    from urllib.request import Request
+    try:
         body = json.dumps(data).encode("utf-8")
         hdr = {"Content-Type": "application/json", "X-Aurora-Request": "1"}
         if headers:
@@ -1068,11 +1090,15 @@ def _fetch_post(scheme, host, port, path, data, timeout=5.0, headers=None):
         target = "[%s]" % host if ":" in host else host
         req = Request("%s://%s:%s%s" % (scheme, target, port, path),
                       data=body, headers=hdr, method="POST")
-        opener = build_opener(ProxyHandler({}))
-        with opener.open(req, timeout=timeout) as r:
-            return json.loads(r.read().decode("utf-8"))
     except Exception:
         return None
+    for opener in _openers():
+        try:
+            with opener.open(req, timeout=timeout) as r:
+                return json.loads(r.read().decode("utf-8"))
+        except Exception:
+            continue
+    return None
 
 
 def auto_join():
@@ -1210,15 +1236,19 @@ def _fetch_policy(host, port, timeout=3.0):
     """Читает политику далёкого сервера. Возвращает dict или None."""
     if not _valid_peer_host(host) or not _valid_port(port):
         return None
-    try:
-        from urllib.request import ProxyHandler, Request, build_opener
-        target = "[%s]" % host if ":" in host else host
-        request = Request("http://%s:%d/api/mesh/policy" % (target, port),
-                          headers={"X-Aurora-Request": "1"})
-        opener = build_opener(ProxyHandler({}))
-        with opener.open(request, timeout=timeout) as response:
-            body = response.read(MAX_POLICY_BYTES + 1)
-    except Exception:
+    target = "[%s]" % host if ":" in host else host
+    body = b""
+    for opener in _openers():
+        try:
+            from urllib.request import Request
+            request = Request("http://%s:%d/api/mesh/policy" % (target, port),
+                              headers={"X-Aurora-Request": "1"})
+            with opener.open(request, timeout=timeout) as response:
+                body = response.read(MAX_POLICY_BYTES + 1)
+        except Exception:
+            continue
+        break
+    else:
         return None
     if len(body) > MAX_POLICY_BYTES:
         return None
@@ -1269,17 +1299,44 @@ def _catalog_valid(value):
     return {"plans": plans, "extras": extras, "buy_url": buy_url.strip()}
 
 
+def _policy_targets():
+    """A-289: узлы-hub из своего списка плюс запасной AURORA_MESH_POLICY_ADDR
+    (host:port панели головного). Без запасного свежий узел, у которого ещё
+    нет записи hub, вообще не знает адреса головного и молча ждёт флагов."""
+    targets = []
+    try:
+        for node in all_nodes():
+            if node.get("id") != "hub" and node.get("role") != "hub":
+                continue
+            port = _policy_port(node)
+            if port and node.get("host"):
+                targets.append((str(node.get("host")), port))
+    except Exception:
+        pass
+    value = str(os.environ.get("AURORA_MESH_POLICY_ADDR", "") or "").strip()
+    if not value:
+        try:
+            value = str(config.get("mesh_policy_addr", "") or "").strip()
+        except Exception:
+            value = ""
+    if value and "://" not in value:
+        host, _, port_text = value.partition(":")
+        host = host.strip()
+        if host and _valid_peer_host(host):
+            port = int(port_text) if port_text.strip().isdigit() else 0
+            if not _valid_port(port):
+                port = _policy_port({})
+            if port:
+                targets.append((host, port))
+    return targets
+
+
 def _policy_loop():
     """Фоновый опрос мастера: узел применяет подписанные show_mesh/show_subs."""
     while True:
         try:
-            for node in all_nodes():
-                if node.get("id") != "hub" and node.get("role") != "hub":
-                    continue
-                port = _policy_port(node)
-                if not port:
-                    continue
-                raw = _fetch_policy(node.get("host"), port)
+            for host, port in _policy_targets():
+                raw = _fetch_policy(host, port)
                 core = _policy_valid(raw)
                 if not core:
                     continue
@@ -1290,7 +1347,7 @@ def _policy_loop():
                         changed = True
                 if changed:
                     config.log("mesh: применена политика мастера %s:%d" % (
-                        node.get("host"), port))
+                        host, port))
                 catalog = _catalog_valid(raw)
                 if catalog:
                     mark = "%s|%s|%s" % (
