@@ -314,6 +314,29 @@ def _token_matches(value, expected):
         str(value).encode("utf-8"), str(expected).encode("utf-8")))
 
 
+def _local_mesh_root():
+    """A-274: root of its own subnet. Tunnel on = this node may issue
+    and accept invites for ITS subnet without the master flag."""
+    try:
+        if config.get("mesh_tunnel", False):
+            return True
+    except Exception:
+        pass
+    try:
+        import meshtunnel
+        return bool(meshtunnel.enabled())
+    except Exception:
+        return False
+
+
+def _mesh_post_allowed(path):
+    """A-274: own-subnet paths stay open for a local root even when the
+    master has not turned show_mesh on."""
+    if path in ("/api/mesh/invite", "/api/mesh/regenerate", "/api/mesh/join"):
+        return _local_mesh_root()
+    return False
+
+
 def _admin_ok(self):
     if _token_matches(self.headers.get("X-Auth", ""), _UI_TOKEN):
         return True
@@ -997,8 +1020,10 @@ class Handler(BaseHTTPRequestHandler):
         # гейт видимости: меш-разделы и подписки закрыты, пока головной сервер
         # не поставит show_mesh/show_subs (правятся только через mesh._policy_loop)
         if path in ("/api/mesh", "/api/nodes", "/api/routes") and not config.get("show_mesh", False):
-            self._send(*_json({"ok": False, "error": "mesh: закрыто до команды мастера"}, 403))
-            return
+            # A-277: own-subnet view for a local root of its own mesh
+            if not _local_mesh_root():
+                self._send(*_json({"ok": False, "error": "mesh: закрыто до команды мастера"}, 403))
+                return
         if path in ("/api/subs/list", "/api/subs/plans", "/api/plans", "/api/stats") \
                 and not config.get("show_subs", False):
             self._send(*_json({"ok": False, "error": "subs: закрыто до команды мастера"}, 403))
@@ -1191,8 +1216,10 @@ class Handler(BaseHTTPRequestHandler):
         # гейт видимости: POST-изменения меша/подписок закрыты, пока мастер
         # не разрешил (show_mesh/show_subs), /api/mesh/policy — public выше
         if path.startswith("/api/mesh/") and not config.get("show_mesh", False):
-            self._send(*_json({"ok": False, "error": "mesh: закрыто до команды мастера"}, 403))
-            return
+            # A-274: own-subnet invite for a local root of its own mesh
+            if not _mesh_post_allowed(path):
+                        self._send(*_json({"ok": False, "error": "mesh: закрыто до команды мастера"}, 403))
+                        return
         if (path.startswith("/api/subs/") or path in ("/api/plans/save",)) \
                 and not config.get("show_subs", False):
             self._send(*_json({"ok": False, "error": "subs: закрыто до команды мастера"}, 403))
