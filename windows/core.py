@@ -88,18 +88,17 @@ def _cross_process_lock():
                     handle.close()
                     _XRAY_FILE_STATE["handle"] = None
 
-XRAY_MANAGE = os.environ.get("XRAY_MANAGE", "proc" if os.name == "nt" else "systemctl")
+# Как управлять xray: "systemctl" (по умолчанию) или "proc" (в Docker: xray — подпроцесс).
+XRAY_MANAGE = os.environ.get("XRAY_MANAGE", "systemctl")
 _XRAY_PROC = [None]  # Popen (режим proc)
 
 
 def _xray_bin():
     cands = [
-        shutil.which("xray.exe"),
         shutil.which("xray"),
-        os.path.join(config.BASE_DIR, "bin", "xray.exe"),
-        os.path.join(config.BASE_DIR, "xray.exe"),
-        os.path.join(config.BASE_DIR, "xray"),
+        shutil.which("xray.exe"),
         os.path.join(os.path.expanduser("~"), "xray"),
+        os.path.join(config.BASE_DIR, "xray"),
         "/usr/local/bin/xray",
     ]
     for c in cands:
@@ -279,6 +278,11 @@ def build_xray_config(final_tag):
             rules.insert(_mesh_rule_position(rules),
                          {"type": "field", "inboundTag": ["vless-in"],
                           "email": mesh_emails, "outboundTag": "mesh"})
+    # A-293: туннель головного - через его внешний VLESS Reality (8443).
+    # Правило вставляется ПЕРЕД catch-all, домашний/обычный трафик не трогаем.
+    if _master_mesh_outbound():
+        cfg["outbounds"].append(_master_mesh_outbound())
+        rules.insert(_mesh_rule_position(rules), _master_mesh_rule())
     http_rule["inboundTag"] = ["http-in", "vless-in"]
     if master_locked:
         master_ip = _master_source_ip()
@@ -299,12 +303,98 @@ def build_xray_config(final_tag):
     return cfg
 
 
+# A-293: соединение с туннелем головного (mesh) идёт через его ВНЕШНИЙ
+# VLESS Reality :8443 - тот порт и так открыт наружу, а 51821 закрыт роутером.
+# Настройки берём ТОЛЬКО из env AURORA_MESH_MASTER_VLESS (JSON) - без env
+# поведение узла не меняется ничего, секреты в репозиторий не попадают.
+_MASTER_MESH_TAG = "master-mesh"
+_MASTER_MESH_DEFAULT_PORT = 51821
+
+
+def _master_mesh_spec():
+    """A-293: параметры внешнего VLESS головного из env (пусто = выключено)."""
+    raw = (os.environ.get("AURORA_MESH_MASTER_VLESS", "") or "").strip()
+    if not raw:
+        return None
+    try:
+        import json
+        data = json.loads(raw)
+    except Exception:
+        return None
+    if not isinstance(data, dict):
+        return None
+    for field in ("id", "pbk", "sid", "sni", "host"):
+        if not str(data.get(field) or "").strip():
+            return None
+    try:
+        port = int(data.get("port") or 8443)
+    except (TypeError, ValueError):
+        return None
+    if not 0 < port < 65536:
+        return None
+    data["port"] = port
+    return data
+
+
+def _master_mesh_port():
+    """A-293: локальный порт, который клиент шлёт мастеру (по умолчанию 51821)."""
+    raw = (os.environ.get("AURORA_MESH_MASTER_PORT", "") or "").strip()
+    if raw:
+        try:
+            port = int(raw)
+        except (TypeError, ValueError):
+            port = 0
+        if 0 < port < 65536:
+            return port
+    return _MASTER_MESH_DEFAULT_PORT
+
+
+def _master_mesh_outbound():
+    """A-293: outbound к внешнему VLESS Reality головного (fail-closed)."""
+    spec = _master_mesh_spec()
+    if not spec:
+        return None
+    return {
+        "tag": _MASTER_MESH_TAG,
+        "protocol": "vless",
+        "settings": {"vnext": [{
+            "address": spec["host"],
+            "port": spec["port"],
+            "users": [{"id": spec["id"], "encryption": "none",
+                       "flow": str(spec.get("flow") or "xtls-rprx-vision")}],
+        }]},
+        "streamSettings": {
+            "network": "tcp",
+            "security": "reality",
+            "realitySettings": {
+                "serverName": spec["sni"],
+                "fingerprint": "chrome",
+                "publicKey": spec["pbk"],
+                "shortId": spec["sid"],
+            },
+        },
+    }
+
+
+def _master_mesh_rule():
+    """A-293: трафик на порт туннеля головного уводим в его внешний VLESS."""
+    return {"type": "field", "inboundTag": ["http-in"],
+            "port": str(_master_mesh_port()),
+            "outboundTag": _MASTER_MESH_TAG,
+            "ruleTag": "aurora-master-mesh"}
+
+
 def _authoritative_config(cfg, target):
     import copy
     allowed = {k.get("tag", "") for k in pool.get_keys() if k.get("tag")}
     # A-146: релей-туннель меш-сети не считаем «чужим» outbound: иначе
     # автосинхронизация вычистит и outbound, и правило маршрутизации.
     allowed.add("mesh")
+    # A-293: outbound к внешнему VLESS головного - тоже не «чужой», иначе
+    # автосинхронизация вычистит и outbound, и правило маршрутизации.
+    master_mesh_ob = _master_mesh_outbound()
+    if master_mesh_ob:
+        allowed.add(master_mesh_ob["tag"])
     # A-146: возвращаем outbound mesh, если правила по нему остались
     mesh_ob = _mesh_outbound()
     if mesh_ob and not any(isinstance(o, dict) and o.get("tag") == "mesh"
@@ -345,6 +435,10 @@ def _authoritative_config(cfg, target):
     # RU-байпас и bittorrent->direct (Xray берёт первое совпавшее правило).
     def _is_http_catch_all(rule):
         if rule.get("type") != "field":
+            return False
+        if rule.get("ruleTag"):
+            # A-295: aurora-master-mesh тоже матчит http-in,
+            # но это служебное правило, а не catch-all.
             return False
         tags = rule.get("inboundTag")
         if not isinstance(tags, list):
@@ -476,8 +570,7 @@ def _xray_proc_start():
     try:
         _XRAY_PROC[0] = subprocess.Popen(
             [xbin, "run", "-c", config.XRAY_CONFIG],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            creationflags=config.HIDE_FLAG)
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except OSError as e:
         config.log("core: proc-старт xray не удался: %s" % e)
         return False
@@ -487,18 +580,6 @@ def _xray_proc_start():
             return True
         time.sleep(1)
     config.log("core: xray (proc) не поднял порт за 15с")
-    proc = _XRAY_PROC[0]
-    if proc and proc.poll() is None:
-        proc.terminate()
-        try:
-            proc.wait(timeout=5)
-        except Exception:
-            proc.kill()
-            try:
-                proc.wait(timeout=5)
-            except Exception:
-                pass
-    _XRAY_PROC[0] = None
     return False
 
 
@@ -535,14 +616,14 @@ def _restart_xray():
         _XRAY_PROC[0] = None
         return _xray_proc_start()
     try:
-        r = subprocess.run(
+        result = subprocess.run(
             ["systemctl", "--user", "restart", "xray"],
             capture_output=True, timeout=20)
-        if r.returncode != 0:
-            config.log("core: systemctl restart xray вернул %d" % r.returncode)
+        if result.returncode != 0:
+            config.log("core: xray restart failed rc=%s" % result.returncode)
             return False
     except Exception as e:
-        config.log("core: systemctl restart xray не удался: %s" % e)
+        config.log("core: xray restart failed: %s" % e)
         return False
     end = time.time() + 15
     while time.time() < end:
@@ -603,18 +684,18 @@ def _sync_impl():
     cfg, final_tag = _authoritative_config(cfg, final_tag)
     if not _xray_config_valid(cfg):
         config.update_state(vless_now="-", final_mode="-", egress_ip="-",
-                            comm={"state": "error", "msg": "ошибка preflight конфигурации xray"})
+                            comm={"state": "error", "msg": "xray config preflight failed"})
         return False, "direct"
     if not _write_config(cfg):
         config.update_state(vless_now="-", final_mode="-", egress_ip="-",
-                            comm={"state": "error", "msg": "ошибка записи конфигурации xray"})
+                            comm={"state": "error", "msg": "xray config write failed"})
         return False, "direct"
     expected = _config_fingerprint(cfg)
     if not _restart_xray() or _current_fingerprint() != expected:
         if previous is not None and _restore_config_cas(expected, previous):
             _restart_xray()
         config.update_state(vless_now="-", final_mode="-", egress_ip="-",
-                            comm={"state": "error", "msg": "ошибка запуска xray"})
+                            comm={"state": "error", "msg": "xray restart failed"})
         return False, "direct"
 
     # egress-проверка активного канала (4 попытки — cold start Reality >8с)
@@ -635,14 +716,14 @@ def _sync_impl():
                 if previous is not None and _restore_config_cas(expected, previous):
                     _restart_xray()
                 config.update_state(vless_now="-", final_mode="-", egress_ip="-",
-                                    comm={"state": "error", "msg": "ошибка применения direct fallback"})
+                                    comm={"state": "error", "msg": "direct fallback failed"})
                 return False, "direct"
             direct_expected = _config_fingerprint(cfg)
             if not _restart_xray() or _current_fingerprint() != direct_expected:
                 if previous is not None and _restore_config_cas(direct_expected, previous):
                     _restart_xray()
                 config.update_state(vless_now="-", final_mode="-", egress_ip="-",
-                                    comm={"state": "error", "msg": "ошибка применения direct fallback"})
+                                    comm={"state": "error", "msg": "direct fallback failed"})
                 return False, "direct"
             config.update_state(vless_now="direct", final_mode="direct", egress_ip=config.get_direct_ip() or "-",
                                 comm={"state": "idle", "msg": ""})
@@ -716,6 +797,24 @@ def egress_ip(force=False):
     return ip
 
 
+def _is_service_rule(rule):
+    """A-295: правило с ruleTag - служебное (меш-маршрут), не VPN-тег."""
+    return bool(isinstance(rule, dict) and rule.get("ruleTag"))
+
+
+def _is_final_http_rule(rule):
+    """A-295: финальное VPN-правило - это http-in БЕЗ ruleTag.
+
+    A-293 добавил служебное правило aurora-master-mesh с inboundTag
+    ["http-in"], и обычный поиск "первого правила с http-in" возвращал
+    'master-mesh': собственный выход узла уезжал в служебный outbound.
+    Служебные правила (ruleTag) из выбора финального тега исключаются.
+    """
+    if not isinstance(rule, dict) or _is_service_rule(rule):
+        return False
+    return "http-in" in (rule.get("inboundTag") or [])
+
+
 def get_vless_now():
     """Единственный источник правды активного тега — rule в xray.json."""
     cfg = _read_config()
@@ -723,7 +822,7 @@ def get_vless_now():
         return "-"
     try:
         for rule in cfg.get("routing", {}).get("rules", []):
-            if "http-in" in (rule.get("inboundTag") or []):
+            if _is_final_http_rule(rule):
                 return rule.get("outboundTag", "-")
     except Exception:
         pass
@@ -745,7 +844,7 @@ def _set_direct_impl():
             config.update_state(comm={"state": "idle", "msg": ""})
             return False
         for rule in cfg.get("routing", {}).get("rules", []):
-            if "http-in" in (rule.get("inboundTag") or []):
+            if _is_final_http_rule(rule):
                 rule["outboundTag"] = "direct"
         if not _write_config(cfg):
             config.update_state(comm={"state": "idle", "msg": ""})
@@ -828,7 +927,7 @@ def _set_active_tag_impl(tag):
             config.update_state(comm={"state": "idle", "msg": ""})
             return True, "already active"
         for rule in cfg.get("routing", {}).get("rules", []):
-            if "http-in" in (rule.get("inboundTag") or []):
+            if _is_final_http_rule(rule):
                 rule["outboundTag"] = tag
         if not _write_config(cfg):
             config.update_state(comm={"state": "idle", "msg": ""})
@@ -856,7 +955,7 @@ def _set_active_tag_impl(tag):
         cfg = _read_config()  # перечитываем свежую версию (конфиг мог смениться)
         if cfg:
             for rule in cfg.get("routing", {}).get("rules", []):
-                if "http-in" in (rule.get("inboundTag") or []):
+                if _is_final_http_rule(rule):
                     rule["outboundTag"] = rollback
             _write_config(cfg)
     _restart_xray()

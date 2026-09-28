@@ -109,8 +109,13 @@ def node_address(node_id):
     if not _ID_RE.match(node_id):
         return ""
     digest = hashlib.sha256(("aurora-mesh:" + node_id).encode("utf-8")).digest()
-    value = MESH_BASE | (int.from_bytes(digest[:3], "big") & 0x003FFFFF)
-    return "100.%d.%d.%d" % ((value >> 16) & 0x3F, (value >> 8) & 0xFF, value & 0xFF)
+    # A-305: адрес обязан попадать в MESH_NET (100.64.0.0/10). Раньше тут был
+    # MESH_BASE | (digest & 0x3FFFFF), а потом (value >> 16) & 0x3F - у MESH_BASE
+    # (0x0A400001) это 0x0A40, и 0x0A40 & 0x3F == 0, поэтому второй окет всегда
+    # был 0..63, а не 64..127: адреса выходили ВНЕ /10, и мастер честно отклонял
+    # регистрацию узла (register_by_secret требует адрес из 100.64.0.0/10).
+    raw = int.from_bytes(digest[:3], "big") & 0xFFFFFF
+    return "100.%d.%d.%d" % (64 + ((raw >> 16) & 0x3F), (raw >> 8) & 0xFF, raw & 0xFF)
 
 
 def tunnel_name(node_id):
@@ -286,6 +291,42 @@ def _secret():
     return value
 
 
+def _self_policy_port():
+    """A-296: port paneli uzla dlya golovnogo servera (pyatoe pole HELLO)."""
+    try:
+        return int(getattr(config, "UI_PORT", 0) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+_MASTER_ID_RE = re.compile(
+    r"(?:[0-7][0-9A-HJKMNP-TV-Z]{25}"
+    r"|[0-9a-fA-F]{32}"
+    r"|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}"
+    r"-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+    r"|[0-9a-f]{4,8})"
+)
+
+
+def _strict_node_id(value):
+    """A-305: golovnoy server v reestr beret tol'ko ULID / hex32 / UUID / hex4-8.
+
+    Nashi starie imena ("mesh-aurora-home", "aurora-test-01") v etot spisok ne
+    popadayut, i avtoregistraciya po obщemu sekretu seti zavershalas otkazom.
+    Poetomu nevalidnoe imya deterministichesko prevoditsya v hex32 iz ego
+    SHA-256: id uzla ostaetsya postoyannym (kak i ranshe), no stanet validnym
+    dlya mesh._valid_node_id na golovnom servere.
+    """
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    if _MASTER_ID_RE.fullmatch(text):
+        return text
+    if not _ID_RE.match(text):
+        return ""
+    return hashlib.sha256(("aurora-mesh-id:" + text).encode("utf-8")).hexdigest()[:32]
+
+
 def _node_id():
     with _LOCK:
         if _STATE.get("node_id"):
@@ -297,6 +338,7 @@ def _node_id():
         value = ""
     if not value:
         value = str(os.environ.get("AURORA_MESH_ID", "") or "")
+    value = _strict_node_id(value)
     with _LOCK:
         _STATE["node_id"] = value
     return value
@@ -322,14 +364,48 @@ def _expected_proof(secret, nonce, node_id):
                     hashlib.sha256).hexdigest().encode("ascii")
 
 
+def _network_proof_ok(node_id, proof, nonce):
+    """A-296: proof po OBSHCHEMU sekretu seti (AURORA_MESH_SECRET)."""
+    secret = _secret()
+    if not secret:
+        return False
+    return hmac.compare_digest(_expected_proof(secret, nonce, node_id),
+                               _keybytes(proof))
+
+
+def _register_from_hello(node_id, host, port, policy_port=0):
+    """A-296: avtoregistraciya uzla, prishedshego po obщему sekretu seti.
+
+    Ranee neizvestnyj uzel molchal otrabыvalsya: lichnyj sekret est tolko v
+    reestre, a reestr napolnyaetsya cherez /api/mesh/*, panel golovnogo
+    servera snaruzhi zakryta - rukopozhatie v tunnele vsegda obrivalos.
+    Teper uzel s korrektnym proof po AURORA_MESH_SECRET prinimaetsya i
+    zanositsya v reestr (mesh.register_by_secret). Postoronnie bez sekreta
+    otbrasyvayutsya kak i ranshe - fail-closed. Log vedet mesh.py."""
+    if str(_STATE.get("started", "") or "") != "master":
+        return False
+    if not host or not port:
+        return False
+    try:
+        import mesh
+        adder = getattr(mesh, "register_by_secret", None)
+        if not callable(adder):
+            return False
+        return bool(adder(node_id, host, port, policy_port or None))
+    except Exception:
+        return False
+
+
 def _known(node_id, proof, nonce):
     if not _ID_RE.match(str(node_id or "").strip()) or not proof or not nonce:
         return False
-    secret = _peer_secret(str(node_id).strip())
-    if not secret:
-        return False
-    return hmac.compare_digest(_expected_proof(secret, nonce, str(node_id).strip()),
-                               _keybytes(proof))
+    node = str(node_id).strip()
+    secret = _peer_secret(node)
+    if secret:
+        return hmac.compare_digest(_expected_proof(secret, nonce, node),
+                                   _keybytes(proof))
+    # A-296: lichnogo sekreta v reestre eshche net (uzel pervyj raz).
+    return _network_proof_ok(node, proof, nonce)
 
 
 def status():
@@ -615,6 +691,42 @@ def _dial_via_socks(host, port, dest_host, dest_port):
     return sock
 
 
+def _dial_via_http_proxy(host, port, dest_host, dest_port):
+    """A-294: HTTP CONNECT through the local http-inbound of xray.
+
+    The local inbound is protocol "http" and NOT "mixed", so a SOCKS5 greeting
+    is rejected by xray ("malformed HTTP request") and the A-289 fallback could
+    never work. CONNECT is the transport xray understands on that inbound, and
+    the returned raw socket keeps working as the mesh tunnel.
+    """
+    sock = socket.create_connection((host, int(port)), HANDSHAKE_TIMEOUT_S)
+    try:
+        sock.settimeout(HANDSHAKE_TIMEOUT_S)
+        target = "%s:%d" % (dest_host, int(dest_port))
+        request = ("CONNECT %s HTTP/1.1\r\nHost: %s\r\n"
+                   "User-Agent: aurora-mesh\r\n\r\n" % (target, target))
+        sock.sendall(request.encode("ascii"))
+        head = b""
+        while b"\r\n\r\n" not in head:
+            chunk = sock.recv(256)
+            if not chunk:
+                raise OSError("proxy closed during CONNECT")
+            head += chunk
+            if len(head) > 4096:
+                raise OSError("proxy CONNECT response too long")
+        first = head.split(b"\r\n", 1)[0].decode("ascii", "replace")
+        parts = first.split(" ")
+        if len(parts) < 2 or parts[1] != "200":
+            raise OSError("proxy CONNECT refused: %s" % first[:60])
+    except (OSError, ValueError):
+        try:
+            sock.close()
+        except OSError:
+            pass
+        raise
+    return sock
+
+
 def _recv_exact(sock, size):
     out = b""
     while len(out) < size:
@@ -853,10 +965,13 @@ def _connect_master():
             pass
         proxy_port = _master_proxy_port()
         if proxy_port:
-            try:
-                return _dial_via_socks("127.0.0.1", proxy_port, host, port)
-            except (OSError, ValueError):
-                pass
+            # A-294: CONNECT first (http-inbound understands CONNECT), SOCKS5 as
+            # a second chance for a mixed/socks-only inbound.
+            for dial in (_dial_via_http_proxy, _dial_via_socks):
+                try:
+                    return dial("127.0.0.1", proxy_port, host, port)
+                except (OSError, ValueError):
+                    continue
     return socket.create_connection((host, port), timeout=HANDSHAKE_TIMEOUT_S)
 
 
@@ -971,7 +1086,10 @@ def _hello_frame(node_id, secret, addr, key):
     # (master chitaet payload kak utf-8) i ryadom na bayte 0x7C ("|").
     nonce = os.urandom(16).hex().encode("ascii")
     proof = _expected_proof(secret, nonce, node_id)
-    payload = (_keybytes(node_id) + b"|" + proof + b"|" + nonce + b"|" + _keybytes(addr))
+    # A-296: pyatoe pole - port paneli uzla (policy_port), chtoby golovnoj
+    # server ne pridumyval ego. Staryj master ego prosto ignoriruet.
+    payload = (_keybytes(node_id) + b"|" + proof + b"|" + nonce + b"|"
+               + _keybytes(addr) + b"|" + _keybytes(str(_self_policy_port())))
     return nonce, payload
 
 
@@ -1734,9 +1852,16 @@ def _peer_session(conn, key):
             if len(parts) < 3:
                 return
             node_id, proof, nonce = parts[0], parts[1], parts[2]
-            host, port = _parse_addr(parts[3] if len(parts) > 3 else "")
+            # A-296: hvost kadra - "addr|policy_port" (pyatoe pole). Starye
+            # uzly shlyut tolko addr, togda policy_port ostaetsya 0.
+            tail = (parts[3] if len(parts) > 3 else "").split("|", 1)
+            host, port = _parse_addr(tail[0])
+            policy_port = 0
+            if len(tail) > 1 and tail[1].isdigit():
+                policy_port = int(tail[1])
             if not _known(node_id, proof, nonce):
                 return
+            _register_from_hello(node_id, host, port, policy_port)
             # A-291: политику шлём ПЕРЕД T_OK. Клиент ждёт T_OK в _wait_ok и
             # возвращается сразу на нём, поэтому кадр, посланный следом, мог
             # потеряться вместе с буфером recv. Перед T_OK он гарантированно
