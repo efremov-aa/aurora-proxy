@@ -297,6 +297,14 @@ def _rebuild(offline_reason=None):
         return dict(_SNAPSHOT)
 
 
+def apply_tunnel_license(value):
+    """A-307: license received in the mesh tunnel, applied as a 200 answer.
+
+    The same _apply() path as the HTTP answer - no second source of truth.
+    """
+    return _apply(value, 200)
+
+
 def state():
     """Снимок для панели. Раз в интервал поднимает фоновую проверку."""
     with STATE_LOCK:

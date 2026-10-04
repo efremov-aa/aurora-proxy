@@ -63,6 +63,10 @@ T_PIPE_BYE = 12
 # узлу не нужен доступ к панели мастера. Без подписи клиент её не примет.
 T_POLICY = 13
 MAX_POLICY_PAYLOAD = 16384
+# A-307: license of the node (PRO features) rides the same tunnel 51821 -
+# the master UI port is closed outside, so HTTP there is impossible.
+T_LICENSE = 14
+MAX_LICENSE_PAYLOAD = 16384
 
 _ID_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,64}$")
 
@@ -413,9 +417,22 @@ def status():
     zhivost uzla opredelyaetsya dialom na kazhdyy zapros. Otdayom chestno."""
     with _LOCK:
         peers = _STATE.get("peers", {})
-        live = [row for row in peers.values() if time.time() - row.get("seen", 0) < TTL]
+        now = time.time()
+        fresh = [row for row in peers.values()
+                 if now - row.get("seen", 0) < TTL]
+        # A-398: ranee "peer_count" schital tolko svezhie po "seen", a piry s
+        # ZHIVYM socketom no bez trafika (legalno molchashchie po A-191
+        # variant B) v nego ne popadali => panel pokazyval "pirov 0" pri
+        # zivom soedinenii. Teper tri schetchika, i kazhdyy chestnyy:
+        #   peers_fresh    - viden nedavno (est trafik),
+        #   peer_sessions  - zhivoy socket pira,
+        #   peer_count     - oba sluchaya (uzel zhiv, esli zhiv lyuboy iz nikh).
+        sessions = [row for row in peers.values()
+                    if isinstance(row, dict) and row.get("sock") is not None]
         return {"enabled": enabled(), "node_id": _node_id(), "peers": sorted(peers),
-                "peer_count": len(live), "liveness": "per-request dial",
+                "peer_count": len(set(id(r) for r in fresh + sessions)),
+                "peers_fresh": len(fresh), "peer_sessions": len(sessions),
+                "liveness": "socket or fresh-seen",
                 "sessions": int(_STATE.get("sessions", 0) or 0),
                 "announce": int(_STATE.get("announce", 0) or 0),
                 "announce_s": int(ANNOUNCE),
@@ -427,7 +444,14 @@ def status():
                 "peer_rtt": dict((rid, int(rw.get("rtt_ms", 0) or 0))
                                  for rid, rw in peers.items()
                                  if _rtt_fresh(rw)),
+                # A-429c: schyotchiki pingu/ponga po kazhdomu piru - pozvolyayut
+                # otlichit "ping ne otvechaet" ot "RTT prosto ne izmeren".
+                "peer_ping": dict(
+                    (rid, [int(rw.get("ping_sent", 0) or 0),
+                           int(rw.get("pong_seen", 0) or 0)])
+                    for rid, rw in peers.items()),
                 "last_error": str(_STATE.get("last_error", "") or ""),
+                "last_reader_end": str(_STATE.get("last_reader_end", "") or ""),
                 "net": MESH_NET, "frag": FRAG_SIZE, "pipes": _active_pipes(), "peer_conns": _live_conns(), "mode": "relay"}
 
 
@@ -840,7 +864,11 @@ def _parse_addr(value):
         return "", 0
     host, sep, port = text.rpartition(":")
     if not sep:
-        return host, MESH_PORT
+        # A-396: rpartition() puts the WHOLE string into the third element and
+        # leaves the first one empty, so "return host" returned "" for every
+        # address given without a port (AURORA_MESH_PUBLIC_ADDR=79.110.253.10).
+        # The master then refused each HELLO with no-addr. Return the text.
+        return text, MESH_PORT
     try:
         number = int(port)
     except ValueError:
@@ -980,6 +1008,7 @@ def _announce_loop(key):
     A-191 (variant B): posle T_OK soket NE zakryvaem - po nemu master
     otkryvaet potoki, a my ih obsluzhivaem (_peer_pump). Peredacha inache
     trebovala by, chtoby master dostichal 8443 pira (NAT)."""
+    backoff = 0
     while True:
         sock = None
         handed = False
@@ -1011,7 +1040,15 @@ def _announce_loop(key):
             _STATE["up"] = {}
         if _STATE.get("stop"):
             return
-        time.sleep(1 if handed else max(1, int(ANNOUNCE)))
+        if handed:
+            # A-426: healthy link - just wait for it to drop.
+            backoff = 0
+            time.sleep(max(1, int(ANNOUNCE)))
+        else:
+            # A-426: broken handoff used to retry every second and hammer a
+            # flickering master. Exponential backoff instead: 2, 4, 8 ... 60s.
+            backoff = min(backoff + 1, 6)
+            time.sleep(min(60, 2 ** backoff))
 
 
 def _publish_profile():
@@ -1079,6 +1116,36 @@ def _master_addr():
     return (host or "127.0.0.1"), (port or MESH_PORT)
 
 
+def _license_identity():
+    """A-307: token/credential of this node, taken from the ext-gate module.
+
+    Empty when the build is not licensed - the master then answers fail-closed.
+    """
+    try:
+        import extgate
+        token, credential = extgate.identity()
+    except Exception:
+        return "", ""
+    return str(token or "").strip()[:128], str(credential or "").strip()[:256]
+
+
+def _apply_tunnel_license(payload):
+    """A-307: license from the tunnel goes through the ext-gate path as is."""
+    if not payload or len(payload) > MAX_LICENSE_PAYLOAD:
+        return False
+    try:
+        raw = json.loads(bytes(payload).decode("utf-8", "replace"))
+    except Exception:
+        return False
+    if not isinstance(raw, dict):
+        return False
+    try:
+        import extgate
+        return bool(extgate.apply_tunnel_license(raw))
+    except Exception:
+        return False
+
+
 def _hello_frame(node_id, secret, addr, key):
     """Edinyy format HELLO: node_id|proof|nonce|addr (adres optsionalny)."""
     # A-137: nonce idet cherez tekstovyj kadr "node_id|proof|nonce|addr",
@@ -1088,8 +1155,13 @@ def _hello_frame(node_id, secret, addr, key):
     proof = _expected_proof(secret, nonce, node_id)
     # A-296: pyatoe pole - port paneli uzla (policy_port), chtoby golovnoj
     # server ne pridumyval ego. Staryj master ego prosto ignoriruet.
+    # A-307: shestoe i pyatoe pole - token/credential licenzii PRO-fitur.
+    # Kadr uzh zashishchjon obshchim sekretom seti (keystream + MAC), a
+    # master otvechaet tem zhe kadrom, no s resheniem o licenzii.
+    lic_token, lic_cred = _license_identity()
     payload = (_keybytes(node_id) + b"|" + proof + b"|" + nonce + b"|"
-               + _keybytes(addr) + b"|" + _keybytes(str(_self_policy_port())))
+               + _keybytes(addr) + b"|" + _keybytes(str(_self_policy_port()))
+               + b"|" + _keybytes(lic_token) + b"|" + _keybytes(lic_cred))
     return nonce, payload
 
 
@@ -1148,6 +1220,11 @@ def _wait_ok(sock, key):
             if msg_type == T_POLICY:
                 # A-291: политика головного приходит по туннелю, а не по HTTP
                 _apply_tunnel_policy(_payload)
+                continue
+            if msg_type == T_LICENSE:
+                # A-307: license of the node rides the same tunnel (HTTP to
+                # the master UI port is closed outside).
+                _apply_tunnel_license(_payload)
                 continue
             if msg_type is not None:
                 # A-157: drugoy tip kadra (T_HELLO/T_PING/...) - prosto ignorim,
@@ -1261,6 +1338,36 @@ def _live_conns():
         peers = _STATE.get("peers", {})
         return len([row for row in peers.values()
                     if isinstance(row, dict) and row.get("sock") is not None])
+
+
+def peer_info():
+    """A-397: sostoianie kazhdogo pira dlya paneli i /api/nodes.
+
+    Dial po adresu iz HELLO - edinyy istochnik zhistoty po A-388, no u uzla
+    port 51821 slushaet TOLKO loopback, poetomu pryamoy dial v ego adres
+    nikogda ne proydet, poka sessiya tunnelya zhiva. Zdes my otdayom CHESTNOE:
+    zhivoy li soket pira i svek li ego "seen". Sekretov zdes net."""
+    now = time.time()
+    out = {}
+    with _LOCK:
+        peers = _STATE.get("peers", {})
+        for rid, row in peers.items():
+            if not isinstance(row, dict):
+                continue
+            try:
+                seen = float(row.get("seen", 0) or 0)
+            except (TypeError, ValueError):
+                seen = 0.0
+            age = int(now - seen) if seen else -1
+            out[str(rid)] = {
+                "sock": row.get("sock") is not None,
+                "age": age if age >= 0 else -1,
+                "fresh": bool(seen and now - seen < TTL),
+                "streams": len(_streams(row)),
+                "rtt_ms": int(row.get("rtt_ms", 0) or 0),
+                "addr": str(row.get("addr", "") or "")[:64],
+            }
+    return out
 
 
 def _active_pipes():
@@ -1428,11 +1535,40 @@ def _peer_reader(conn, key, node_id):
     buf = b""
     last = time.time()
     used = False
+    # A-429: when we ask the peer T_PING we remember the moment, and its
+    # T_PONG turns that pair into a real round-trip time for the panel.
+    ping_sent = 0.0
+    # A-426b: the master keeps the permanent link up by itself. Any peer build
+    # answers T_PING with T_PONG (handler exists since A-191), so even a node
+    # that predates the client-side keepalive stops tripping PEER_IDLE_S.
+    ping_every = _int_env("AURORA_MESH_PING_S", 60, 10, 600)
     try:
         conn.settimeout(None)
         while not _STATE.get("stop"):
             try:
-                chunk = conn.recv(65536)
+                conn.settimeout(float(ping_every))
+                try:
+                    chunk = conn.recv(65536)
+                finally:
+                    conn.settimeout(None)
+            except socket.timeout:
+                # silence is not death: ask the peer, do not hang up
+                try:
+                    _send_row(row, T_PING, b"", key)
+                except OSError:
+                    break
+                # A-429c: schyotchik, skolko raz master sprashil ping u pira.
+                # Esli on rastet, a pongov net - uzel ne otvechaet na ping
+                # (staraya sborka ili tonnel zapeschitan); panel pokazhet eto
+                # chestno, a ne pridumaet RTT.
+                row["ping_sent"] = int(row.get("ping_sent", 0) or 0) + 1
+                # A-429: the answer is timed against this exact moment.
+                ping_sent = time.time()
+                # A-426c: `last` is NOT refreshed here on purpose. It only
+                # moves when the peer actually answers (T_PONG or any frame),
+                # so a peer that died silently still trips PEER_IDLE_S and is
+                # reaped instead of lingering as a zombie peer forever.
+                continue
             except OSError:
                 break
             if not chunk:
@@ -1453,6 +1589,23 @@ def _peer_reader(conn, key, node_id):
                         _send_row(row, T_PONG, b"", key)
                     except OSError:
                         pass
+                    continue
+                if msg_type == T_PONG:
+                    # A-429: real measured RTT of the live tunnel. `last` is
+                    # NOT touched here - it moved already when the frame
+                    # arrived (line above), so A-426c reaping still works.
+                    if ping_sent > 0.0:
+                        rtt = int(max(0.0, time.time() - ping_sent) * 1000)
+                        ping_sent = 0.0
+                        with _LOCK:
+                            row["rtt_ms"] = rtt
+                            # A-429b: status() otdayet peer_rtt tolko dlya
+                            # svezhih snimkov (_rtt_fresh smotrit na
+                            # "rtt_at"), poetomu bez etoy metki RTT,
+                            # izmerennyy cherez tunnel, ne vidno voobshe.
+                            row["rtt_at"] = time.time()
+                            # A-429c: schyotchik poluchennyh pongov.
+                            row["pong_seen"] = int(row.get("pong_seen", 0) or 0) + 1
                     continue
                 if msg_type == T_DATA:
                     # A-193: staryi klient (protokol A1) prosit relay.
@@ -1514,8 +1667,12 @@ def _peer_reader(conn, key, node_id):
             tunnel = bool(current.get("b_used")) if isinstance(current, dict) else False
             # A-202: cheстnaya diagnostika v status() - kakim obrazom zavershilsya
             # reader pira (pomogayet nayti poteryu obratnogo kanala v zhivom teste).
-            _STATE["last_error"] = ("peer-reader end: mine=%s tunnel=%s used=%s"
-                                    % (mine, tunnel, used))
+            # A-398: "peer-reader end" - eto SHTAATNOE zavershenie (idle break
+            # ili obрыв zakrytogo soketa), a ne polomka. Ranee ono pisalos v
+            # last_error, i panel pokazyval oshibku tam, gde vse v poryadke.
+            # Diagnostika idet v otdelnoe pole, last_error - tolko realnyi sboi.
+            _STATE["last_reader_end"] = ("peer-reader end: mine=%s tunnel=%s used=%s"
+                                         % (mine, tunnel, used))
         if mine and tunnel:
             # A-199: reshaem po `mine`, a NE po `used`. V variante B
             # soedinenie pira postoyannoe i mozhet legalno molchat (idle),
@@ -1549,6 +1706,11 @@ def _peer_pump(conn, key):
     tx = threading.Lock()
     buf = b""
     last = time.time()
+    # A-426: the master's _peer_reader drops a peer after PEER_IDLE_S of
+    # silence. The client never spoke while idle, so the link died every
+    # ~5 minutes even though it was perfectly healthy. We now recv with a
+    # timeout and emit our own T_PING (the master already answers T_PONG).
+    ping_every = _int_env("AURORA_MESH_PING_S", 60, 10, 600)
 
     def send(msg_type, payload):
         with tx:
@@ -1591,7 +1753,18 @@ def _peer_pump(conn, key):
         conn.settimeout(None)
         while not _STATE.get("stop"):
             try:
-                chunk = conn.recv(65536)
+                # A-426: recv under a timeout so an idle tunnel still emits a
+                # keepalive. socket.timeout is a subclass of OSError, so it
+                # MUST be caught first. The timeout is dropped again right
+                # after recv so a blocking send can never half-write a frame.
+                conn.settimeout(float(ping_every))
+                try:
+                    chunk = conn.recv(65536)
+                finally:
+                    conn.settimeout(None)
+            except socket.timeout:
+                send(T_PING, b"")
+                continue
             except OSError:
                 break
             if not chunk:
@@ -1954,8 +2127,14 @@ def set_rtt(rows):
                 else:
                     # A-152: pira net - RTT snachayut srazu, ne cherez TTL
                     # A-154: zapominaem "merTV" svezhim - piron idet v konец
-                    row["rtt_ms"] = 0
-                    row["rtt_at"] = 0.0
+                    # A-429d: sobstvennyi dial mastera mozhet ne otvechat, poka
+                    # zhivaya sessiya tunnela est (u pira 5181 sluchaet tolko
+                    # na loopback). Staryi kod zdes stiral izmerennyy po
+                    # tunnelu RTT, i poetomu peer_rtt ostalos pustym. Svehiy
+                    # snimok ne trogaem - otkaz diala uzhe zapisan v rtt_fail.
+                    if not _rtt_fresh(row):
+                        row["rtt_ms"] = 0
+                        row["rtt_at"] = 0.0
                     row["rtt_fail"] = now
                 break
     return applied

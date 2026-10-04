@@ -42,7 +42,6 @@
 
       <div class="ngroup" id="g-shop">
         <div class="ngroup-title" data-short="🛒">🛒 <span data-i18n="nav.shop">Магазин</span></div>
-        <button data-t="shop-plans"><span class="ic">💎</span><span class="lb" data-i18n="nav.shop-plans">Тарифы VPN</span><span class="tag gold" id="tag-plan">basic</span></button>
         <button data-t="shop-features"><span class="ic">🧩</span><span class="lb" data-i18n="nav.shop-features">Дополнительные возможности Aurora</span><span class="tag" id="tag-feat">2</span></button>
         <button data-t="shop-billing"><span class="ic">💳</span><span class="lb" data-i18n="nav.shop-billing">Платежи</span></button>
       </div>
@@ -174,7 +173,6 @@
             </div>
             <div class="widget-body" id="w-plan-body">—</div>
             <div class="widget-foot">
-              <button class="btn small" data-act="nav" data-tab="shop-plans">💎 <span data-i18n="nav.shop-plans">Тарифы VPN</span></button>
               <button class="btn small" data-act="nav" data-tab="shop-features">🧩 <span data-i18n="nav.shop-features">Дополнительные возможности Aurora</span></button>
             </div>
           </div>
@@ -473,32 +471,18 @@
         </div>
       </section>
 
-      <!-- ==================================================
-           МАГАЗИН · ТАРИФЫ
-           ================================================== -->
-      <section class="tab" id="t-shop-plans">
-        <div class="card">
-          <h2><span class="ic">💎</span><span data-i18n="sp.head">Тарифные планы VPN</span></h2>
-          <p class="hint" data-i18n="sp.hint">Для тех, у кого серый IP: для тех, у кого серый IP: нужен обход блокировок. Оплата и продление — через Telegram-бота, тариф подключается сразу.</p>
-          <div class="plan-st" id="plans-loading"><span class="empty"><span class="ic">🐾</span><span data-i18n="sp.loading">загрузка тарифов…</span></span></div>
-          <div class="plans" id="plans-grid"></div>
-        </div>
-
-        <div class="card">
-          <h2><span class="ic">ℹ️</span><span data-i18n="sp.comp">Состав тарифов</span></h2>
-          <div class="tbl-wrap">
-            <table>
-              <thead><tr><th data-i18n="th.func">Функция</th><th data-i18n="th.val">Значение</th></tr></thead>
-              <tbody id="cmp-rows"></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <!-- ==================================================
+<!-- ==================================================
            МАГАЗИН · ФУНКЦИИ
            ================================================== -->
       <section class="tab" id="t-shop-features">
+        <div class="card">
+          <h2><span class="ic">🐾</span><span data-i18n="sf.model">Как это устроено</span></h2>
+          <p class="hint" data-i18n="sf.model-hint">Локальный прокси, своя Aurora, участие в общей
+            меш-сети и до 5 mesh-клиентов для игр — бесплатно, без квот и счётчиков. Покупаются
+            только дополнительные возможности, и Aurora должна быть зарегистрирована в общей сети:
+            это видно до оплаты. VPN-доступ не продаётся.</p>
+        </div>
+
         <div class="card pad-0">
           <div style="padding:14px 18px 12px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
             <h2 style="margin:0"><span class="ic">🧩</span><span data-i18n="nav.shop-features">Дополнительные возможности Aurora</span></h2>

@@ -28,8 +28,7 @@ _BILLING = {"version": 1, "payments": [], "traffic": {"months": {}}}
 # бинарь xray для statsquery (счётчики трафика по ключам):
 # сначала PATH, потом типовые места установки (дом/сервер/Docker/Windows)
 _XRAY_BIN = ""
-for _c in (os.path.join(config.BASE_DIR, "bin", "xray.exe"),
-           shutil.which("xray"),
+for _c in (shutil.which("xray"),
            os.path.join(os.path.expanduser("~"), "xray"),
            os.path.join(config.BASE_DIR, "xray"),
            "/usr/local/bin/xray",
@@ -1014,6 +1013,85 @@ def public_link(sub):
     return "http://%s:%d/sub?%s" % (
         host, config.UI_PORT, urllib.parse.urlencode({"token": sub.get("token", "")}))
 
+# --- A-311: klientskaya fail-closed proverka podpisi shapki podpiski ---
+_SUB_SIG_RE = re.compile(r"^#\s*aurora-sig=([0-9a-f]{64})\s*$")
+_SUB_NAME_RE = re.compile(r"^#\s*Aurora\b")
+_SUB_LINK_RE = re.compile(r"^vless://([0-9A-Fa-f-]{36})@")
+
+
+def _sub_sign_key():
+    """A-311: tot zhe klyuch podpisi, chto na golovnom servere.
+
+    Prioritet: AURORA_SUB_SIGN_KEY -> AURORA_MESH_POLICY_KEY -> AURORA_MESH_SECRET.
+    Pusto = podpis proverit nechem (proverka vozvrashchaet fail-closed).
+    """
+    for name in ("AURORA_SUB_SIGN_KEY", "AURORA_MESH_POLICY_KEY",
+                 "AURORA_MESH_SECRET"):
+        value = (os.environ.get(name) or "").strip()
+        if value:
+            return value
+    return ""
+
+
+def verify_subscription(text):
+    """A-311: proverka podpisi shapki poluchennoj podpiski (fail-closed).
+
+    Vozvrashchaet {"ok", "reason", "signature", "header", "servers"}.
+    Servery vozvrashchutsya TOLKO pri sovpavshey podpisi: podmenennyy
+    fayl podpiski (s chuzhim vless://) importirovat nelzya.
+    Algoritm povtoryaet golovnoy server: v podpis idut stroki shapki
+    BEZ pervoy ("# Aurora ...") + ",".join(sorted(key_ids)).
+    """
+    import hashlib
+    import hmac as _hmac
+
+    result = {"ok": False, "reason": "", "signature": "", "header": [],
+              "servers": []}
+    raw = str(text or "").replace("\r\n", "\n").replace("\r", "\n")
+    lines = [line.rstrip() for line in raw.split("\n")]
+    header = [line for line in lines if line.strip().startswith("#")]
+    servers = [line for line in lines
+               if line.strip().lower().startswith("vless://")]
+    result["header"] = list(header)
+
+    signature = ""
+    body = []
+    for line in header:
+        found = _SUB_SIG_RE.match(line.strip())
+        if found:
+            signature = found.group(1).lower()
+            continue
+        body.append(line)
+    if not signature:
+        result["reason"] = "podpis otsutstvuet"
+        return result
+    result["signature"] = signature
+    if not any(_SUB_NAME_RE.match(line.strip()) for line in body):
+        result["reason"] = "pervaya stroka shapki ne naydena"
+        return result
+    signed = [line for line in body if not _SUB_NAME_RE.match(line.strip())]
+    if not signed:
+        result["reason"] = "shapka podpiski pusta"
+        return result
+    secret = _sub_sign_key()
+    if not secret:
+        result["reason"] = "net klyucha podpisi (zaday AURORA_SUB_SIGN_KEY)"
+        return result
+    key_ids = []
+    for line in servers:
+        found = _SUB_LINK_RE.match(line.strip())
+        if found:
+            key_ids.append(found.group(1).lower())
+    payload = "\n".join(signed) + "\n" + ",".join(sorted(key_ids))
+    digest = _hmac.new(secret.encode("utf-8"), payload.encode("utf-8"),
+                       hashlib.sha256).hexdigest()
+    if not _hmac.compare_digest(digest, signature):
+        result["reason"] = "podpis ne sovpadayet (vozmozhno podmena)"
+        return result
+    result["ok"] = True
+    result["reason"] = "ok"
+    result["servers"] = servers
+    return result
 
 def subscription_text(sub):
     """Текст подписки для клиента: vless-ссылки всех ключей.

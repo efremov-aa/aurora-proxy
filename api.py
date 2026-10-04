@@ -777,11 +777,15 @@ def build_state(local=True):
     st["xray_api_port"] = config.XRAY_API_PORT
     st["tgws_port"] = config.TGWS_PORT
     st["vpn_mode"] = config.get("vpn_mode", True)
+    # A-427: /api/state had no white_ip at all, so every panel view that reads
+    # the shared state object showed an empty white IP.
+    st["white_ip"] = config.WHITE_IP
     st["auto_recovery"] = config.get("auto_recovery", True)
     st["vless_now"] = core.get_vless_now() or "-"
     st["egress_ip"] = core.egress_ip()
     st["comm"] = st.pop("comm", {"state": "idle", "msg": ""})
     st["vless_ext"] = _vless_ext()
+    st["mesh_tunnel"] = _tunnel_status()
     st["mesh_nodes"] = mesh.node_count()
     st["invite_available"] = False
     st["server_name"] = config.get("server_name", "Home")
@@ -1135,12 +1139,12 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/nodes":
             # A-101: ping_all отдаёт ok/ping_ms, добавляем status/ping_port.
-            nodes = [_node_alive(n) for n in mesh.ping_all()]
+            nodes = [_alive_via_tunnel(_node_alive(n)) for n in mesh.ping_all()]
             if not trusted:
                 nodes = [{k: v for k, v in node.items()
                           if k not in ("ip", "host", "port", "address", "secret", "invite")}
                          for node in nodes if isinstance(node, dict)]
-            self._send(*_json({"ok": True, "nodes": nodes}))
+            self._send(*_json({"ok": True, "tunnel": _tunnel_status(), "nodes": nodes}))
             return
         if path == "/api/routes":
             self._send(*_json(_routes()))
@@ -1930,7 +1934,12 @@ class Handler(BaseHTTPRequestHandler):
         self._send(*_json({"ok": True, "msg": "настройки сброшены"}))
 
     def _mesh_ping(self, data):
-        self._send(*_json({"ok": True, "nodes": mesh.ping_all()}))
+        # A-427: ping is what the "ping" button calls, and the panel repaints
+        # the white IP from THIS answer. Without the field a ping wiped it.
+        self._send(*_json({"ok": True, "white_ip": config.WHITE_IP,
+                           "nodes": [_alive_via_tunnel(_node_alive(n))
+                                     for n in (mesh.ping_all() or [])],
+                           "tunnel": _tunnel_status()}))
 
     def _mesh_invite(self, data):
         invite = mesh.invite()
@@ -2153,6 +2162,67 @@ def _node_alive(node, timeout=2.0):
         out["reason"] = "timeout" if ports else "no-port"
     return out
 
+
+
+def _tunnel_module():
+    """A-397: lazy import - v klientskoy sborke meshtunnel mozhet ne byt."""
+    try:
+        import meshtunnel
+    except Exception:
+        return None
+    return meshtunnel
+
+
+def _tunnel_status():
+    """A-397: status tunnelya BEZ sekretov (uzel, piry, sessii, rtt, potoki)."""
+    mod = _tunnel_module()
+    if mod is None:
+        return {}
+    getter = getattr(mod, "status", None)
+    if not callable(getter):
+        return {}
+    try:
+        data = getter()
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _tunnel_peers():
+    """A-397: po odnomu piru - zhiv li soket i svek li 'seen'."""
+    mod = _tunnel_module()
+    if mod is None:
+        return {}
+    getter = getattr(mod, "peer_info", None)
+    if not callable(getter):
+        return {}
+    try:
+        data = getter()
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _alive_via_tunnel(node):
+    """A-397: pryamoy dial ne prohodit, potomu chto u uzla 51821 slushaet
+    tolko loopback. Zhiva li sessiya tunnelya - uzel zhiv, i my govorim ob
+    etom CHESTNO cherez alive_via="tunnel", ne vydumyvaya ping_ms."""
+    if not isinstance(node, dict):
+        return node
+    row = dict(node)
+    row.setdefault("alive_via", "")
+    if row.get("ok"):
+        return row
+    node_id = str(row.get("id") or row.get("node_id") or "")
+    if not node_id:
+        return row
+    info = _tunnel_peers().get(node_id)
+    if isinstance(info, dict) and (info.get("sock") or info.get("fresh")):
+        row["ok"] = True
+        row["alive_via"] = "tunnel"
+        row["tunnel_age"] = int(info.get("age", -1) or -1)
+        row["tunnel_streams"] = int(info.get("streams", 0) or 0)
+    return row
 
 def _ext_packages():
     """A-164: какие сборки расширения реально лежат в этом сервере.
