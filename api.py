@@ -18,6 +18,7 @@ import crypt
 import extgate
 import core
 import mesh
+import meshsignal
 import pool
 import recovery
 import rusegment
@@ -1137,6 +1138,10 @@ class Handler(BaseHTTPRequestHandler):
                                "nodes": nodes,
                                "count": mesh.node_count()}))
             return
+        if path == "/api/mesh/signal":
+            # A-557: сигналинг меша (offer/answer/ICE) для клиентов чата и голоса.
+            self._mesh_signal_get()
+            return
         if path == "/api/nodes":
             # A-101: ping_all отдаёт ok/ping_ms, добавляем status/ping_port.
             nodes = [_alive_via_tunnel(_node_alive(n)) for n in mesh.ping_all()]
@@ -1273,6 +1278,7 @@ class Handler(BaseHTTPRequestHandler):
             "/api/setup/complete": self._setup_complete,
             "/api/settings/reset": self._settings_reset,
             "/api/mesh/ping": self._mesh_ping,
+        "/api/mesh/signal": self._mesh_signal_post,
             "/api/mesh/invite": self._mesh_invite,
             "/api/mesh/regenerate": self._mesh_regenerate,
             "/api/mesh/node/add": self._mesh_node_add,
@@ -1954,6 +1960,36 @@ class Handler(BaseHTTPRequestHandler):
             self._send(*_json({"ok": False, "error": "invite unavailable"}, 503))
             return
         self._send(*_json({"ok": True, "invite": invite}))
+
+    def _mesh_signal_auth(self):
+        # A-557: узловой токен меша, НЕ админский: клиенту
+        # входа в меш не нужен доступ к панели.
+        token = str(config.get("mesh_token") or "").strip()
+        if not token:
+            return False
+        return _token_matches(self.headers.get("X-Auth"), token)
+
+    def _mesh_signal_post(self, data):
+        # A-557: offer/answer/candidate от одного узла к другому.
+        if not self._mesh_signal_auth():
+            self._send(*_json({"ok": False, "error": "mesh token required"}, 403))
+            return
+        code, err, info = meshsignal.put(str(config.get("mesh_id") or ""),
+                                          data.get("to"), data.get("group"),
+                                          data.get("kind"), data.get("payload"))
+        self._send(*_json({"ok": err is None, "error": err, "result": info}, code))
+
+    def _mesh_signal_get(self):
+        # A-557: забор сигналов адресованным узлу; одноразовое забирание.
+        if not self._mesh_signal_auth():
+            self._send(*_json({"ok": False, "error": "mesh token required"}, 403))
+            return
+        qs = urllib.parse.parse_qs(self.path.split("?", 1)[-1]) or {}
+        code, err, body = meshsignal.take(str(config.get("mesh_id") or ""),
+                                          (qs.get("group") or [""])[0],
+                                          (qs.get("peer") or [""])[0],
+                                          (qs.get("limit") or ["32"])[0])
+        self._send(*_json({"ok": err is None, "error": err, "result": body}, code))
 
     def _mesh_join(self, data):
         invite = str(data.get("invite") or "").strip()

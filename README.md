@@ -137,6 +137,7 @@ aurora/
 ├── security.py       # admin-токен панели, rate-limit
 ├── updater.py        # авто-обновление с GitHub Releases
 ├── release_sign.py   # Ed25519: подпись и проверка ассетов
+├── meshsignal.py    # сигналинг mesh для клиентов: offer/answer/ICE, чат и голос
 ├── mesh.py           # меш-сеть: узлы, invite, политика
 ├── telemetry.py      # устройства и трафик (ss/netstat)
 ├── tgws.py           # Telegram WS-прокси
