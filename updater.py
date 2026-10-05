@@ -126,6 +126,19 @@ def _ver_tuple(v):
     return tuple(parts[:3])
 
 
+def _integrity_broken():
+    """A-567: версия совпадает, но файлов из манифеста не хватает.
+    Так сломался тестовый сервер: обновление применилось из промежуточного
+    релиза (4 ассета) — api.py уже с import meshsignal, а самого модуля нет.
+    Без этой проверки updater говорит «уже актуально» и не чинит."""
+    for rel in _MODULES:
+        p = os.path.join(config.DATA_DIR, "..", *rel.split("/"))
+        p = os.path.normpath(p)
+        if not os.path.isfile(p):
+            return True
+    return False
+
+
 def check():
     """Сверяет VERSION с releases/latest. Возвращает {ok, current, latest, update}."""
     if not _REPO:
@@ -135,12 +148,18 @@ def check():
         rel = _http_json(_API + _REPO + "/releases/latest")
         latest = str(rel.get("tag_name") or "").lstrip("v")
         update = _ver_tuple(latest) > _ver_tuple(config.VERSION)
+        broken = _integrity_broken()
+        if broken and not update:
+            # A-567: версия та же, но файлов нет — принудительное обновление
+            update = True
+            _set_state("checking", "целостность нарушена, требуется переобновление")
         with _LOCK:
             _STATE["latest"] = latest
             _STATE["update"] = update
         _set_state("ready" if update else "done",
                    ("доступно: v%s" % latest) if update else ("актуально: v%s" % config.VERSION))
-        return {"ok": True, "current": config.VERSION, "latest": latest, "update": update}
+        return {"ok": True, "current": config.VERSION, "latest": latest, "update": update,
+                "integrity_broken": broken}
     except Exception as e:
         _set_state("error", "check: %s" % e)
         return {"ok": False, "error": str(e)}

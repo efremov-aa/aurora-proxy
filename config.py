@@ -14,7 +14,7 @@ import urllib.request
 import uuid
 from collections import deque
 
-VERSION = "1.10.0"
+VERSION = "1.10.1"
 VERSION_NAME = "Кот-вольный"
 APP_NAME = "Aurora"
 

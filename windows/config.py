@@ -21,7 +21,7 @@ from collections import deque
 # (xray run/keytest/statsquery/netstat/netsh/taskkill/tg-ws-proxy и т.п.).
 HIDE_FLAG = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
 
-VERSION = "1.10.0"
+VERSION = "1.10.1"
 VERSION_NAME = "Кот-вольный"
 APP_NAME = "Aurora"
 
