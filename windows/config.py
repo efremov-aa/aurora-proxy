@@ -742,9 +742,17 @@ def _gen_vless_material():
         return None
     priv = pub = ""
     for ln in out.splitlines():
-        if ln.startswith("PrivateKey:"):
+        # A-814: xray v26.9.9 печатает метку публичного ключа как
+        # "Password (PublicKey):", а не "PublicKey:". Старый разбор сравнивал
+        # строго с "PublicKey:" → pub оставался ПУСТЫМ → функция отдавала None →
+        # в лог падало "vless: xray недоступен, внешний VLESS не сгенерирован",
+        # и внешний VLESS в Windows-сборке не создавался вообще. Замерено на
+        # живом выводе xray x25519: старый разбор даёт pub пустым, новый — 43
+        # символа (верная длина x25519). Принимаем обе метки.
+        low = ln.strip().lower()
+        if low.startswith("privatekey:"):
             priv = ln.split(":", 1)[1].strip()
-        elif ln.startswith("PublicKey:"):
+        elif "publickey" in low and ":" in ln:
             pub = ln.split(":", 1)[1].strip()
     if not priv or not pub:
         return None

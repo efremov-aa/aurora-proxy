@@ -89,16 +89,34 @@ def _cross_process_lock():
                     _XRAY_FILE_STATE["handle"] = None
 
 # Как управлять xray: "systemctl" (по умолчанию) или "proc" (в Docker: xray — подпроцесс).
-XRAY_MANAGE = os.environ.get("XRAY_MANAGE", "systemctl")
+# Режим управления xray: "systemctl" (на сервере) или "proc" (Docker, и Windows).
+# A-815: дефолт был безусловно "systemctl", и на Windows systemctl не существует
+# вовсе. _restart_xray() уходил в ветку systemctl, subprocess падал с WinError 2
+# («не удается найти указанный файл»), в лог шло «core: xray restart failed» —
+# и xray не стартовал НИ РАЗУ: панель поднималась (:8890), а прокси не работал,
+# потому что :8899 и :8897 молча не слушались. Замерено на frozen-сборке.
+# Теперь дефолт зависит от ОС, но явный env по-прежнему главнее.
+XRAY_MANAGE = os.environ.get("XRAY_MANAGE") or ("proc" if os.name == "nt" else "systemctl")
 _XRAY_PROC = [None]  # Popen (режим proc)
 
 
 def _xray_bin():
+    # A-813: кандидатов на bundled-бинарь НЕ БЫЛО ВООБЩЕ — только PATH, ~/xray,
+    # BASE_DIR/xray (без .exe и без каталога bin) и linux-путь. Под службой NSSM
+    # в PATH бинаря установщика нет, поэтому _xray_bin() возвращал None: панель
+    # поднималась (:8890), а xray не стартовал — порты :8899 и :8897 молча не
+    # слушались, прокси не работал. Замерено на frozen-сборке 1.10.3: сам файл
+    # `_internal\bin\xray.exe` исправен (`x25519` отдаёт ключи, код 0) — сломана
+    # была именно эта разрешающая функция.
+    _base = config.BASE_DIR
     cands = [
-        shutil.which("xray"),
+        os.path.join(_base, "bin", "xray.exe"),   # frozen onedir: _internal\bin
+        os.path.join(_base, "bin", "xray"),
         shutil.which("xray.exe"),
+        shutil.which("xray"),
         os.path.join(os.path.expanduser("~"), "xray"),
-        os.path.join(config.BASE_DIR, "xray"),
+        os.path.join(_base, "xray.exe"),
+        os.path.join(_base, "xray"),
         "/usr/local/bin/xray",
     ]
     for c in cands:
