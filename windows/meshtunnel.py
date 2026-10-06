@@ -15,6 +15,7 @@ nonce-антиреплей и фрагментация с padding.
 
 import hmac
 import hashlib
+import ipaddress
 import json
 import os
 import re
@@ -28,8 +29,11 @@ try:
 except ImportError:
     import config
 
-MESH_NET = "100.64.0.0/10"
+MESH_NET = str(os.environ.get("AURORA_MESH_NET", "10.254.0.0/16")
+                 or "10.254.0.0/16").strip()
+MESH_NET_OBJ = ipaddress.ip_network(MESH_NET, strict=False)
 MESH_BASE = 0x0A400000 + 1
+
 MESH_PORT = 51821
 HEARTBEAT_S = 25
 PEER_TTL_S = 180
@@ -83,6 +87,43 @@ def _int_env(name, default, low, high):
         return default
     return max(low, min(high, value))
 
+DIRECT_IDLE_S = _int_env("AURORA_MESH_DIRECT_IDLE", 300, 30, 3600)
+DIRECT_INTERVAL_S = _int_env("AURORA_MESH_DIRECT_INTERVAL", 5, 1, 60)
+DIRECT_RETRY_MAX_S = _int_env("AURORA_MESH_DIRECT_RETRY_MAX", 300, 30, 3600)
+DIRECT_RETRY_MIN_S = _int_env("AURORA_MESH_DIRECT_RETRY_MIN", 15, 5, 600)
+DIRECT_UDP_MAX = _int_env("AURORA_MESH_DIRECT_UDP_MAX", 1200, 576, 1400)
+FLINKER_S = _int_env("AURORA_MESH_FLANKER", 10, 2, 300)
+GAME_DIAG_PERIOD_S = _int_env("AURORA_MESH_DIAG_S", 300, 0, 86400)
+GAME_GROUP = _int_env("AURORA_MESH_GROUP", 1, 1, 254)
+GAME_MTU = _int_env("AURORA_MESH_GAME_MTU", 1500, 576, 9000)
+MAX_RAW_PAYLOAD = 65535
+MESH_DIAG_REASONS = (
+    "bad-id", "bad-proof", "no-net-key", "not-master",
+    "no-addr", "no-adder", "refused", "short-hello",
+    # A-455: node-side view of the master's game-peer list
+    "game-inbox",
+    # A-453: master-side view of the game-peer list (diagnostics only)
+    "game-announce",
+    # A-459: why direct_publish() published nothing / what the master received
+    # A-459
+    "game-publish", "game-pub-recv",
+    # A-395: parsed HELLO head, so an empty addr field is visible as-is
+    "hello-parse",
+)
+MESH_DIAG_REJECTS = (
+    "bad-id", "bad-proof", "no-net-key", "not-master",
+    "no-addr", "no-adder", "refused", "short-hello",
+)
+REDIAL_S = _int_env("AURORA_MESH_REDIAL", 2, 1, 30)
+RELAY_MAX = _int_env("AURORA_MESH_RELAY_MAX", MAX_RAW_PAYLOAD,
+                      DIRECT_UDP_MAX, MAX_RAW_PAYLOAD)
+T_DIRECT = 17
+T_GAME_PEERS = 16
+T_RAW = 15
+_GAME_DIAG_LAST = {}
+_GAME_DIAG_LOCK = threading.Lock()
+_NO_GAME_IDS = ("aurora-home", "aurora-test", "master", "hub")
+
 
 FRAG_SIZE = _int_env("AURORA_MESH_FRAG", FRAG_MAX, 256, 1400)
 PAD_MAX = _int_env("AURORA_MESH_PAD", FRAG_PAD_MAX, 0, 4096)
@@ -113,13 +154,16 @@ def node_address(node_id):
     if not _ID_RE.match(node_id):
         return ""
     digest = hashlib.sha256(("aurora-mesh:" + node_id).encode("utf-8")).digest()
-    # A-305: адрес обязан попадать в MESH_NET (100.64.0.0/10). Раньше тут был
+    # A-305: адрес обязан попадать в MESH_NET (10.254.0.0/16 (own mesh net)). Раньше тут был
     # MESH_BASE | (digest & 0x3FFFFF), а потом (value >> 16) & 0x3F - у MESH_BASE
     # (0x0A400001) это 0x0A40, и 0x0A40 & 0x3F == 0, поэтому второй окет всегда
     # был 0..63, а не 64..127: адреса выходили ВНЕ /10, и мастер честно отклонял
-    # регистрацию узла (register_by_secret требует адрес из 100.64.0.0/10).
+    # регистрацию узла (register_by_secret требует адрес из 10.254.0.0/16 (own mesh net)).
+    # A-388: address is built from MESH_NET (our own range).
     raw = int.from_bytes(digest[:3], "big") & 0xFFFFFF
-    return "100.%d.%d.%d" % (64 + ((raw >> 16) & 0x3F), (raw >> 8) & 0xFF, raw & 0xFF)
+    base = int(MESH_NET_OBJ.network_address)
+    size = int(MESH_NET_OBJ.num_addresses)
+    return str(ipaddress.ip_address(base + 1 + (raw % (size - 1))))
 
 
 def tunnel_name(node_id):
@@ -335,17 +379,21 @@ def _node_id():
     with _LOCK:
         if _STATE.get("node_id"):
             return _STATE["node_id"]
-    value = ""
-    try:
-        value = str(config.get("mesh_id", "") or "")
-    except Exception:
-        value = ""
+    # A-447: явный AURORA_MESH_ID из окружения ВАЖНЕЕ дефолта из
+    # settings.json - иначе два игровых узла получали один и тот же id, а
+    # значит один и тот же игровой адрес 10.<группа>.<узел>.1.
+    value = str(os.environ.get("AURORA_MESH_ID", "") or "").strip()
     if not value:
-        value = str(os.environ.get("AURORA_MESH_ID", "") or "")
+        try:
+            value = str(config.get("mesh_id", "") or "")
+        except Exception:
+            value = ""
+    # A-160/A-305: строгая валидация id обязательна и в клиентской сборке.
     value = _strict_node_id(value)
+    if not value:
+        value = "mesh-aurora-home"
     with _LOCK:
         _STATE["node_id"] = value
-    return value
 
 
 def _peer_secret(node_id):
@@ -372,9 +420,13 @@ def _network_proof_ok(node_id, proof, nonce):
     """A-296: proof po OBSHCHEMU sekretu seti (AURORA_MESH_SECRET)."""
     secret = _secret()
     if not secret:
+        _diag("no-net-key", node_id, "network secret is empty")
         return False
-    return hmac.compare_digest(_expected_proof(secret, nonce, node_id),
-                               _keybytes(proof))
+    ok = hmac.compare_digest(_expected_proof(secret, nonce, node_id),
+                            _keybytes(proof))
+    if not ok:
+        _diag("no-net-key", node_id, "network proof mismatch")
+    return ok
 
 
 def _register_from_hello(node_id, host, port, policy_port=0):
@@ -387,27 +439,39 @@ def _register_from_hello(node_id, host, port, policy_port=0):
     zanositsya v reestr (mesh.register_by_secret). Postoronnie bez sekreta
     otbrasyvayutsya kak i ranshe - fail-closed. Log vedet mesh.py."""
     if str(_STATE.get("started", "") or "") != "master":
+        _diag("not-master", node_id, "started=%s" % str(_STATE.get("started", ""))[:16])
         return False
     if not host or not port:
+        _diag("no-addr", node_id, "host=%s port=%s" % (str(host)[:32], port))
         return False
     try:
         import mesh
         adder = getattr(mesh, "register_by_secret", None)
         if not callable(adder):
+            _diag("no-adder", node_id, "mesh.register_by_secret missing")
             return False
-        return bool(adder(node_id, host, port, policy_port or None))
-    except Exception:
+        ok = bool(adder(node_id, host, port, policy_port or None))
+        if not ok:
+            _diag("refused", node_id, "%s:%s policy_port=%s" % (
+                str(host)[:40], port, policy_port))
+        return ok
+    except Exception as exc:
+        _diag("no-adder", node_id, "register raised %s" % type(exc).__name__)
         return False
 
 
 def _known(node_id, proof, nonce):
     if not _ID_RE.match(str(node_id or "").strip()) or not proof or not nonce:
+        _diag("bad-id", node_id, "proof=%s nonce=%s" % (bool(proof), bool(nonce)))
         return False
     node = str(node_id).strip()
     secret = _peer_secret(node)
     if secret:
-        return hmac.compare_digest(_expected_proof(secret, nonce, node),
-                                   _keybytes(proof))
+        ok = hmac.compare_digest(_expected_proof(secret, nonce, node),
+                                  _keybytes(proof))
+        if not ok:
+            _diag("bad-proof", node, "personal secret mismatch")
+        return ok
     # A-296: lichnogo sekreta v reestre eshche net (uzel pervyj raz).
     return _network_proof_ok(node, proof, nonce)
 
@@ -971,8 +1035,26 @@ def _serve_dispatch(conn, key, peer_id, master):
 
 
 def _master_proxy_port():
-    """A-289: порт mixed-инбаунда xray этого узла. Через него можно достучаться
-    до мастера, даже если прямой маршрут закрыт (NAT, чужой провайдер)."""
+    """A-439 + A-289 (ported): port mixed-inbounda xray etogo uzla. Cherez
+    nego mozhno dostuchatsya do mastera, dazhe esli pryamoy marshrut zakryt
+    (NAT, chuzhoy provayder)."""
+    # A-450: yavno zadannyy v okruzhenii port proksi VAZHNEE konstanty
+    # config.XRAY_PORT. Uzlu, u kotorogo sobstvennyy xray slushaet ne na
+    # XRAY_PORT (n-primer, testovyy most slushaet 50541, a config dlya etogo
+    # uzla soobshchaet 8899), connect uhodil v pustotu i padal na pryamoy
+    # socket.create_connection, kotoryy u mastera slushaet tolko loopback.
+    # Teper port mozhno zadat yavno: AURORA_MESH_PROXY_PORT, zatem
+    # AURORA_XRAY_PORT, i tolako potom - sobstvennyy xray uzla.
+    for var in ("AURORA_MESH_PROXY_PORT", "AURORA_XRAY_PORT"):
+        raw = str(os.environ.get(var, "") or "").strip()
+        if not raw:
+            continue
+        try:
+            port = int(raw)
+        except (TypeError, ValueError):
+            continue
+        if 0 < port < 65536:
+            return port
     try:
         port = int(getattr(config, "XRAY_PORT", 0) or 0)
     except (TypeError, ValueError):
@@ -1009,10 +1091,13 @@ def _announce_loop(key):
     otkryvaet potoki, a my ih obsluzhivaem (_peer_pump). Peredacha inache
     trebovala by, chtoby master dostichal 8443 pira (NAT)."""
     backoff = 0
+    up_since = None
     while True:
         sock = None
         handed = False
         try:
+            # A-439: snachala napryamuyu, potom cherez sobstvennyy
+            # proksi Aurora (public sborka: _connect_master).
             sock = _connect_master()
             sock.settimeout(HANDSHAKE_TIMEOUT_S)
             _nonce, payload = _hello_frame(_node_id(), _secret(),
@@ -1026,6 +1111,7 @@ def _announce_loop(key):
                                     name="mesh-up", daemon=True)
             pump.start()
             handed = True
+            up_since = time.time()
             sock = None
             while not _STATE.get("stop") and pump.is_alive():
                 time.sleep(0.5)
@@ -1042,8 +1128,20 @@ def _announce_loop(key):
             return
         if handed:
             # A-426: healthy link - just wait for it to drop.
-            backoff = 0
-            time.sleep(max(1, int(ANNOUNCE)))
+            # A-726: no more blind 60 s wait here. It is NOT an announce period
+            # (the loop above only exits when the pump died), it was pure dead
+            # time before we re-dialled. After an xray restart on the master that
+            # is a full minute of dropped game traffic plus a window where the
+            # master counts writes to a dead socket as `sent`.
+            # Long-lived link => the master restarted, not a refusal => fast
+            # re-dial. Short-lived link => master is flapping/refusing => keep
+            # the A-426 exponential backoff so we never hammer it.
+            if up_since is not None and (time.time() - up_since) >= FLINKER_S:
+                backoff = 0
+                time.sleep(REDIAL_S)
+            else:
+                backoff = min(backoff + 1, 6)
+                time.sleep(min(60, 2 ** backoff))
         else:
             # A-426: broken handoff used to retry every second and hammer a
             # flickering master. Exponential backoff instead: 2, 4, 8 ... 60s.
@@ -1190,7 +1288,17 @@ def _send_policy(conn, key):
 
 
 def _apply_tunnel_policy(payload):
-    """A-291: приём политики из туннеля: только разбор и передача в mesh."""
+    """A-291: приём политики из туннеля: только разбор и передача в mesh.
+
+    A-755: широкий `except Exception: return False` был причиной молчаливой
+    потери политики — отсутствие apply_policy_raw() в mesh.py выглядело как
+    «мастер не прислал», и по диагностике это не отличить. Теперь отказ виден.
+
+    ЛОГ ЗДЕСЬ ЗАПРЕЩЁН ПО КОНТРАКТУ: в модуле циркулирует AURORA_MESH_SECRET,
+    config не импортируется (проверяет test_a160_relay_tunnel). Поэтому отказ
+    пишется в last_error — по A-202 это «честная диагностика, панель покажет
+    ошибку там, где всё в порядке», а не отдельный канал логирования.
+    """
     if not payload or len(payload) > MAX_POLICY_PAYLOAD:
         return False
     try:
@@ -1201,8 +1309,17 @@ def _apply_tunnel_policy(payload):
         return False
     try:
         import mesh
-        return bool(mesh.apply_policy_raw(raw, "tunnel"))
-    except Exception:
+    except Exception as exc:
+        _STATE["last_error"] = "policy-tunnel: mesh import %s" % exc.__class__.__name__
+        return False
+    receiver = getattr(mesh, "apply_policy_raw", None)
+    if not callable(receiver):
+        _STATE["last_error"] = "policy-tunnel: apply_policy_raw отсутствует"
+        return False
+    try:
+        return bool(receiver(raw, "tunnel"))
+    except Exception as exc:
+        _STATE["last_error"] = "policy-tunnel: %s" % exc.__class__.__name__
         return False
 
 
@@ -1256,7 +1373,9 @@ def _client_session(conn, key, peer_id):
         conn.close()
         return
     host, port = target
+    upstream = None
     try:
+        # A-439: kak i v _announce_loop - cherez proksi, a ne napryamuyu.
         upstream = _connect_master()
     except OSError:
         conn.close()
@@ -1607,6 +1726,42 @@ def _peer_reader(conn, key, node_id):
                             # A-429c: schyotchik poluchennyh pongov.
                             row["pong_seen"] = int(row.get("pong_seen", 0) or 0) + 1
                     continue
+                # A-456: sosed soobshchayet svoy pryamoy UDP-endpoint cherez
+                # tunnel. Bez etogo v spiske bytol tolko mesh-adres.
+                if msg_type == T_DIRECT:
+                    raw = bytes(payload or b"")
+                    if raw.startswith(b"MINE|"):
+                        ep = raw[5:].decode("utf-8", "replace").strip()[:80]
+                        if ep and _parse_addr(ep)[0]:
+                            _direct_pub_set(node_id, ep)
+                            _game_stat("direct_pub_seen")
+                            # A-459: master vidit chego otkuda
+                            _diag("game-pub-recv", node_id,
+                                  "endpoint=%s len=%d" % (ep, len(raw)))
+                        else:
+                            _game_stat("dropped_bad_len")
+                            _diag("game-pub-recv", node_id,
+                                  "rejected raw=%r" % (raw[:64],))
+                    continue
+                if msg_type == T_RAW:
+                    # A-461: uzel otdal syroy paket masteru, pryamogo kanala
+                    # net. Master rassylaet paket vsem ostalnym u zlam.
+                    used = True
+                    # A-744 (A-744_MARK): na igrovom uzle etot kanal
+                    # obsluzhivaet GOSTYA, a ne mastera. `_relay_raw` na uzle
+                    # raznosit po SVOIM piram, a mastera v peerah uzla net (do
+                    # mastera idem cherez `_STATE["up"]`/`_relay_up`), tak chto
+                    # spisok poluchatelei byl pust i paket dropalsya. Smerka
+                    # A-742: master vsegda videl 0 relay-fwd s bytes=123.
+                    # Teper syroy paket gostya idet VVERH tem zhe putem, chto i
+                    # sobstvennye pakety uzla iz TUN: `raw_send` - pryamyj
+                    # sosed, inache `_relay_up`. Na master ne menyaetsya.
+                    if (game_enabled()
+                            and str(_STATE.get("started", "") or "") != "master"):
+                        raw_send(bytes(payload or b""))
+                    else:
+                        _relay_raw(node_id, bytes(payload or b""))
+                    continue
                 if msg_type == T_DATA:
                     # A-193: staryi klient (protokol A1) prosit relay.
                     used = True
@@ -1782,6 +1937,16 @@ def _peer_pump(conn, key):
                     continue
                 if msg_type == T_BYE:
                     raise OSError("master closed the tunnel")
+                # A-433 (Ш1.1): syroy IP-paket ot soseda po pryamomu kanalu
+                # idet v virtualnyj adapter; staruyu sobstvennuyu sety ne trogaem.
+                if msg_type == T_RAW:
+                    raw_inject(payload)
+                    continue
+                # A-435: signaly pryamogo kanala ot mastera i rukopozhatie
+                # na pryamom kanale ot soseda - obrabotchik v etoy zhe petle.
+                if msg_type in (T_GAME_PEERS, T_DIRECT):
+                    direct_inbox(msg_type, payload, key)
+                    continue
                 if msg_type == T_PIPE_OPEN:
                     if len(payload) < 4:
                         continue
@@ -2021,28 +2186,41 @@ def _peer_session(conn, key):
                 continue
             if msg_type != T_HELLO:
                 return
-            parts = str(payload.decode("utf-8", "replace")).split("|", 3)
+            parts = str(payload.decode("utf-8", "replace")).split("|", 5)
             if len(parts) < 3:
+                _diag("short-hello", "", "fields=%d" % len(parts))
                 return
             node_id, proof, nonce = parts[0], parts[1], parts[2]
             # A-296: hvost kadra - "addr|policy_port" (pyatoe pole). Starye
             # uzly shlyut tolko addr, togda policy_port ostaetsya 0.
-            tail = (parts[3] if len(parts) > 3 else "").split("|", 1)
+            tail = (parts[3] if len(parts) > 3 else "").split("|", 3)
+            # A-307: pyatoe i shestoe pole - token i credential licenzii uzla
+            lic_token = tail[2].strip() if len(tail) > 2 else ""
+            lic_cred = tail[3].strip() if len(tail) > 3 else ""
             host, port = _parse_addr(tail[0])
             policy_port = 0
             if len(tail) > 1 and tail[1].isdigit():
                 policy_port = int(tail[1])
+            # A-395: log the raw HELLO head once per connection: how many
+            # fields arrived and what exactly sits in the address field. A
+            # client and a master must agree on the frame layout, otherwise
+            # the address is parsed out of the wrong slot and stays empty.
+            _diag("hello-parse", node_id, "fields=%d tail=%d addr=%r" % (
+                len(parts), len(tail), tail[0][:48]))
             if not _known(node_id, proof, nonce):
                 return
+            # A-392: _known logs its own reason; _register_from_hello logs
+            # its own refusal, so a silent drop is now impossible.
             _register_from_hello(node_id, host, port, policy_port)
-            # A-291: политику шлём ПЕРЕД T_OK. Клиент ждёт T_OK в _wait_ok и
-            # возвращается сразу на нём, поэтому кадр, посланный следом, мог
-            # потеряться вместе с буфером recv. Перед T_OK он гарантированно
-            # разобран и применён тем же fail-closed путём, что и HTTP-политика.
+            # A-307: snachala politika i licenziya, potom T_OK - klient v
+            # _wait_ok vozvrashchaetsya na T_OK i poteryal by hvos buffer.
             _send_policy(conn, key)
+            _send_license(conn, key, lic_token, lic_cred)
             _send(conn, T_OK, hmac.new(_keybytes(key),
                                        b"aurora-mesh-ok" + _keybytes(nonce),
                                        hashlib.sha256).hexdigest().encode("ascii"), key)
+            # A-291: сразу после T_OK отдаём подписанную политику - клиент
+            # применит её тем же fail-closed путём, что и HTTP-политику.
             break
     finally:
         try:
@@ -2057,7 +2235,17 @@ def _peer_session(conn, key):
     if _peer(node_id, addr, sock=conn) is None:
         conn.close()
         return
-    if str(_STATE.get("started", "") or "") == "master":
+    # A-743: pump vybiralsya NE po roli, a po tomu, CHTO eto za peer.
+    # Master obsluzhivaet vhodyashchih cherez _peer_reader. Uzly igry ranee
+    # otdavali vsyakoe ne-master soedinenie v `_relay` (legacy relay-hub),
+    # a `_relay` ne obsluzhivaet T_RAW - i gost s T_OK vsegda molchal: ego
+    # igrovye pakety ne uhodili nikuda (proverka A-742: master ne uvidel
+    # relay-fwd s bytes=123, vsego 0).
+    # Teper: master - kak bylo; uzol igry - tozhe cherez _peer_reader, CHTOBY
+    # host, podklyuchivshijsya k etomu uzlu, poluchal realnyj T_RAW v svoem TUN.
+    # Sostoyanie mastera ne menyaetsya voobshche.
+    if (str(_STATE.get("started", "") or "") == "master"
+            or game_enabled()):
         threading.Thread(target=_peer_reader, args=(conn, key, node_id),
                          name="mesh-peer-%s" % node_id, daemon=True).start()
         return
@@ -2286,7 +2474,1410 @@ def start(role=None):
     master = role == "master"
     target = _server_serve if master else _client_serve
     threading.Thread(target=target, name="mesh-relay", daemon=True).start()
+    # A-435: прямой канал между игровыми узлами. Мастер здесь только
+    # сигналит списком соседей, сами пакеты идут напрямую.
+    try:
+        direct_loop()
+    except Exception:
+        pass
     if master:
         threading.Thread(target=_ensure_socks, args=(key,),
                          name="mesh-socks", daemon=True).start()
     return True
+
+
+_DIAG_MAX = 200
+_DIAG = []
+
+
+def _note(reason, text="", level="info"):
+    """A-291 в клиентской сборке: модуль НЕ пишет в лог сам - в нём циркулирует
+    секрет сети. Диагностика кладётся в ограниченный буфер и в _STATE, откуда её
+    читает панель. Ни печати в консоль, ни вызовов логгера, ни файлов."""
+    try:
+        item = {"t": int(time.time()), "reason": str(reason)[:40],
+                "level": str(level)[:8], "text": str(text)[:200]}
+        _DIAG.append(item)
+        if len(_DIAG) > _DIAG_MAX:
+            del _DIAG[:len(_DIAG) - _DIAG_MAX]
+        with _LOCK:
+            _STATE["diag"] = item
+            if str(level) == "error":
+                _STATE["last_error"] = item["text"]
+        return True
+    except Exception:
+        # A-498: и сам ход диагностики не должен ронять туннель.
+        return False
+
+
+def _diag(reason, node_id="", extra=""):
+    """A-392: log a peer rejection reason. Never raises, never blocks."""
+    try:
+        # A-482: prefiks zavisit ot prichiny - otkaz ili prostaya diag.
+        tag = "peer rejected" if reason in MESH_DIAG_REJECTS else "diag"
+        _note(reason, "%s node=%s%s" % (
+            tag, str(node_id or "")[:40], (" " + extra) if extra else ""))
+    except Exception:
+        pass
+
+
+def _diag_throttled(reason, node_id="", extra=""):
+    """A-498: _diag(), no tolko pri IZMENENII sostoyaniya.
+
+    Podpisyvaetsya na signaturu (reason + extra). Pervy yhod vsegda pishetsya,
+    daleyshe - tolko esli podpis izmenilis ili proshlo GAME_DIAG_PERIOD_S
+    (togda dobavlyaetsya "(same)"). GAME_DIAG_PERIOD_S = 0 = staroe povedenie,
+    kazhdyy cykl. Nichego ne glotaet i ne podmenyaet: _diag() vsyu zapis
+    propisyvaet cherez config.log, zdes toloto reshenie, KOGDA pisat."""
+    try:
+        sig = "%s|%s" % (str(reason), str(extra))
+        now = time.time()
+        with _GAME_DIAG_LOCK:
+            prev = _GAME_DIAG_LAST.get(sig)
+            if prev is not None and prev[0] == sig:
+                same = True
+                if GAME_DIAG_PERIOD_S and (now - prev[1]) < GAME_DIAG_PERIOD_S:
+                    return False
+            else:
+                same = False
+            _GAME_DIAG_LAST[sig] = (sig, now)
+        _diag(reason, node_id, ("%s (same)" % extra) if same else extra)
+        return True
+    except Exception as exc:
+        # A-498: ne molchать, esli sam hod diagnostiki svalilsya.
+        try:
+            _note("diag-throttle-fail", "%s: %s"
+                 % (type(exc).__name__, exc), level="error")
+        except Exception:
+            pass
+        return False
+
+
+def _direct_accept(nid, sender):
+    """Responder: sozdaet svoy UDP-soket i zapuskaet reader dlya sosededa,
+    kotoryy pozval po pryamomu kanalu. Vypolnyaetsya tolko dlya uzla, naznannogo
+    masterom nashim sosedom (proverka grant/known_nonce v _direct_handshake)."""
+    st = _direct_state()
+    with _LOCK:
+        info = dict(st.get(nid) or {})
+    if info.get("sock") is None:
+        try:
+            sock = _direct_socket()
+        except OSError:
+            return 0
+        info["sock"] = sock
+    else:
+        sock = info.get("sock")
+    info["addr"] = sender
+    info["last"] = time.time()
+    with _LOCK:
+        st[nid] = info
+    th = threading.Thread(target=_direct_reader, args=(sock, nid, sender),
+                          name="mesh-direct-%s" % nid[:8], daemon=True)
+    th.start()
+    _game_stat("direct_accepted")
+    return 1
+
+
+def _direct_dispatch(pkt, key=None, dst=None):
+    """A-475: otpravka po ZHIVym pryamym UDP-kanalam.
+
+    Relay-folbyaka zdes NET - ego dobavlyayut caller'y (`direct_send` i
+    `raw_send`), chtoby reshenie A-432 p.3 ("snachala pryamoy UDP, tolko potom
+    rely") zhilo v odnom meste, a pryamoy kanal realno uchastvoval v obmene.
+    """
+    if dst is None:
+        _src, dst = _raw_endpoints(pkt)
+    if not dst:
+        return 0
+    bcast, own_segment, targets = _direct_targets(dst)
+    if not targets:
+        return 0
+    # A-483: pryamoy UDP idet v internet cherez NAT - paket bolshe
+    # DIRECT_UDP_MAX tam ne dostavit, a relay (cherez _relay_up) dostavit.
+    if len(pkt or b"") > DIRECT_UDP_MAX:
+        _game_stat("dropped_direct_len")
+        return 0
+    if key is None or not isinstance(key, (bytes, bytearray)):
+        try:
+            key = _keybytes(_secret())
+        except Exception:
+            key = b""
+    frame = _pack(T_RAW, bytes(pkt), key)
+    sent = 0
+    st = _direct_state()
+    for nid, info in targets:
+        sock = info.get("sock")
+        addr = info.get("addr")
+        if sock is None or not addr:
+            continue
+        try:
+            sock.sendto(frame, addr)
+            sent += 1
+            with _LOCK:
+                cur = dict(st.get(nid) or {})
+                cur["sent"] = int(cur.get("sent", 0) or 0) + 1
+                cur["last"] = time.time()
+                st[nid] = cur
+        except OSError:
+            _game_stat("send_failed")
+    if sent:
+        _game_stat("sent", sent)
+        _game_stat("direct_bcast" if bcast else
+                    ("direct_segment" if own_segment else "direct_unicast"))
+    return sent
+
+
+def _direct_grant(node_id, nonce):
+    """Podpis mastera po sety seti. Eto NE granica bezopasnosti (setu znaet ves
+    mesh), a tolko otsekaet sluchainnyh posetiteley: podpisannymi dannymi
+    polzovatsya mozhno tolko izvesnym uzlam seti."""
+    try:
+        key = _keybytes(_secret())
+    except Exception:
+        key = b""
+    raw = "aurora-direct:%s:%s" % (str(node_id), str(nonce))
+    return hmac.new(key, raw.encode("utf-8"), hashlib.sha256).hexdigest()[:32]
+
+
+def _direct_handshake(payload, sender=None):
+    """HI -> otvet OK s podpisom; OK -> proverka podpisi i "kanal gotov"."""
+    try:
+        text = payload.decode("utf-8", "replace")
+    except Exception:
+        return True
+    bits = text.split("|")
+    if not bits:
+        return True
+    tag = bits[0].strip().upper()
+    me = str(_STATE.get("node_id", "") or "")
+    st = _direct_state()
+    if tag == "HI" and len(bits) >= 3:
+        nid = bits[1].strip()
+        nonce = bits[2].strip()
+        if not nid or nid == me or nid in _NO_GAME_IDS:
+            return True
+        with _LOCK:
+            info = dict(st.get(nid) or {})
+        # otvechat tolko tomu, kogo master nazval nashim sosedom
+        if not nonce or not info.get("known_grant") or not nonce == info.get("known_nonce"):
+            return True
+        sock = info.get("sock")
+        addr = info.get("addr")
+        if sock is None:
+            if sender is None:
+                return True
+            _direct_accept(nid, sender)
+            with _LOCK:
+                info = dict(st.get(nid) or {})
+            sock = info.get("sock")
+            addr = info.get("addr")
+        if sock is None or not addr:
+            return True
+        try:
+            sig = _direct_grant(me, nonce)
+            reply = ("OK|%s|%s|%s" % (me, nonce, sig)).encode("utf-8")
+            sock.sendto(_pack(T_DIRECT, reply, _keybytes(_secret())), addr)
+            with _LOCK:
+                info["rtt_ms"] = 0
+                info["last"] = time.time()
+                info["up"] = 1
+                # A-474: kanal podnyalsya - schyotchik neudachnykh popytok snul
+                info["retries"] = 0
+                st[nid] = info
+        except (OSError, TypeError, ValueError):
+            pass
+        return True
+    if tag == "OK" and len(bits) >= 4:
+        nid = bits[1].strip()
+        nonce = bits[2].strip()
+        sig = bits[3].strip()
+        # A-435-fix: "OK" neset id OTVETCHIKA, poetomu kanal ishemy po nid,
+        # a ne po svoemu id - inache kanal nikogda ne podnimalsya by.
+        with _LOCK:
+            info = dict(st.get(nid) or {})
+        if (info.get("sock") is not None and nid != me and nonce
+                and nonce == info.get("nonce") and sig
+                and sig == _direct_grant(nid, nonce)):
+            with _LOCK:
+                info["up"] = 1
+                info["last"] = time.time()
+                info["rtt_ms"] = 0
+                # A-474: kanal podnyalsya - schyotchik neudachnykh popytok snul
+                info["retries"] = 0
+                st[nid] = info
+            _game_stat("direct_up")
+        return True
+    return True
+
+
+def _direct_initiate(nid, addr, nonce):
+    """Initsiator (men'shiiy id) otkryvaet UDP-soket i posylayet HI."""
+    import socket
+    host, port = _parse_addr(addr)
+    if not host:
+        return 0
+    try:
+        sock = _direct_socket()
+        me = str(_STATE.get("node_id", "") or "")
+        hi = ("HI|%s|%s" % (me, nonce)).encode("utf-8")
+        sock.sendto(_pack(T_DIRECT, hi, _keybytes(_secret())), (host, int(port or MESH_PORT)))
+    except (OSError, TypeError, ValueError):
+        return 0
+    st = _direct_state()
+    with _LOCK:
+        info = dict(st.get(nid) or {})
+        old = info.get("sock")
+        info.update({"sock": sock, "addr": (host, int(port or MESH_PORT)),
+                     "nonce": nonce, "up": 0, "sent": 0, "recv": 0,
+                     "started": time.time(), "last": time.time()})
+        st[nid] = info
+    try:
+        if old is not None:
+            old.close()
+    except (OSError, AttributeError):
+        pass
+    th = threading.Thread(target=_direct_reader, args=(sock, nid, (host, int(port or MESH_PORT))),
+                          name="mesh-direct-%s" % nid[:8], daemon=True)
+    th.start()
+    _game_stat("direct_started")
+    return 1
+
+
+def _direct_known(payload):
+    """Razbor spiska ot mastera: {'known': {nid: {addr, grant}}, 'peers': [...]}"""
+    try:
+        text = bytes(payload).decode("utf-8", "replace")
+    except Exception:
+        return [], {}
+    known = {}
+    order = []
+    for chunk in text.split(";"):
+        bits = chunk.split("|")
+        if len(bits) < 4:
+            continue
+        nid, addr, nonce, grant = bits[0].strip(), bits[1].strip(), bits[2].strip(), bits[3].strip()
+        if not nid or not addr or nid in _NO_GAME_IDS:
+            continue
+        known[nid] = {"addr": addr, "nonce": nonce, "grant": grant}
+        order.append(nid)
+    return order, known
+
+
+def _direct_nat_shared(addr):
+    """A-474: moy i sosedin opublikovannyi endpoint s ODNIM publichnym IP ->
+    pryamoy UDP mezhdu nimi nevozmozhen (odin NAT), znachit tolko relej."""
+    me = str(_STATE.get("node_id", "") or "")
+    my_host, _ = _parse_addr(_direct_pub_get(me) or "")
+    host, _ = _parse_addr(addr or "")
+    return bool(my_host and host and my_host == host)
+
+
+def _direct_pub_get(node_id):
+    with _LOCK:
+        return str((_STATE.get("direct_pub", {}) or {}).get(str(node_id), "") or "")
+
+
+def _direct_pub_local():
+    """Svoy pryamoy endpoint: host iz _self_addr() + port sobstvennogo UDP-soketa."""
+    me = str(_STATE.get("node_id", "") or "")
+    with _LOCK:
+        st = dict(_STATE.get("direct", {}) or {})
+    port = 0
+    # A-457: snachala own endpoint, zapisannyy pri sozdanii soketa.
+    with _LOCK:
+        local = dict(_STATE.get("direct_local", {}) or {})
+    try:
+        port = int(local.get("port", 0) or 0)
+    except (TypeError, ValueError):
+        port = 0
+    if not port:
+        # fallback: lyuboy zhivoy pryamoy soket etogo uzla
+        for nid, info in st.items():
+            if not isinstance(info, dict):
+                continue
+            sock = info.get("sock")
+            if sock is None:
+                continue
+            try:
+                port = int(sock.getsockname()[1])
+            except (OSError, IndexError, TypeError, ValueError):
+                port = 0
+            if port:
+                break
+    if not port:
+        return ""
+    host = _parse_addr(_self_addr())[0]
+    if not host:
+        return ""
+    return "%s:%d" % (host, port)
+
+
+def _direct_pub_set(node_id, endpoint):
+    with _LOCK:
+        pub = dict(_STATE.get("direct_pub", {}) or {})
+        pub[str(node_id)] = str(endpoint)
+        _STATE["direct_pub"] = pub
+        return str(endpoint)
+
+
+def _direct_reader(sock, nid, addr):
+    """Potok pryamogo kanala: prinimaet T_DIRECT i T_RAW ot soseda."""
+    import socket
+    key = None
+    while not _STATE.get("stop"):
+        try:
+            sock.settimeout(1.0)
+            data, sender = sock.recvfrom(65535)
+        except socket.timeout:
+            continue
+        except OSError:
+            break
+        try:
+            key = _keybytes(_secret())
+            msg_type, payload, _rest = _unpack(data, key)
+        except Exception:
+            continue
+        if msg_type is None:
+            continue
+        if msg_type == T_DIRECT:
+            _direct_handshake(bytes(payload), sender)
+            continue
+        if msg_type == T_RAW:
+            st = _direct_state()
+            with _LOCK:
+                info = dict(st.get(nid) or {})
+                info["recv"] = int(info.get("recv", 0) or 0) + 1
+                info["last"] = time.time()
+                info["addr"] = "%s:%d" % sender
+                st[nid] = info
+            _game_stat("direct_received")
+            raw_inject(bytes(payload))
+    try:
+        sock.close()
+    except OSError:
+        pass
+
+
+def _direct_retry(nid, info, addr, nonce):
+    # A-461: novyy HI po uzhe otkrytomu UDP-soketu, bez peresozdaniya socketa.
+    sock = info.get("sock")
+    host, port = _parse_addr(addr)
+    if sock is None or not host or not (0 < int(port or 0) < 65536):
+        return 0
+    me = str(_STATE.get("node_id", "") or "")
+    try:
+        key = _keybytes(_secret())
+    except Exception:
+        return 0
+    frame = _pack(T_DIRECT, ("HI|%s|%s" % (me, nonce)).encode("ascii", "replace"), key)
+    try:
+        sock.sendto(frame, (host, int(port)))
+    except OSError:
+        return 0
+    st = _direct_state()
+    with _LOCK:
+        cur = dict(st.get(nid) or {})
+        cur["started"] = time.time()
+        cur["retries"] = int(cur.get("retries", 0) or 0) + 1
+        cur["up"] = 0
+        st[nid] = cur
+    _game_stat("direct_retry")
+    return 1
+
+
+def _direct_retry_wait(info):
+    """A-474: eksponencialnyi backoff mezhdu popytkami HI (15..300 s)."""
+    tries = int(info.get("retries", 0) or 0)
+    if tries < 0:
+        tries = 0
+    return min(float(DIRECT_RETRY_MAX_S),
+               float(DIRECT_RETRY_MIN_S) * (2 ** min(tries, 4)))
+
+
+def _direct_socket(bind_addr=""):
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    except OSError:
+        pass
+    if bind_addr:
+        try:
+            s.bind((bind_addr, 0))
+        except OSError:
+            pass
+    # A-457: zapоминаem SVOY sobstvennyy UDP-endpoint. Ranee port vyshis'
+    # po zapisi kanala v _STATE["direct"], a tam klyuch - id SOSEDA, poetomu
+    # zapisi pod "ya" nikogda ne bylo, port ne nahodilsya i publichnyy
+    # endpoint ne ukhodil masteru (T_DIRECT MINE|...), a pryamoy kanal ne
+    # podnimalsya: HI ukhodil na mesh-port vmeshesto pryamogo UDP.
+    try:
+        _port = int(s.getsockname()[1])
+    except (OSError, IndexError, TypeError, ValueError):
+        _port = 0
+    if _port:
+        with _LOCK:
+            _STATE["direct_local"] = {"port": _port, "at": time.time()}
+    return s
+
+
+def _direct_state():
+    """{nid: {sock, addr, nonce, up, down, sent, recv, rtt_ms, last, known}}"""
+    with _LOCK:
+        st = _STATE.setdefault("direct", {})
+        if not isinstance(st, dict):
+            st = {}
+            _STATE["direct"] = st
+        return st
+
+
+def _direct_targets(dst):
+    """Kakie pryamye kanaly dolzhny poluchit' etot paket: unicast - tolko
+    vladeletsu adresa, broadcast/multicast/svoy segment - vsem zhivym."""
+    me = str(_STATE.get("node_id", "") or "")
+    bcast = _raw_is_bcast(dst)
+    prefix = "10.%d." % GAME_GROUP
+    my_addr = game_address(me)
+    # A-435-fix3: VSE igrovye adresa konchayutsya na ".1" (10.<gruppa>.<uzel>.1),
+    # poetomu staraya proverka na ".1" schitala LYUBOY unicast "svoim segmentom"
+    # i rassylala paket VSEM kanalam gruppy. Segmentom schitaetsya tolko
+    # broadcast/setevoy adres gruppy (10.<gruppa>.<x>.0 ili .255).
+    own_segment = (bool(my_addr) and dst.startswith(prefix)
+                   and dst != my_addr and _is_segment_addr(dst))
+    out = []
+    with _LOCK:
+        st = dict(_STATE.get("direct", {}) or {})
+    for nid, info in st.items():
+        if not isinstance(info, dict) or nid == me or nid in _NO_GAME_IDS:
+            continue
+        if not info.get("up") or info.get("sock") is None:
+            continue
+        if not bcast and not own_segment and game_address(nid) != dst:
+            continue
+        out.append((nid, info))
+    return bcast, own_segment, out
+
+
+def _game_peers_now():
+    """Zhivye igrovye sosedy po sostoyaniyu sebe: id -> {addr, rtt}. Sluzhebnye
+    uzly (master/test) i uzly bez zhivogo soketa isklyuchayutsya."""
+    me = str(_STATE.get("node_id", "") or "")
+    out = {}
+    with _LOCK:
+        rows = dict(_STATE.get("peers", {}) or {})
+    for nid, row in rows.items():
+        if nid == me or nid in _NO_GAME_IDS:
+            continue
+        if not isinstance(row, dict) or row.get("sock") is None:
+            continue
+        addr = _parse_addr(str(row.get("addr") or ""))
+        if not addr or not addr[0]:
+            continue
+        endpoint = "%s:%d" % (addr[0], int(addr[1] or MESH_PORT))
+        # A-456: esli sosed opublikoval svoy pryamoy UDP-endpoint, berem ego,
+        # a ne mesh-adres: inache HI-datagramma ushla by v port tunnelya.
+        pub = _direct_pub_get(nid)
+        if pub and _parse_addr(pub)[0]:
+            endpoint = pub
+        out[str(nid)] = {"addr": endpoint,
+                         "rtt": int(row.get("rtt_ms", 0) or 0),
+                         "mesh": endpoint != pub}
+    return out
+
+
+def _game_stat(name, delta=1):
+    with _LOCK:
+        st = _STATE.setdefault("game", {})
+        st[name] = int(st.get(name, 0) or 0) + delta
+        return st[name]
+
+
+def _guest_row_for(body):
+    """A-745 (A-745_MARK): lokalnyi pir, kotoromu adresovan paket - gost,
+    podklyuchivshiysya k etomu uzlu. vozvrashchaet (node_id, row, dst) libo None.
+
+    Tolko dlya paketov, adresovannyh NE nam: sobstvennye adresa, kak i ranshe,
+    inzhektitsya v nash adapter."""
+    try:
+        _src, dst = _raw_endpoints(bytes(body or b""))
+    except Exception:
+        return None
+    if not dst:
+        return None
+    me = str(_STATE.get("node_id", "") or "")
+    if dst == game_address(me):
+        return None
+    try:
+        with _LOCK:
+            rows = dict(_STATE.get("peers", {}) or {})
+    except Exception:
+        return None
+    for nid, row in rows.items():
+        nid = str(nid)
+        if nid == me or nid in _NO_GAME_IDS:
+            continue
+        if not isinstance(row, dict) or row.get("sock") is None:
+            continue
+        if game_address(nid) != dst:
+            continue
+        return nid, row, dst
+    return None
+
+
+def _is_segment_addr(dst):
+    """Broadcast/setevoy adres igrovoj gruppy (10.<gruppa>.<x>.0 ili .255).
+    VSE igrovye adresa uzlov konchayutsya na .1, poetomu oni NE segment -
+    inache unicast k sosedu rassylalsya by VSEM kanalam (A-435-fix3)."""
+    octets = str(dst or "").split(".")
+    if len(octets) != 4:
+        return False
+    for o in octets:
+        if not o.isdigit():
+            return False
+    # A-435-fix4: "0" v poslednem oktete - eto setevoy adres /24
+    # (10.<gruppa>.<uzel>.0), on takzhe rassylaetsya vsem, a ne tolko vladeltsu.
+    return octets[2] == "0" or octets[3] in ("0", "255")
+
+
+def _raw_endpoints(pkt):
+    """A-433: (src, dst) iz IPv4-zagolovka. Pusto, esli paket ne IPv4 / korotkij."""
+    if len(pkt) < 20:
+        return "", ""
+    if ((pkt[0] >> 4) & 0x0F) != 4:
+        return "", ""
+    return (socket.inet_ntoa(pkt[12:16]), socket.inet_ntoa(pkt[16:20]))
+
+
+def _raw_is_bcast(dst):
+    """A-433: broadcast/multicast ili adres svoyey podseti — takoy paket
+    rassylaetsya VSEM uzelam gruppy (reshenie vladelca «broadcast yes»)."""
+    if not dst:
+        return False
+    parts = dst.split(".")
+    if len(parts) != 4:
+        return False
+    try:
+        oktets = [int(x) for x in parts]
+    except ValueError:
+        return False
+    if oktets[3] == 255:
+        return True
+    return oktets[0] >= 224          # multicast 224.0.0.0/4
+
+
+def _raw_mine(pkt):
+    # A-461: etot syryj paket mozhno vpustit v nash virtualnyj adapter?
+    # Reley cherez master prinodit vse, chto master rassylal, a master ne znaet,
+    # komu imenno paket. Bez proverki chuzhie unicast-pakety prishli by v nashi
+    # adaptery (i uzhe v sistemnuyu set game-processa).
+    body = bytes(pkt or b"")
+    if len(body) < 20:
+        return False
+    _src, dst = _raw_endpoints(body)
+    if not dst:
+        return False
+    my_addr = game_address(str(_STATE.get("node_id", "") or ""))
+    if not my_addr:
+        return False
+    if dst == my_addr:
+        return True
+    if _raw_is_bcast(dst) or _is_segment_addr(dst):
+        return dst.startswith("10.%d." % GAME_GROUP)
+    return False
+
+
+def _relay_raw(from_id, pkt, key=None):
+    # A-461: master prinimaet syroy paket uzla i rassylaet vsem ostalnym
+    # u zlam krugy otpravitelya. Master v adapter ne pishet - on sluzhebnyy
+    # uzel, igrovykh adresov ne imeet.
+    body = bytes(pkt or b"")
+    # A-483: rely, a ne pryamoy UDP - svist limit DIRECT_UDP_MAX.
+    if not body or len(body) > RELAY_MAX:
+        _game_stat("dropped_bad_len")
+        return 0
+    _src, dst = _raw_endpoints(body)
+    if not dst:
+        _game_stat("dropped_not_ipv4")
+        return 0
+    try:
+        if key is None:
+            key = _keybytes(_secret())
+    except Exception:
+        return 0
+    me = str(_STATE.get("node_id", "") or "")
+    # A-489: master rassylaet tolko adresatu - kak na uzle v raw_send (A-433b).
+    # Bez etogo lyuboy unicast-paket sholsya vseomu pivu (pri N>2 uzlach trafik
+    # mnozhilsya na N-1) i master ne proveral, chto dst voobshche iz gruppy
+    # 10.<GAME_GROUP>.* - to est proverka adresata byla tolko na prieme uzla.
+    bcast = _raw_is_bcast(dst)
+    # A-490: gruppa beretsya iz SAMOGO dst, a ne iz GAME_GROUP mastera:
+    # u mastera svoey igrovoy gruppy net (env AURORA_MESH_GROUP zadayotsya na
+    # uzle), a dst mozhet prinadlezhat lyuboy gruppe.
+    grp = game_group_of(dst)
+    segment = bcast or _is_segment_addr(dst)
+    with _LOCK:
+        peers = dict(_STATE.get("peers", {}) or {})
+    cand = [nid for nid in peers
+            if nid != me and nid != from_id and nid not in _NO_GAME_IDS
+            and isinstance(peers.get(nid), dict)
+            and peers[nid].get("sock") is not None]
+    targets = []
+    if segment or not grp:
+        # broadcast / setevoy adres / vneshniy server - vsem, kak do A-489.
+        targets = cand
+    else:
+        targets = [nid for nid in cand if game_address_in(nid, grp) == dst]
+        if not targets:
+            # A-490: vladeleca adresa sredi_peerov net - NE RVM RELEY, otdayom
+            # vsem (kak do A-489). Priem uzlа otfiltruyet chuzhoy unicast
+            # cherez _raw_mine, a trafik ne pogibayet iz-za metadannyh.
+            targets = cand
+            _game_stat("relay_owner_unknown")
+    sent = 0
+    for nid in targets:
+        row = peers[nid]
+        try:
+            _send_row(row, T_RAW, body, key)
+            sent += 1
+        except OSError:
+            _game_stat("relay_failed")
+            # A-730: soket pira myortv. Ranee zdes byl tolko schetchik, a sam
+            # soket ostavalsya v peerah navsegda, i kazhdyy sleduyushchiy paket
+            # snova pisalsya v nego, schetchik "sent" rast, hotya trafik
+            # nichego ne dostaval. Teper osvobozhdaem soket po uzhe zavedennoy v
+            # proekte semantike A-194/A-200: zapis pira ostaetsya (ee vidit
+            # panel), no pisat v nego bolshe nechego.
+            try:
+                _release_peer_sock(nid, row.get("sock"))
+            except Exception:
+                pass
+            _game_stat("relay_peer_gone")
+            # A-730b: na uzlah takuyu diagnostiku dala A-697 (relay-nosock,
+            # relay-failed), a master pro otkaz molchal VOOBSHCHE - iz-za etogo
+            # schetchiki _game_stat nevidimy i fix neproverim v loge.
+            _diag_throttled("relay-peer-gone", nid,
+                            "soket pira myortv, paket %d B poteryan" % len(body))
+    if sent > 0:
+        _game_stat("relayed")
+    else:
+        # A-730: `relayed` bolshe ne rostet, kogda nikto nichego ne poluchil.
+        # Raneto schetchik uspeha kruzhal pusto. Teper eto chitayemyj otkaz.
+        _game_stat("relay_no_target")
+        # A-730b: i etot otkaz viden v loge, a ne tolko v schetchike.
+        _diag_throttled("relay-no-target", from_id,
+                        "net poluchatelya, %d B poteryano (peers=%d)"
+                        % (len(body), len(peers)))
+    _game_stat("relay_forwarded", sent)
+    _diag("relay-fwd", from_id,
+          "dst=%s bytes=%d sent=%d peers=%d" % (dst, len(body), sent, len(peers)))
+    return sent
+
+
+def _relay_up(pkt, key=None):
+    # A-461: pryamogo kanala net (NAT ne probroshen) - ne voryuem "net marshruta",
+    # a chestno otdayom syryj paket masteru cherez uzhe otkrytyy tunel.
+    # A-697: body schitaem SRAZU, do proverki soketa. Inache novaya diagnostika
+    # v vetve otkaza obrashchalas' k peremennoy, kotoraya eshche ne ob'yavlenа,
+    # i padala s NameError imenno tam, gde dolzhna byla pomogat' s otkazom.
+    body = bytes(pkt or b"")
+    up = _STATE.get("up", {}) or {}
+    sock = up.get("sock")
+    if sock is None:
+        _game_stat("no_relay")
+        # A-697: раньше это был МОЛЧАЛИВЫЙ отказ — только счётчик, ни одной
+        # строки в лог. При обрыве туннеля к мастеру пакеты умирали молча, и
+        # 800 пакетов флуда выглядели как «транзит не работает», хотя причина
+        # была в отсутствии сокета (05.10.2026 измерено: no_relay=800 ровно
+        # по объёму флуда, relayed за это время не вырос). Отказ делаем видимым.
+        _diag_throttled("relay-nosock", _STATE.get("node_id", ""),
+                        "net soketa k masteru, %d Б otbrosheno" % len(body))
+        return 0
+    # A-483: rely, a ne pryamoy UDP - svist limit DIRECT_UDP_MAX.
+    if not body or len(body) > RELAY_MAX:
+        _game_stat("dropped_bad_len")
+        return 0
+    try:
+        if key is None:
+            key = _keybytes(_secret())
+    except Exception:
+        _game_stat("no_relay")
+        return 0
+    try:
+        _send(sock, T_RAW, body, key)
+    except OSError:
+        _game_stat("relay_failed")
+        # A-697: kak i no_relay, sdacha na master ne voskresla molcha.
+        _diag_throttled("relay-failed", _STATE.get("node_id", ""),
+                        "sdacha masteru ne udalas, %d Б poteryano" % len(body))
+        return 0
+    _game_stat("relayed")
+    _diag("relay-up", _STATE.get("node_id", ""), "bytes=%d" % len(body))
+    return 1
+
+
+def _send_license(conn, key, token, credential):
+    """A-307: otdayot licenziyu uzla po tomu zhe tonnelu, chto i politiku.
+
+    Tolko rol master, i tolko s zaprosom samogo uzla: komercicheskaya logika
+    uzela ne dubliiruetsya - beretsya gotovaya api._ext_config (fail-closed).
+    """
+    if _STATE.get("started") != "master":
+        return False
+    token = str(token or "").strip()[:128]
+    credential = str(credential or "").strip()[:256]
+    if not token:
+        return False
+    try:
+        import api
+        code, payload = api._ext_config(token, credential)
+    except Exception:
+        payload = None
+    if not isinstance(payload, dict):
+        payload = {"ok": False, "plan": "free", "blocked": False}
+    try:
+        body = json.dumps(payload, ensure_ascii=True).encode("utf-8")
+    except (TypeError, ValueError):
+        return False
+    if len(body) > MAX_LICENSE_PAYLOAD:
+        return False
+    _send(conn, T_LICENSE, body, key)
+    return True
+
+
+def direct_announce_peers():
+    """Master: rassylayet spisok igrovykh sosedey vsem igrovym uzlam. Spisok
+    podpisan grant-tokenom, starye/pozhiee sosedya otpadayut samostoyatel'no."""
+    # A-453: master-side diagnostics. Until this was logged we only saw
+    # peers_live=0 on the nodes and could not tell whether the master has
+    # no game peers at all, or filters them out, or is "no_game" itself.
+    # A-498: sostoyanie sobiraem odno, pishem tolko pri izmenenii.
+    try:
+        with _LOCK:
+            allp = sorted((_STATE.get("peers", {}) or {}).keys())
+            socks = sum(1 for r in (_STATE.get("peers", {}) or {}).values()
+                        if isinstance(r, dict) and r.get("sock") is not None)
+    except Exception as exc:
+        allp, socks = [], 0
+        _note("peer-list", "ne prochitan: %s" % exc, level="error")
+    peers = _game_peers_now()
+    # A-691: `all=`/`socks=` выше меряют ПИРЫ MESH-ТУННЕЛЯ (_STATE["peers"]),
+    # а игровые прямые каналы живут в _direct_state(). Поэтому на игровом узле
+    # all=0 — это НЕ поломка контура, а просто другой счётчик, и по нему нельзя
+    # судить о транзите. 05.10.2026 на этой строке ловили ложную тревогу двое
+    # (приёмка «peers_live=0» и мой разбор extgate). Добавляю настоящие числа
+    # по прямому контуру; старые поля не убираю, чтобы ничего не сломать.
+    try:
+        _dst = dict(_direct_state() or {})
+        d_all = len(_dst)
+        d_up = sum(1 for i in _dst.values()
+                   if isinstance(i, dict) and i.get("up"))
+        d_sock = sum(1 for i in _dst.values()
+                     if isinstance(i, dict) and i.get("sock") is not None)
+        d_nat = sum(1 for i in _dst.values()
+                    if isinstance(i, dict) and i.get("nat_shared"))
+    except Exception as exc:
+        d_all = d_up = d_sock = d_nat = -1
+        _note("direct-state", "ne prochitan: %s" % exc, level="error")
+    _diag_throttled("game-announce", "",
+                    "enabled=%s no_game=%s role=%s me=%s peers=%d all=%d socks=%d"
+                    " direct=%d d_up=%d d_sock=%d d_nat=%d" % (
+                        game_enabled(), no_game(),
+                        str(_STATE.get("started", "") or "")[:12],
+                        str(_STATE.get("node_id", "") or "")[:24],
+                        len(peers), len(allp), socks,
+                        d_all, d_up, d_sock, d_nat))
+    if not peers:
+        return 0
+    try:
+        key = _keybytes(_secret())
+    except Exception:
+        key = b""
+    # A-480: STABILNYI nonce na paru master<->uzel. Ranee master generiroval
+    # novyy nonce (os.urandom(8)) na KAZHDYY anonim, t.e. kazhdye
+    # DIRECT_INTERVAL_S (5 s). _direct_handshake() na storone uzla otvechaet
+    # tolko na nonce, ravnyy TEKUSHCHEY known_nonce (stroka proverki "not
+    # nonce == info.get("known_nonce)"), a uzel otpravlyaet HI pryamo v
+    # direct_inbox() -> direct_try(). HI uzla mog pryti k sosedu ran'she,
+    # chem sosed obrabotit svoy spisok s tem zhe nonce => otkaz, pryamoy
+    # kanal ne podnimaetsya do ocherdnogo backoff-a (15..300 s).
+    # Teper nonce zhivyet v keshe _STATE["direct_nonce"] pod klyuchem
+    # "<nid>|<addr>" i menyetsya TOLKO pri smene addr soseda; grant
+    # schitaetsya ot (nid, nonce), tak chto ostaetsya validnym.
+    nonce_cache = _STATE.setdefault("direct_nonce", {})
+    parts = []
+    fresh_nonce = 0
+    need_pub = []
+    for nid in sorted(peers):
+        addr = str(peers[nid].get("addr") or "")
+        ckey = "%s|%s" % (nid, addr)
+        nonce = str(nonce_cache.get(ckey, "") or "")
+        if len(nonce) != 16:
+            nonce = os.urandom(8).hex()
+            try:
+                with _LOCK:
+                    stale = [k for k in list(nonce_cache.keys())
+                             if str(k).split("|", 1)[0] == nid and k != ckey]
+                    for k in stale:
+                        nonce_cache.pop(k, None)
+                    nonce_cache[ckey] = nonce
+            except Exception:
+                pass
+            fresh_nonce += 1
+            _game_stat("direct_nonce_new")
+        else:
+            _game_stat("direct_nonce_reuse")
+        # A-481: uzel ne opublikoval svoy pryamoy UDP-endpoint (posle restarta
+        # mastera kesh _direct_pub pust) => prosim perеopublikovat.
+        if peers[nid].get("mesh"):
+            need_pub.append(nid)
+        parts.append("%s|%s|%s|%s" % (nid, addr, nonce,
+                                      _direct_grant(nid, nonce)))
+    text = ";".join(parts).encode("utf-8")
+    if len(text) > MAX_RAW_PAYLOAD:
+        return 0
+    me = str(_STATE.get("node_id", "") or "")
+    sent = 0
+    asked = 0
+    with _LOCK:
+        rows = dict(_STATE.get("peers", {}) or {})
+    for nid, row in rows.items():
+        if nid == me or nid in _NO_GAME_IDS:
+            continue
+        if not isinstance(row, dict) or row.get("sock") is None:
+            continue
+        try:
+            _send_row(row, T_GAME_PEERS, text, key)
+            sent += 1
+            # A-481: prosba perеopublikovat' pryamoy UDP-endpoint
+            if nid in need_pub:
+                _send_row(row, T_DIRECT, b"MINE?", key)
+                asked += 1
+        except OSError:
+            pass
+    if fresh_nonce or asked:
+        _diag_throttled("game-announce", "",
+                        "peers=%d fresh_nonce=%d ask_republish=%d" % (
+                            len(peers), fresh_nonce, asked))
+    if asked:
+        _game_stat("direct_republish_asked")
+    return sent
+
+
+def direct_inbox(msg_type, payload, key=None):
+    """Obrabotka T_GAME_PEERS / T_DIRECT na storone uzla."""
+    # A-455: log what the master actually sent us. Until now the nodes
+    # only reported peers_live=0, so it was impossible to tell whether
+    # the list never arrived, arrived empty, or was rejected.
+    if msg_type == T_GAME_PEERS:
+        try:
+            _kn = _direct_known(payload)[1]
+            _one = list(_kn.values())[0] if _kn else {}
+            _diag_throttled("game-inbox", "",
+                            "payload=%d known=%d sample_addr=%s me=%s" % (
+                                len(bytes(payload)), len(_kn),
+                                str((_one or {}).get("addr", ""))[:32],
+                                str(_STATE.get("node_id", "") or "")[:16]))
+        except Exception as exc:
+            # A-498: ranee zdes bylo `except Exception: pass` - myagkoe zakrytie
+            # skryvalo polomku samoy diagnostiki. Pishem prichinu.
+            _note("game-inbox", "razbor ne udalsya: %s" % exc, level="error")
+        order, known = _direct_known(payload)
+        if not order:
+            return True
+        st = _direct_state()
+        with _LOCK:
+            for nid, info in known.items():
+                st.setdefault(nid, {}).update(
+                    {"known_addr": info["addr"], "known_nonce": info["nonce"],
+                     "known_grant": info["grant"], "known_at": time.time()})
+        direct_try()
+        return True
+    if msg_type == T_DIRECT:
+        raw = bytes(payload)
+        # A-481: master prosit perеopublikovat' pryamoy UDP-endpoint
+        # (soobshchenie "MINE?"). Bez etogo master posle restarta ne znaet
+        # pryamogo adresa uzla i otpravlyaet HI v mesh-port 51821, a pryamoy
+        # kanal mezh igrovymi uzlami ne podnimaetsya voobshche.
+        try:
+            if raw[:5].upper() == b"MINE?":
+                _diag("game-republish", "",
+                      "asked by master me=%s" % (
+                          str(_STATE.get("node_id", "") or "")[:24],))
+                direct_publish(None, force=True)
+                return True
+        except Exception:
+            pass
+        return _direct_handshake(raw)
+    return False
+
+
+def direct_info():
+    """Bezopasnaya svodka pryamyh kanalov (bez sekretov).
+
+    A-755: каждый канал теперь несёт ещё age_master — сколько секунд назад узел
+    последний раз видел мастера (из политики туннеля). Это НЕ примешивается
+    отдельной записью в список пиров: список остаётся списком пиров, иначе
+    потребители, которые ищут запись по node_id, получат чужой элемент.
+    Плашка «работаю на кэше, мастер не отвечает с 14:32» собирается из этих
+    чисел плюс autonomy из mesh.policy_autonomy() (см. game_info).
+    """
+    now = time.time()
+    out = []
+    with _LOCK:
+        st = dict(_STATE.get("direct", {}) or {})
+    me = str(_STATE.get("node_id", "") or "")
+    age_master = -1
+    try:
+        import mesh as _mesh
+        age_master = int(_mesh.policy_autonomy().get("age_s", -1))
+    except Exception:
+        # Сводка не должна падать из-за необязательной связи с mesh.
+        age_master = -1
+    for nid in sorted(st):
+        if nid == me:
+            continue
+        info = st.get(nid)
+        if not isinstance(info, dict):
+            continue
+        last = float(info.get("last", 0) or 0)
+        up = bool(info.get("up"))
+        out.append({"id": nid, "up": up,
+                    "mode": "direct" if up else "relay",
+                    "retries": int(info.get("retries", 0) or 0),
+                    "sent": int(info.get("sent", 0) or 0),
+                    "recv": int(info.get("recv", 0) or 0),
+                    "age": int(max(0.0, now - last)),
+                    "age_master": age_master,
+                    "rtt_ms": int(info.get("rtt_ms", 0) or 0)})
+    return out
+
+
+def direct_loop():
+    """Fonovy potok: obnovlyaet pryamye kanaly, a na mastere - rassylayet spisok
+    sosedey. Odin potok na process, start idetempotentno."""
+    global _DIRECT_LOOP
+    with _LOCK:
+        if _STATE.get("direct_loop"):
+            return False
+        _STATE["direct_loop"] = True
+    def run():
+        while not _STATE.get("stop"):
+            try:
+                # A-454: master samiy ne igrovoj uzel (no_game = True po roli),
+                # no imenno on znaet VSEH igrovykh sosedey i imenno on
+                # rassylaet ikh spisok. Staraya proverka "if not no_game()"
+                # propuskala etot shag, i T_GAME_PEERS voobsche ne uhodila -
+                # pryamoy kanal mezh igrovymi uzlami ne podnimalsya.
+                if not no_game() or str(_STATE.get("started", "") or "") == "master":
+                    direct_announce_peers()
+                direct_try()
+                # A-456: kazhdyy tsikl soobshchaem svoy pryamoy endpoint
+                # (idempotentno - tozhe, i vspyatku ne shlem).
+                try:
+                    direct_publish()
+                except Exception:
+                    pass
+            except Exception:
+                pass
+            time.sleep(DIRECT_INTERVAL_S)
+        with _LOCK:
+            _STATE["direct_loop"] = False
+    threading.Thread(target=run, name="mesh-direct", daemon=True).start()
+    return True
+
+
+def direct_publish(key=None, force=False):
+    """Uzel soobshchaet masteru svoy pryamoy UDP-endpoint (T_DIRECT MINE|...)."""
+    if not game_enabled():
+        return 0
+    me = str(_STATE.get("node_id", "") or "")
+    endpoint = _direct_pub_local()
+    if not endpoint:
+        # A-459: net socketa ili net svoyego porta => nichego publikovat nelzya
+        _diag("game-publish", me, "skip=no-endpoint direct_local=%s" % (
+            _STATE.get("direct_local"),))
+        return 0
+    if _direct_pub_get(me) == endpoint and not force:
+        # A-459: idempotentnyj vyhod, uzhe opublikovano - eto norma, ne bug
+        # A-481: no s "force" eta vetv blokirovala otvet na prosbu mastera
+        # "MINE?" - master posle restarta poteryal _direct_pub i ne znal
+        # pryamogo UDP-adresa uzla, a uzlu bylo nevozmozhno soobshchit'
+        # endpoint snova.
+        _diag("game-publish", me, "skip=already endpoint=%s" % (endpoint,))
+        return 0
+    if key is None:
+        try:
+            key = _secret()
+        except Exception:
+            key = b""
+    if not key:
+        return 0
+    text = ("MINE|%s" % endpoint).encode("ascii", "replace")
+    with _LOCK:
+        rows = dict(_STATE.get("peers", {}) or {})
+    sent = 0
+    cand = 0
+    nogo = 0
+    for nid, row in rows.items():
+        if nid == me or nid in _NO_GAME_IDS:
+            continue
+        cand += 1
+        if not isinstance(row, dict) or row.get("sock") is None:
+            nogo += 1
+            continue
+        try:
+            _send_row(row, T_DIRECT, text, key)
+            sent += 1
+        except OSError:
+            continue
+    # A-460: uzel-KLIENT ne imeet pryamykh mesh-soketov k sosedyam, vse igrovye
+    # uzly - tozhe klienty: _STATE["peers"] u nikh pusto (rows=0 v A-459),
+    # poetemu rassylat MINE| sosedam prosto nechego i pryamoy kanal mezh
+    # igrovymi uzlami nikogda ne podnimalsya. No u uzla VSEGDA est otkrytyy
+    # tunnel k masteru - _STATE["up"]["sock"] (sohranyaetsya v _announce_loop
+    # posle T_HELLO/T_OK). Shlem endpoint emu: master prinimaet T_DIRECT
+    # "MINE|..." v _peer_reader, sohranyaet _direct_pub_set(node_id, ep) i
+    # podstavlyaet opublikovannye adresa v spisok sosedey (T_GAME_PEERS).
+    sent_up = 0
+    up = _STATE.get("up", {}) or {}
+    upsock = up.get("sock") if isinstance(up, dict) else None
+    have_up = 1 if upsock is not None else 0
+    if upsock is not None:
+        try:
+            _send(upsock, T_DIRECT, text, key)
+            sent_up = 1
+        except OSError:
+            sent_up = 0
+    # A-459/A-460: vsegda odna stroka diagnostiki, chtoby bylo vidno PRICHINU
+    _diag("game-publish", me,
+          "endpoint=%s rows=%d cand=%d no_sock=%d sent=%d up=%d sent_up=%d" % (
+              endpoint, len(rows), cand, nogo, sent, have_up, sent_up))
+    if sent or sent_up:
+        _direct_pub_set(me, endpoint)
+        _game_stat("direct_published")
+    return sent + sent_up
+
+
+def direct_send(pkt, key=None):
+    """Otpravit syryy IP-paket PO PRYAMYM KANALAM, a esli pryamogo kanala net
+    (NAT ne probroshen) - chestno cherez master (A-461 rely)."""
+    if not game_enabled():
+        _game_stat("dropped_not_game")
+        return 0
+    if not pkt or len(pkt) > DIRECT_UDP_MAX:
+        _game_stat("dropped_bad_len")
+        return 0
+    _src, dst = _raw_endpoints(pkt)
+    if not dst:
+        _game_stat("dropped_not_ipv4")
+        return 0
+    # A-475: snachala pryamye UDP-kanaly, tolko potom rely cherez master
+    # (reshenie A-432 p.3).
+    sent = _direct_dispatch(pkt, key, dst)
+    if sent:
+        return sent
+    # Ranee zdes bylo "no_route" i myalo - mezh dvumya NAT-uzlami trafik
+    # voobsche ne kholodil.
+    sent_relay = _relay_up(pkt, key)
+    if sent_relay:
+        return sent_relay
+    _game_stat("no_route")
+    return 0
+
+
+def direct_try():
+    """Initsiator nachinaet pryamye kanaly k tem uzlam, kotorye nas zovut."""
+    if not game_enabled():
+        return 0
+    me = str(_STATE.get("node_id", "") or "")
+    st = _direct_state()
+    started = 0
+    with _LOCK:
+        items = [(nid, dict(info)) for nid, info in st.items() if isinstance(info, dict)]
+    for nid, info in items:
+        if nid in _NO_GAME_IDS or nid == me:
+            continue
+        # A-461: staryy gate "me >= nid" znal tolko odin initsiator na paru
+        # ("men'shiy" id zvonit). Esli u nego kanal ne podnyalsya - nikto
+        # bolshe ne probil, a direct_try zhdal DIRECT_IDLE_S (300 s) i pri
+        # zhivom sokete voobsche ne posylal novyy HI. Teper kazhdyy uzel
+        # probivayet svoy kanal, a esli soket uzhe est - prosto posylayet
+        # novyy HI po zhivomu soketu (de-sinxronizatsiya hole punching).
+        if info.get("up") and (time.time() - float(info.get("last", 0) or 0)) < DIRECT_IDLE_S:
+            continue
+        addr = info.get("known_addr") or ""
+        nonce = info.get("known_nonce") or ""
+        if not addr or not nonce:
+            continue
+        # A-474: ranee HI posylalsya KAZHDYH 5 s poka kanal ne podnyalsya,
+        # a pryamoy UDP za odnim NAT nevozmozhen voobsche -> beskonechnyi shum.
+        # Teper: obshchii publichnyi IP -> chestnaya metka "relay only" i bez
+        # popytok; inache eksponencialnyi backoff.
+        if not info.get("up"):
+            if _direct_nat_shared(addr):
+                if not info.get("nat_shared"):
+                    with _LOCK:
+                        cur = dict(st.get(nid) or {})
+                        cur["nat_shared"] = 1
+                        st[nid] = cur
+                    _game_stat("direct_nat_shared")
+                    _diag("direct-nat", nid, "odin publichnyi IP - pryamoy UDP nevozmozhen, tolko relej")
+                continue
+            if info.get("nat_shared"):
+                # A-476: staryy setchik "odin NAT" bolshe ne vernost - publichnyy
+                # IP sosedа ili moy izmenilsya, pryamoy UDP snova v proze.
+                with _LOCK:
+                    cur = dict(st.get(nid) or {})
+                    cur.pop("nat_shared", None)
+                    st[nid] = cur
+                _game_stat("direct_nat_cleared")
+                _diag("direct-nat-clear", nid, "obshchego publichnogo IP net - pryamoy UDP snova proveryaetsya")
+                info = cur
+            wait = _direct_retry_wait(info)
+            if (time.time() - float(info.get("started", 0) or 0)) < wait:
+                continue
+        if info.get("sock") is not None:
+            started += _direct_retry(nid, info, addr, nonce)
+            continue
+        started += _direct_initiate(nid, addr, nonce)
+    return started
+
+
+def game_address(node_id):
+    """A-433: 10.<gruppa>.<uzel>.1 — trebovanie vladelca «10.Gruppa.Uzel.1».
+    Stabilno (sha256 ot id) i ne vMESH_NET, poetomu ne putaetsya s servisami."""
+    node_id = str(node_id or "").strip()
+    if not _ID_RE.match(node_id):
+        return ""
+    digest = hashlib.sha256(("aurora-game:" + node_id).encode("utf-8")).digest()
+    return "10.%d.%d.1" % (GAME_GROUP, 1 + (int.from_bytes(digest[:2], "big") % 254))
+
+
+def game_address_in(node_id, group):
+    """A-490: igrovoy adres uzla v LYUBOY gruppe, ne tolko v svoyey GAME_GROUP.
+
+    Master obsluzhivaet uzly raznyh grupp (AURORA_MESH_GROUP zadayotsya na
+    UZLE, u mastera env obychno net => tam GAME_GROUP=1). Esli master
+    schitaet adres uzla voyey gruppoy, unicast ne sootvetstvuet dst i paket
+    otbrasyvaetsya - imenno eto slomalo rely v A-489."""
+    try:
+        grp = int(group)
+    except (TypeError, ValueError):
+        return ""
+    if not (1 <= grp <= 254):
+        return ""
+    node_id = str(node_id or "").strip()
+    if not _ID_RE.match(node_id):
+        return ""
+    digest = hashlib.sha256(("aurora-game:" + node_id).encode("utf-8")).digest()
+    return "10.%d.%d.1" % (grp, 1 + (int.from_bytes(digest[:2], "big") % 254))
+
+
+def game_enabled():
+    """A-433: igry razresheny tolko tam, gde tunnel vklyuchen i uzel NE sluzhebnyj."""
+    return bool(enabled()) and not no_game()
+
+
+def game_group_of(dst):
+    """A-490: gruppa iz samogo adresa naznacheniya (10.<gr>.<uzel>.1) ili 0.
+
+    0 = eto ne adres igrovogo uzla (vneshniy igrovoj server, broadcast
+    224.x, mul'tikast i t.p.) - takuyu paketrelay ne klassificiruet."""
+    octets = str(dst or "").split(".")
+    if len(octets) != 4:
+        return 0
+    for o in octets:
+        if not o.isdigit():
+            return 0
+    try:
+        first, grp, node = int(octets[0]), int(octets[1]), int(octets[2])
+    except ValueError:
+        return 0
+    if first != 10 or octets[3] != "1":
+        return 0
+    if not (1 <= grp <= 254) or not (1 <= node <= 254):
+        return 0
+    return grp
+
+
+def game_info():
+    """A-433: честное состояние игрового режима для панели.
+
+    A-755: добавлен блок policy — сколько секунд назад мы видели мастера и на
+    сколько суток вообще можем работать без него. Панель по этим числам пишет
+    «работаю на кэше, мастер не отвечает с 14:32» вместо тишины.
+    """
+    with _LOCK:
+        peers = dict(_STATE.get("peers", {}) or {})
+        me = str(_STATE.get("node_id", "") or "")
+    live = [n for n, r in peers.items()
+            if n != me and (r or {}).get("sock") is not None]
+    policy = None
+    try:
+        import mesh as _mesh
+        policy = _mesh.policy_autonomy()
+    except Exception:
+        policy = None
+    return {"enabled": bool(game_enabled()), "group": GAME_GROUP,
+            "mtu": GAME_MTU, "me": me, "my_address": game_address(me),
+            "peers_live": sorted(live), "peers_live_count": len(live),
+            "no_game": bool(no_game()), "stats": game_stats(),
+            "policy": policy}
+
+
+def game_sink(fn):
+    """A-433: adapter (meshtun) registriruet priemnik syryh paketov. Net
+    adaptera — pakety schitayutsya, no nikuda ne idut (cheстno, ne tiho)."""
+    with _LOCK:
+        _STATE.setdefault("game", {})["sink"] = fn
+    return True
+
+
+def game_stats():
+    with _LOCK:
+        return dict(_STATE.get("game", {}))
+
+
+def group_addresses(node_ids):
+    """A-433: vse adresa gruppy + spisok koliziy (odin adres u dvukh uzlov —
+    sozdanie gruppy dolzhno byt' zablokirovano RANO)."""
+    out, seen, dupes = {}, set(), []
+    for nid in node_ids or ():
+        addr = game_address(nid)
+        if not addr:
+            continue
+        if addr in seen:
+            dupes.append(addr)
+            continue
+        seen.add(addr)
+        out[nid] = addr
+    return out, sorted(set(dupes))
+
+
+def no_game():
+    """A-433: sluzhebnyj uzel NE igrovoj. Sluzhebnye - master, test, yavno
+    zadannye v AURORA_MESH_NO_GAME (perechislenie cherez zapyatuyu)."""
+    flag = str(os.environ.get("AURORA_MESH_NO_GAME", "") or "").strip()
+    if flag:
+        return True
+    role = str(os.environ.get("AURORA_MESH_ROLE", "") or "").strip().lower()
+    if role in ("master", "hub", "test"):
+        return True
+    try:
+        nid = str(_STATE.get("node_id", "") or "").strip().lower()
+    except Exception:
+        nid = ""
+    return nid.startswith(_NO_GAME_IDS)
+
+
+def raw_inject(pkt):
+    """A-433: prinyat syryy paket s pita — v virtualnyj adapter (ili schitaem
+    i otpuskaem, esli adaptera net)."""
+    if len(pkt or b"") > MAX_RAW_PAYLOAD:
+        _game_stat("dropped_bad_len")
+        return False
+    # A-745 (A-745_MARK_INJECT): snachala sprashivaem, komu ETO adresovan.
+    # Esli eto ne my, a podklyuchivshiysya k nam gost - otdayom paket emu
+    # po yego sobstvennomu tunnelu, a ne v svoj adapter.
+    _guest = _guest_row_for(bytes(pkt or b""))
+    if _guest is not None:
+        _gid, _grow, _dst = _guest
+        try:
+            _gkey = _keybytes(_secret())
+        except Exception:
+            return False
+        try:
+            _send_row(_grow, T_RAW, bytes(pkt or b""), _gkey)
+        except OSError:
+            _game_stat("guest_forward_failed")
+            _diag_throttled("guest-fwd-failed", _gid, "dst=%s" % _dst)
+            return False
+        _game_stat("guest_forwarded")
+        _diag_throttled("guest-fwd", _gid, "dst=%s bytes=%d" % (_dst, len(pkt or b"")))
+        return True
+    # A-461: rely prinodit pakety ot VSEKH uzlov, a master ne znaet adresata.
+    # Bez proverki "paket moy?" unicast chuzhogo uzla sidel by v nashem
+    # adaptere i ukhodil v set game-processa.
+    if not _raw_mine(bytes(pkt or b"")):
+        _game_stat("relay_not_mine")
+        return False
+    with _LOCK:
+        sink = _STATE.get("game", {}).get("sink")
+    if not callable(sink):
+        _game_stat("no_adapter")
+        return False
+    try:
+        sink(bytes(pkt))
+    except Exception:
+        _game_stat("sink_error")
+        return False
+    _game_stat("received")
+    return True
+
+
+def raw_send(pkt, key=None):
+    """A-433: otpravit syryy IP-paket v igrovuyu podsiet. Unicast — odnoy
+    celi, broadcast/multicast/svoy segment — veerom po VSEM zhe zivym piram
+    (krome sebya). NICHego ne idet cherez master."""
+    if not game_enabled():
+        _game_stat("dropped_not_game")
+        return 0
+    if not pkt or len(pkt) > MAX_RAW_PAYLOAD:
+        _game_stat("dropped_bad_len")
+        return 0
+    _src, dst = _raw_endpoints(pkt)
+    if not dst:
+        _game_stat("dropped_not_ipv4")
+        return 0
+    if key is None:
+        try:
+            key = _STATE.get("secret") or _secret()
+        except Exception:
+            key = b""
+    me = str(_STATE.get("node_id", "") or "")
+    my_addr = game_address(me)
+    bcast = _raw_is_bcast(dst)
+    prefix = "10.%d." % GAME_GROUP
+    # A-433c: "svoy segment" - eto adres gruppy 10.<gruppa>.<uzel>.1, a ne lyuboj
+    # 10.<gruppa>.*: inache chuzhoy adres 10.7.99.9 rassylalsya by vsem.
+    # A-435-fix3: VSE igrovye adresa konchayutsya na ".1" (10.<gruppa>.<uzel>.1),
+    # poetomu staraya proverka na ".1" schitala LYUBOY unicast "svoim segmentom"
+    # i rassylala paket VSEM kanalam gruppy. Segmentom schitaetsya tolko
+    # broadcast/setevoy adres gruppy (10.<gruppa>.<x>.0 ili .255).
+    own_segment = (bool(my_addr) and dst.startswith(prefix)
+                   and dst != my_addr and _is_segment_addr(dst))
+    sent = 0
+    with _LOCK:
+        peers = dict(_STATE.get("peers", {}) or {})
+    for nid, row in peers.items():
+        if nid == me or nid in _NO_GAME_IDS:
+            continue
+        if (row or {}).get("sock") is None:
+            continue
+        # A-433b: unicast idet TOLKO vladeltsu adresa naznacheniya, a veer
+        # (broadcast / multicast / svoy segment) - vsem zhivym uzlam gruppy,
+        # krome sebya. Inache kazhdyy kazhdomu poluchal by chuzhoy trafik.
+        if not bcast and not own_segment and game_address(nid) != dst:
+            continue
+        try:
+            _send_row(row, T_RAW, bytes(pkt), key)
+            sent += 1
+        except OSError:
+            _game_stat("send_failed")
+    _game_stat("sent", sent)
+    _game_stat("bcast" if bcast else ("segment" if own_segment else "unicast"))
+    # A-468: TUN vhodit v syroye obmen cherez raw_send, a ne cherez
+    # direct_send (tot s relyem v kode EST, no ne vyzyvalsya NI ODIN RAZ).
+    # U igrovykh uzlov net zhivykh peer-soketov mezhdu soboy, poetomu sent
+    # vsegda 0, a paket shel molcha v nikhde - releya ne bylo chego vklyuchit.
+    # Teper pri pustom sent paket otdayotsya masteru, a master (_relay_raw)
+    # razoslet ego vsem ostalnym zhilym uzlam gruppy.
+    if sent == 0:
+        # A-475: snachala PRYAMYE UDP-kanaly uzla, i tolko potom rely cherez
+        # master. Do A-475 pryamye kanaly voobsche ne uchastvovali v obmene:
+        # `raw_send` znal tolko mesh peer-sokety, kotorykh u klientov net.
+        sent += _direct_dispatch(bytes(pkt), key, dst)
+    if sent == 0:
+        sent += _relay_up(bytes(pkt), key)
+    return sent

@@ -18,18 +18,18 @@
 ![xray](https://img.shields.io/badge/xray-v26.9.9-blue)
 ![version](https://img.shields.io/badge/version-1.10.0-pink)
 
-**Версия:** `VERSION=1.10.0`, `VERSION_NAME=Кот-вольный` · **Политика:** ревизия 2 (принимается при первом запуске)
+**Версия:** `VERSION=1.10.2`, `VERSION_NAME=Кот-тополог` · **Политика:** ревизия 2 (принимается при первом запуске)
 
 ---
 
 ## 📥 Загрузка
 
-Мяу! Всё лежит в [Release v1.10.0 «Кот-вольный»](https://github.com/efremov-aa/aurora-proxy/releases).
+Мяу! Всё лежит в [Release v1.10.2 «Кот-тополог»](https://github.com/efremov-aa/aurora-proxy/releases).
 
 | Ассет | Что внутри |
 |---|---|
-| `Aurora-v1.10.0-linux.zip` | Linux-версия: модули, `ui/`, `proxy/`, `Dockerfile`, `docker-compose.yml`, systemd-юниты |
-| `Aurora-v1.10.0-windows.zip` | Windows-версия (папка `windows/`): те же модули + `bin/`, `nssm/`, `installer/`, `download_xray.ps1` |
+| `Aurora-v1.10.2-linux.zip` | Linux-версия: модули, `ui/`, `proxy/`, `Dockerfile`, `docker-compose.yml`, systemd-юниты |
+| `Aurora-v1.10.2-windows.zip` | Windows-версия (папка `windows/`): те же модули + `bin/`, `nssm/`, `installer/`, `download_xray.ps1` |
 | `Aurora-Setup-1.10.0.exe` 🪟 | **Установщик для Windows**: ставит Aurora как службу **NSSM «Aurora»**, xray и TG-WS внутри, авто-обновление |
 | `*.sig` | Подпись Ed25519 каждого ассета: авто-обновление не примет неподписанный файл 🐾 |
 

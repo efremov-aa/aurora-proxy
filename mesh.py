@@ -1031,7 +1031,14 @@ def ensure_unique_name():
     """Если имя сервера пусто/дефолтно/занято нодой меша — присваивает случайное уникальное.
 
     Возвращает итоговое имя."""
-    taken = [n.get("name", "") for n in all_nodes()]
+    # A-760: all_nodes() начинается с hub(), а hub() отдаёт имя САМОГО СЕБЯ
+    # (server_name). Поэтому cur всегда находился в taken, условие «имя свободно»
+    # не выполнялось никогда, и при КАЖДОМ старте сервер получал новое
+    # случайное имя — отсюда плывущие «Тёплый-Кот/Пушистый-Кот».
+    # Проверяем занятость только по ЧУЖИМ нодам, свой хаб из выборки убираем.
+    with _LOCK:
+        others = [_mask(n) for n in _NODES]
+    taken = [n.get("name", "") for n in others]
     cur = (config.get("server_name") or "").strip()
     low = [str(x).strip().lower() for x in taken]
     if cur and cur not in ("Home", "-") and cur.lower() not in low:
@@ -1110,9 +1117,16 @@ def auto_join():
         config.log("mesh: auto_join включён, но master_addr не задан — пропуск")
         return
     role = "test" if config.get("master_only", False) else "node"
+    # A-761: объявляем СВОЁ устойчивое имя. Раньше здесь всегда уходило
+    # auto_name=True с пустым именем, и мастер при каждой регистрации выдавал
+    # новое случайное («Тёплый-Кот/Пушистый-Кот»). ensure_unique_name() уже
+    # отработал в run.py ДО старта этой нити, так что имя к этому моменту есть.
+    own = str(config.get("server_name") or "").strip()[:40]
+    if not own or own in ("Home", "-"):
+        own = ensure_unique_name()
     payload = {
-        "name": "",
-        "auto_name": True,
+        "name": own,
+        "auto_name": not bool(own),
         "role": role,
         "host": config.VM_HOST,
         "port": config.XRAY_PORT,
@@ -1333,21 +1347,33 @@ def _policy_targets():
 
 def apply_policy_raw(raw, source=""):
     """A-291: единая точка применения политики мастера (HTTP или туннель).
+    A-755: после успешной проверки подпись кладётся в кэш на диск (30 суток),
+    поэтому сеть переживает мёртвого мастера, и ведётся время последней встречи
+    с мастером для честной плашки в панели.
 
     Сначала строгая проверка подписи и master_id (_policy_valid), потом флаги
     show_mesh/show_subs, потом каталог. Всё fail-closed: невалидная политика
     не трогает настройки. source - только для честного лога.
     """
+    where = source or "http"
+    if not isinstance(raw, dict):
+        config.log("mesh: политика (%s) отброшена: не объект" % where)
+        return False
     core = _policy_valid(raw)
     if not core:
+        config.log("mesh: политика (%s) отброшена: подпись не прошла проверку" % where)
         return False
     changed = False
     for key in ("show_mesh", "show_subs"):
         if core[key] != config.get(key):
             config.set(key, bool(core[key]))
             changed = True
+    global _POLICY_SEEN_AT
+    with _POLICY_CACHE_LOCK:
+        _POLICY_SEEN_AT = time.time()
+    _policy_cache_store(raw)
     if changed:
-        config.log("mesh: применена политика мастера (%s)" % (source or "http"))
+        config.log("mesh: применена политика мастера (%s)" % where)
     catalog = _catalog_valid(raw)
     if catalog:
         mark = "%s|%s|%s" % (
@@ -1362,16 +1388,189 @@ def apply_policy_raw(raw, source=""):
     return True
 
 
+POLICY_CACHE_FILE = os.path.join(config.DATA_DIR, "mesh_policy_cache.json")
+POLICY_AUTONOMY_DAYS = 30
+_POLICY_AUTONOMY_S = POLICY_AUTONOMY_DAYS * 86400
+_POLICY_CACHE_LOCK = threading.RLock()
+_POLICY_SEEN_AT = 0.0
+
+
+def _policy_cache_schema(value):
+    """Кэш: ровно проверенная подпись плюс время её получения."""
+    if not isinstance(value, dict):
+        return None
+    received = value.get("received_at")
+    if isinstance(received, bool) or not isinstance(received, (int, float)):
+        return None
+    if not 0 < float(received) <= time.time() + 60:
+        return None
+    policy = value.get("policy")
+    if not isinstance(policy, dict):
+        return None
+    return {"received_at": float(received), "policy": policy}
+
+
+def _policy_cache_load():
+    """Читает кэш с диска. Молчание тут допустимо только вместе с честным логом
+    вызывающего: файл может отсутствовать (первый запуск) — это не ошибка."""
+    try:
+        raw = json.load(open(POLICY_CACHE_FILE, "r", encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return _policy_cache_schema(raw)
+
+
+def _policy_cache_store(policy):
+    """Сохраняет ПРОВЕРЕННУЮ подпись. Ошибка записи не должна ломать применение:
+    флаги уже применены, кэш — это про выживание при мёртвом мастере."""
+    with _POLICY_CACHE_LOCK:
+        payload = {"received_at": time.time(), "policy": policy}
+        tmp = POLICY_CACHE_FILE + ".tmp"
+        try:
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(payload, f, ensure_ascii=True)
+            os.replace(tmp, POLICY_CACHE_FILE)
+            return True
+        except OSError as exc:
+            config.log("mesh: кэш подписи не записан: %s" % exc)
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            return False
+
+
+def policy_autonomy():
+    """Честная сводка для панели: сколько живём на кэше и когда видели мастера.
+
+    A-756: возраст берётся как max(время в памяти, время файла кэша). Иначе
+    после перезапуска узла память пуста, _POLICY_SEEN_AT = 0, и панель писала
+    «мастер не отвечает» с нуля — хотя кэш на диске свежий и сеть жива.
+
+    Возвращает {"cached", "age_s", "autonomy_s", "master_seen_at"} — панель
+    показывает «работаю на кэше, мастер не отвечает с 14:32», а не врёт.
+    """
+    now = time.time()
+    with _POLICY_CACHE_LOCK:
+        seen = float(_POLICY_SEEN_AT or 0.0)
+    cached = _policy_cache_load()
+    file_seen = float(cached["received_at"]) if cached else 0.0
+    if file_seen > seen:
+        seen = file_seen
+    return {"cached": bool(cached),
+            "age_s": int(max(0.0, now - seen)) if seen else -1,
+            "autonomy_s": _POLICY_AUTONOMY_S,
+            "master_seen_at": int(seen) if seen else 0}
+
+
+def apply_cached_policy():
+    """Поднимает флаги из кэша, когда мастер недоступен.
+
+    Кэш переживает 30 суток и при этом НЕ пересекается со свежестью: подпись
+    всё равно проверяется тем же _policy_valid(), то есть подделать кэш на
+    диске нельзя — HMAC тот же ключ.
+    """
+    cached = _policy_cache_load()
+    if not cached:
+        return False
+    age = time.time() - cached["received_at"]
+    if age > _POLICY_AUTONOMY_S:
+        config.log("mesh: кэш подписи старше %d суток (%d с) — игнорирую"
+                   % (POLICY_AUTONOMY_DAYS, int(age)))
+        return False
+    # Повторная проверка подписи обязательна: файл на диске могли подменить.
+    # _policy_valid откажет и по протухшему expires_at (это правильно: значит
+    # мастер был жив недавно, но кэш мы всё равно храним), поэтому для
+    # автономного режима проверяем подпись и master_id напрямую, а срок берём
+    # свой — 30 суток с момента получения.
+    policy = cached["policy"]
+    master_id = _policy_master_id()
+    key = _policy_key()
+    if not key or not master_id or policy.get("master_id") != master_id:
+        config.log("mesh: кэш подписи от чужого мастера — игнорирую")
+        return False
+    signature = policy.get("signature")
+    if not isinstance(signature, str) or not re.fullmatch(r"[0-9a-f]{64}", signature):
+        config.log("mesh: в кэше нет корректной подписи — игнорирую")
+        return False
+    core = {field: policy.get(field) for field in _POLICY_FIELDS}
+    if not hmac.compare_digest(signature, _policy_signature(core)):
+        config.log("mesh: подпись в кэше не сходится — игнорирую")
+        return False
+    changed = False
+    for flag in ("show_mesh", "show_subs"):
+        value = policy.get(flag)
+        if not isinstance(value, bool):
+            config.log("mesh: в кэше флаг %s не bool — игнорирую кэш" % flag)
+            return False
+        if value != config.get(flag):
+            config.set(flag, value)
+            changed = True
+    if changed:
+        config.log("mesh: работаю на кэше подписи мастера (ей %d суток)"
+                   % max(1, int(age // 86400)))
+    return True
+
+
+_POLICY_OFFLINE = False
+
+
+def _policy_autonomy_toggle(offline):
+    """A-756: переход между «живая политика» и «работаю на кэше», лог только на
+    СМЕНУ состояния.
+
+    Цикл живёт MESH_POLICY_MS (15 с) — четыре раза в минуту. Без троттлинга это
+    240 одинаковых строк в час, и настоящие события снова вытесняются из журнала
+    (та же грабля, что уже закрыта для игрового контура, ROADMAP §2.4).
+
+    offline=True  — мастер не дал применимой политики: поднимаем флаги из кэша.
+    offline=False — мастер ответил и политика принята: возвращаемся к живому режиму.
+
+    Кэш применяется ТОЛЬКО когда мастер не дал применимой политики. Если мастер
+    жив, но подпись не сошлась — это не «сеть жива», а «неизвестно что скачено»:
+    неизвестное указание мы не исполняем и держим последнее подтверждённое
+    состояние, а сам факт виден в логе apply_policy_raw.
+    """
+    global _POLICY_OFFLINE
+    if bool(offline) == bool(_POLICY_OFFLINE):
+        return _POLICY_OFFLINE
+    _POLICY_OFFLINE = bool(offline)
+    if _POLICY_OFFLINE:
+        got = apply_cached_policy()
+        info = policy_autonomy()
+        if got:
+            config.log("mesh: мастер не дал применимой политики — работаю на кэше "
+                       "подписи (ей %d с, автономия %d суток)"
+                       % (info["age_s"], POLICY_AUTONOMY_DAYS))
+        else:
+            config.log("mesh: мастер не дал применимой политики, применимого кэша "
+                       "нет — флаги оставлены как есть")
+    else:
+        config.log("mesh: политика мастера получена, вышел из автономии")
+    return _POLICY_OFFLINE
+
+
 def _policy_loop():
-    """Фоновый опрос мастера: узел применяет подписанные show_mesh/show_subs."""
+    """Фоновый опрос мастера: узел применяет подписанные show_mesh/show_subs.
+
+    A-756: при недоступном мастере поднимаем флаги из кэша — сеть живёт, когда
+    мастер мёртв (пункт 3 ФУНДАМЕНТА).
+    """
     while True:
+        got = False
         try:
             for host, port in _policy_targets():
                 if apply_policy_raw(_fetch_policy(host, port),
                                     "http %s:%d" % (host, port)):
+                    got = True
                     break
         except Exception:
-            pass
+            got = False
+        try:
+            _policy_autonomy_toggle(not got)
+        except Exception as exc:
+            config.log("mesh: переход в автономию не удался: %s: %s"
+                       % (type(exc).__name__, exc))
         time.sleep(MESH_POLICY_MS / 1000.0)
 
 
