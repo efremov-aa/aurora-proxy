@@ -13,6 +13,7 @@ SNI) идёт второй независимый слой: keystream BLAKE2b + 
 nonce-антиреплей и фрагментация с padding.
 """
 
+import errno
 import hmac
 import hashlib
 import ipaddress
@@ -34,7 +35,15 @@ MESH_NET = str(os.environ.get("AURORA_MESH_NET", "10.254.0.0/16")
 MESH_NET_OBJ = ipaddress.ip_network(MESH_NET, strict=False)
 MESH_BASE = 0x0A400000 + 1
 
-MESH_PORT = 51821
+# A-766: порт туннеля из окружения. Мастер обязан слушать на порту, который УЖЕ
+# проброшен на роутере (8444/8445) — проброса 51821 нет, и с жёсткой константой
+# переехать туда было нечем. Ничего нового наружу не открываем.
+# Читаем напрямую: _int_env() в этом файле определён ниже по модулю.
+try:
+    MESH_PORT = max(1, min(65535, int(
+        str(os.environ.get("AURORA_MESH_PORT", "") or "51821").strip())))
+except (TypeError, ValueError):
+    MESH_PORT = 51821
 HEARTBEAT_S = 25
 PEER_TTL_S = 180
 ANNOUNCE_S = 60
@@ -996,6 +1005,48 @@ def _listen(port):
     return listener
 
 
+# A-770: окно ожидания занятого порта. На старте aurora и xray поднимаются вместе,
+# и кто первый занял порт — тот и выиграл. Раньше EADDRINUSE ронял поток
+# молча: туннель просто не появлялся, и в панели это выглядело как «меш выключен».
+# Теперь ждём освобождения и ЧЕСТНО пишем об этом в диагностику.
+LISTEN_RETRY_S = 45
+_LISTEN_WAIT_MAX = 5.0
+# Занятый порт сообщается по-разному: Linux — EADDRINUSE, Windows — EACCES
+# (WSAEACCES 10013). Оба означают одно и то же, и оба лечатся ожиданием.
+_LISTEN_BUSY_ERRNOS = frozenset(
+    x for x in (getattr(errno, "EADDRINUSE", None),
+                getattr(errno, "EACCES", None)) if x is not None)
+
+
+def _listen_wait(port):
+    """_listen с ожиданием занятого порта. Не-«занят» пробрасывает как есть."""
+    deadline = time.time() + LISTEN_RETRY_S
+    delay = 1.0
+    waited = False
+    while True:
+        try:
+            listener = _listen(port)
+        except OSError as exc:
+            if getattr(exc, "errno", None) not in _LISTEN_BUSY_ERRNOS:
+                _note("listen-fail", "port %d: %s" % (port, exc.__class__.__name__),
+                      level="error")
+                raise
+            if time.time() >= deadline:
+                _note("listen-busy", "порт %d занят дольше %d с, туннель не поднят"
+                      % (port, LISTEN_RETRY_S), level="error")
+                raise
+            if not waited:
+                waited = True
+                _note("listen-wait", "порт %d занят другим сервисом, ждём освобождения"
+                      % port)
+            time.sleep(delay)
+            delay = min(delay * 1.5, _LISTEN_WAIT_MAX)
+            continue
+        if waited:
+            _note("listen-ok", "порт %d освобождён, туннель поднят" % port)
+        return listener
+
+
 def _accept_loop(listener, handler):
     while True:
         try:
@@ -1174,7 +1225,7 @@ def _publish_profile():
 def _client_serve():
     key = _secret()
     peer_id = _node_id()
-    listener = _listen(MESH_PORT)
+    listener = _listen_wait(MESH_PORT)
     _STATE["srv"] = listener
     with _LOCK:
         first = not _STATE.get("announce")
@@ -1189,7 +1240,7 @@ def _client_serve():
 
 def _server_serve():
     key = _secret()
-    listener = _listen(MESH_PORT)
+    listener = _listen_wait(MESH_PORT)
     _STATE["srv"] = listener
     with _LOCK:
         first_rtt = not _STATE.get("rtt")
@@ -2262,7 +2313,7 @@ def _ensure_socks(key):
         if listener is not None:
             return
     try:
-        listener = _listen(MESH_PORT + 1)
+        listener = _listen_wait(MESH_PORT + 1)
     except OSError:
         return
     with _LOCK:

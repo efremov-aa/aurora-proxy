@@ -25,6 +25,10 @@ _KEYS = []
 _STATUS = {}
 # блеклист: {uri: {reason, ts}}
 _DEAD = {}
+# A-772: источники, ключи которых cleanup() НИКОГДА не трогает — свои и
+# закреплённые владельцем. Мёртвые ключи любых других источников (github, live)
+# удаляются, иначе они висят в пуле мёртвым грузом месяцами.
+_OWN_SOURCES = ("my", "manual", "pinned")
 
 
 def _canonical_host(value):
@@ -764,7 +768,12 @@ def cleanup():
             src = k.get("source", "github")
             st = get_status(uri)
             deadish = blocked(uri) or st.get("status") in ("bad", "slow", "noip")
-            if src == "github" and deadish:
+            # A-772: мёртвые удаляются у ВСЕХ источников, кроме собственных.
+            # Раньше стояло `src == "github"`, и ключи источника "live" (живой
+            # пул проверяльщика 10.1.0.249) с меткой autodead_* оставались в
+            # пуле навсегда: мёртвый груз, который не убирался месяцами. Свои
+            # (my/manual) и закреплённые (pinned) не трогаем никогда.
+            if deadish and src not in _OWN_SOURCES:
                 removed += 1
                 continue
             keep.append(dict(k))
