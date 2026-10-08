@@ -24,6 +24,13 @@ _LOCK = threading.RLock()
 _NODES = []
 
 MAX_NODES = 256
+# A-827 (Ш8): галки прав узла. ВСЕ три по умолчанию ВЫКЛ — владелец сам
+# решает, можно ли через узел гнать чужой трафик и пускать ли к нему.
+#   allow_relay — «разрешить гнать мой трафик» (узел работает релем для других)
+#   allow_lan   — «разрешить доступ к моей Aurora» (трафик к своей локалке)
+#   no_relay   — узел вообще никогда не рель (мастер/test помечены заранее)
+OPTIN_FLAGS = ("allow_relay", "allow_lan", "no_relay")
+OPTIN_DEFAULTS = {"allow_relay": False, "allow_lan": False, "no_relay": False}
 PING_WORKERS = 32
 PING_MIN_TIMEOUT = 0.25
 PING_MAX_TIMEOUT = 1.0
@@ -418,6 +425,12 @@ def _validate_nodes(raw):
             raise ValueError("mesh added is invalid")
         if "secret" in rec and not isinstance(rec["secret"], str):
             raise ValueError("mesh secret is invalid")
+        # A-827 (Ш8): оптины узла. Строгий bool — «1»/«да»/1 НЕ молча истина,
+        # потому что молчаливая истина в правах означает «трафик пошёл», а это
+        # ровно то, что владелец не давал.
+        for flag in OPTIN_FLAGS:
+            if flag in rec and type(rec[flag]) is not bool:
+                raise ValueError("mesh %s is invalid" % flag)
         if node_id in ids or (host, port) in endpoints:
             raise ValueError("duplicate mesh node")
         ids.add(node_id)
@@ -426,6 +439,16 @@ def _validate_nodes(raw):
         rec["name"] = name
         rec["host"] = host
         rec["region"] = region
+        # A-827 (Ш8): отсутствующую галку ДОПИСЫВАЕМ как выключенную, чтобы
+        # дальше по коду «нет галки» и «выключено» не расходились.
+        for flag in OPTIN_FLAGS:
+            rec.setdefault(flag, OPTIN_DEFAULTS[flag])
+        # Служебные узлы релью быть не могут НИКОГДА (ДОРОЖНАЯ КАРТА §5).
+        # Ставим принудительно, даже если в файле было написано иначе:
+        # поднять флаг на мастере нельзя, это ограничение роли, а не настройка.
+        if role in ("hub", "test"):
+            rec["no_relay"] = True
+            rec["allow_relay"] = False
         out.append(rec)
     return out
 
@@ -535,6 +558,71 @@ def test_node_count():
         return sum(1 for n in _NODES if n.get("role") == "test")
 
 
+def _optins_locked(node):
+    """Галки узла из записи. Отсутствующая = выключена (никогда не истина)."""
+    out = {}
+    for flag in OPTIN_FLAGS:
+        out[flag] = node.get(flag) is True
+    return out
+
+
+def optins(node_id):
+    """Публичные галки узла (или хаба). Секретов здесь нет."""
+    with _LOCK:
+        if node_id == "hub":
+            return {"allow_relay": False, "allow_lan": False, "no_relay": True}
+        for n in _NODES:
+            if n.get("id") == node_id:
+                return _optins_locked(n)
+    return dict(OPTIN_DEFAULTS)
+
+
+def relay_eligible(node_id):
+    """A-827 (Ш8): можно ли назначить узел рельём чужого игрового трафика.
+
+    Fail-closed: узла нет, галки нет, узел служебный — всё равно НЕЛЬЗЯ.
+    Право выдаётся только явной галкой владельца."""
+    return bool(optins(node_id).get("allow_relay"))
+
+
+def lan_eligible(node_id):
+    """A-827 (Ш8): можно ли пускать трафик к локалке узла (его Aurora)."""
+    return bool(optins(node_id).get("allow_lan"))
+
+
+def set_optin(node_id, **flags):
+    """A-827 (Ш8): поставить галку. Возвращает (ok, error).
+
+    Ключи вне OPTIN_FLAGS и не-bool отвергаются: молча выкинутое значение
+    галки прав — это «я думал включено, а оно выключено»."""
+    clean = {}
+    for key, value in flags.items():
+        if key not in OPTIN_FLAGS:
+            return False, "неизвестная галка: %s" % key
+        if type(value) is not bool:
+            return False, "галка %s должна быть true/false" % key
+        clean[key] = value
+    if not clean:
+        return False, "нечего менять"
+    node_id = str(node_id or "").strip()
+    with _LOCK:
+        for n in _NODES:
+            if n.get("id") != node_id:
+                continue
+            role = n.get("role")
+            if role in ("hub", "test"):
+                # A-827: служебный узел релью не становится ни при каком вводе.
+                if clean.get("allow_relay") is True or clean.get("no_relay") is False:
+                    return False, "служебный узел не может быть релью"
+            for flag, value in clean.items():
+                if role in ("hub", "test") and flag == "allow_relay" and value is False:
+                    continue
+                n[flag] = value
+            _save()
+            return True, None
+    return False, "узел не найден"
+
+
 def _valid_peer_host(value, allow_loopback=False):
     host = str(value or "").strip().lower()
     if not host or len(host) > 253:
@@ -611,6 +699,12 @@ def add(name, region, host, port, role=None, auto_name=False, policy_port=None):
             "policy_port": policy_port,
             "added": int(time.time()),
         }
+        # A-827 (Ш8): галки сразу заполнены, служебные узлы — сразу no_relay.
+        # Иначе до перезагрузки узел числился бы «можно рель», хотя роль запрещает.
+        for flag in OPTIN_FLAGS:
+            node[flag] = OPTIN_DEFAULTS[flag]
+        if role in ("hub", "test"):
+            node["no_relay"] = True
         if role == "test":
             import secrets
             node["secret"] = secrets.token_hex(16)

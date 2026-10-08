@@ -1325,6 +1325,88 @@
     }).catch(function () { if (!soft) toast('Сервер недоступен', false); });
   }
 
+  // ================= A-WARP-PUB: rezervnyj kanal Cloudflare WARP =================
+  var WARP_PROBE_BUSY = false;
+  function warpRender(w) {
+    w = (w && typeof w === 'object') ? w : {};
+    var names = { off: 'выключен', auto: 'авто (пустой пул)', on: 'всегда' };
+    var mode = String(w.mode || 'off');
+    var put = function (id, v) { var el = $(id); if (el) el.textContent = String(v); };
+    put('warp-state', w.loaded ? ('конфиг загружен' + (w.noise ? ' + маскировка' : '')) : 'конфиг не загружен');
+    put('warp-mode', names[mode] || mode);
+    put('warp-ep', w.endpoint || '—');
+    put('warp-ip', (w.egress && w.egress !== '-') ? w.egress : 'не проверено');
+    var active = w.active === true;
+    put('warp-active', active ? '✅ активен' : (w.loaded ? 'ждёт' : '—'));
+    var hint = $('warp-note');
+    if (hint) {
+      hint.textContent = !w.loaded
+        ? 'Сгенерируй конфиг на ПК (Cloudflare WARP generator, вкладка Xray) и загрузи сюда.'
+        : (active ? 'WARP сейчас несёт трафик.' : 'Трафик идёт через обычные ключи; WARP поднимется сам в режиме «авто».');
+    }
+    var off = $('warp-off'), au = $('warp-auto'), on = $('warp-on');
+    if (au) au.className = 'btn small' + (mode === 'auto' ? ' primary' : '');
+    if (on) on.className = 'btn small' + (mode === 'on' ? ' primary' : '');
+    if (off) off.className = 'btn small' + (mode === 'off' ? ' primary' : '');
+  }
+  function warpUpload() {
+    var inp = $('warp-file');
+    if (!inp) return toast('нет поля загрузки', false);
+    inp.value = '';
+    inp.click();
+  }
+  function warpOnFile(ev) {
+    var f = ev && ev.target && ev.target.files && ev.target.files[0];
+    if (!f) return;
+    if (f.size > 262144) return toast('файл больше 256 КБ', false);
+    var rd2 = new FileReader();
+    toast('Загрузиваю конфиг WARP...', true);
+    rd2.onload = function () {
+      postJSON('/api/warp/upload', { config: String(rd2.result || '') }).then(function (j) {
+        if (j && j.ok) {
+          toast('WARP-конфиг принят, endpoint ' + (j.endpoint || '?'), true);
+          warpRender(j);
+        } else {
+          toast('WARP: конфиг не принят (' + ((j && (j.error || j.msg)) || 'нет ответа') + ')', false);
+        }
+        loadState(true);
+      });
+    };
+    rd2.onerror = function () { toast('не удалось прочитать файл', false); };
+    rd2.readAsText(f);
+  }
+  function warpMode(mode) {
+    var names = { off: 'выключен', auto: 'авто (пустой пул)', on: 'всегда' };
+    toast('Переключаю WARP: ' + (names[mode] || mode) + '...', true);
+    postJSON('/api/warp/mode', { mode: String(mode || 'off') }).then(function (j) {
+      if (j && j.ok) { toast('Режим WARP: ' + (j.mode || mode), true); warpRender(j); }
+      else toast('WARP: режим не переключился', false);
+      loadState(true);
+    });
+  }
+  function warpProbe() {
+    if (WARP_PROBE_BUSY) return toast('проба WARP уже идёт', false);
+    WARP_PROBE_BUSY = true;
+    toast('Пробую WARP: временный канал (~15 с)...', true);
+    postJSON('/api/warp/probe', {}).then(function () {
+      setTimeout(function () {
+        getJSON('/api/warp').then(function (w) {
+          warpRender(w);
+          var ok = w && w.egress && w.egress !== '-';
+          toast(ok ? ('WARP работает, выход ' + w.egress) : ('WARP: выхода нет (' + ((w && w.reason) || 'проба без результата') + ')'), !!ok);
+          WARP_PROBE_BUSY = false;
+        }).catch(function () { WARP_PROBE_BUSY = false; });
+        loadState(true);
+      }, 18000);
+    }).catch(function () { WARP_PROBE_BUSY = false; });
+  }
+  function warpClear() {
+    if (!confirm('Удалить загруженный WARP-конфиг?')) return;
+    postJSON('/api/warp/clear', {}).then(function (j) {
+      toast(j && j.ok ? 'WARP-конфиг удалён' : ('WARP: ' + ((j && j.error) || 'не удалился')), !!(j && j.ok));
+      loadState(true);
+    });
+  }
   function renderAll(soft) {
     try { applyExtGate(); } catch (e) { }  // A-111: гейт PRO
     var S = V.S || {};
@@ -1333,6 +1415,7 @@
     renderHero(S);
     renderPills();
     renderKeys(S);
+    warpRender(S.warp);
     renderDevices(S);
     renderConnect(S);
     renderRu(S);
@@ -2714,7 +2797,12 @@ function loadTG() {
     'sub-copy': function (t) { subCopy(t.getAttribute('data-copy-what') || 'link'); },
     'ext-buy': function () { window.extBuy(); },
     'ext-download': function (t) { window.extDownload(t.getAttribute('data-target') || 'chrome'); },
-    'log-load': function () { window.loadLog(); }
+    'log-load': function () { window.loadLog(); },
+    // A-WARP-PUB: rezervnyj kanal WARP
+    'warp-upload': function () { warpUpload(); },
+    'warp-probe': function () { warpProbe(); },
+    'warp-mode': function (t) { warpMode(t.getAttribute('data-mode') || 'off'); },
+    'warp-clear': function () { warpClear(); }
   };
   function actTarget(ev) {
     var node = ev && ev.target;

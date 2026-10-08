@@ -19,6 +19,33 @@ import updater
 from api import serve
 
 
+def _start_game_tun():
+    """A-816: TUN-подсеть игровых узлов, отдельный флаг game_tun.
+
+    Вызывается ТОЛЬКО после успешного meshtunnel.start(): game_enabled() сам
+    проверяет и туннель, и что узел не служебный, но порядок важен - без
+    поднятого туннеля адаптер всё равно некуда слать пакеты.
+
+    По умолчанию выключено: на Windows нужен WinTun, без него честный отказ в лог.
+    """
+    if not config.get("game_tun", False):
+        return
+    try:
+        import meshtun
+    except Exception as e:
+        config.log("game-tun: модуль недоступен: %s" % type(e).__name__)
+        return
+    try:
+        ok, why = meshtun.start()
+    except Exception as e:
+        config.log("game-tun: не запущен: %s: %s" % (type(e).__name__, e))
+        return
+    if ok:
+        config.log("game-tun: TUN-подсеть игровых узлов запущена")
+    else:
+        config.log("game-tun: не запущена: %s" % why)
+
+
 def _boot():
     """Стартовая последовательность: настройки -> ключи -> sync -> фоновые треды."""
     config.load_settings()
@@ -48,6 +75,7 @@ def _boot():
         try:
             if meshtunnel.start(os.environ.get("AURORA_MESH_ROLE", "")):
                 config.log("mesh: relay-туннель запущен")
+                _start_game_tun()
         except Exception as e:
             config.log("mesh: relay-туннель не запущен: %s" % type(e).__name__)
     pool.cleanup()  # убрать мёртвые github-ключи при старте

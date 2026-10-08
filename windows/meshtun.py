@@ -279,87 +279,161 @@ def _load_wintun():
     if dll is None:
         _W32["reason"] = "net wintun.dll"
         raise OSError(_W32["reason"])
-    dll.WintunOpenAdapter.argtypes = [ctypes.c_void_p]
+    dll.WintunOpenAdapter.argtypes = [ctypes.c_wchar_p]
     dll.WintunOpenAdapter.restype = ctypes.c_void_p
     dll.WintunCloseAdapter.argtypes = [ctypes.c_void_p]
-    dll.WintunGetAdapterLUID.argtypes = [ctypes.c_void_p,
-                                         ctypes.POINTER(LUID)]
-    dll.WintunGetAdapterLUID.restype = ctypes.c_ulong
-    dll.WintunStartSession.argtypes = [ctypes.c_void_p]
-    dll.WintunStartSession.restype = ctypes.c_ulong
+    dll.WintunCloseAdapter.restype = None
     dll.WintunEndSession.argtypes = [ctypes.c_void_p]
-    dll.WintunReceiveEvent.argtypes = [ctypes.c_void_p]
-    dll.WintunReceiveEvent.restype = ctypes.c_void_p
-    dll.WintunSendPacket.argtypes = [ctypes.c_void_p, ctypes.c_void_p,
-                                     ctypes.c_size_t]
+    dll.WintunEndSession.restype = None
+    dll.WintunSendPacket.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
     dll.WintunSendPacket.restype = ctypes.c_ulong
-    dll.WintunReleaseBuffer.argtypes = [ctypes.c_void_p]
-    dll.WintunReleaseBuffer.restype = None
+    # A-818 (IZMERENO): postavlyaemaya DLL - WinTun 1.x, ona NE eksportiruet
+    # WintunReceiveEvent/WintunReleaseBuffer. Staryj kod blindno bindil ih i
+    # pal s AttributeError "function 'WintunReceiveEvent' not found" - to est
+    # adapter ne mog podnyat'sya VOOBSHCHE, a ne iz-za prav. Teper API
+    # opredelyaetsya po NAЛИЧИYU eksportov, i nedostayushchie - chestnyy otkaz.
+    has_new = (hasattr(dll, "WintunReceivePacket")
+               and hasattr(dll, "WintunReleaseReceivePacket"))
+    has_old = (hasattr(dll, "WintunReceiveEvent")
+               and hasattr(dll, "WintunReleaseBuffer"))
+    if has_new:
+        dll.WintunStartSession.argtypes = [ctypes.c_void_p]
+        dll.WintunStartSession.restype = ctypes.c_void_p      # SESSION*
+        dll.WintunGetReadWaitEvent.argtypes = [ctypes.c_void_p]
+        dll.WintunGetReadWaitEvent.restype = ctypes.c_void_p  # HANDLE sobitiya
+        dll.WintunReceivePacket.argtypes = [ctypes.c_void_p,
+                                            ctypes.POINTER(ctypes.c_size_t)]
+        dll.WintunReceivePacket.restype = ctypes.c_void_p
+        dll.WintunReleaseReceivePacket.argtypes = [ctypes.c_void_p,
+                                                   ctypes.c_void_p]
+        dll.WintunReleaseReceivePacket.restype = None
+        if hasattr(dll, "WintunAllocateSendPacket"):
+            dll.WintunAllocateSendPacket.argtypes = [ctypes.c_void_p,
+                                                     ctypes.c_size_t]
+            dll.WintunAllocateSendPacket.restype = ctypes.c_void_p
+        _W32["api"] = "1.x"
+    elif has_old:
+        dll.WintunStartSession.argtypes = [ctypes.c_void_p]
+        dll.WintunStartSession.restype = ctypes.c_ulong       # HANDLE sessii
+        dll.WintunReceiveEvent.argtypes = [ctypes.c_void_p]
+        dll.WintunReceiveEvent.restype = ctypes.c_void_p
+        dll.WintunSendPacket.argtypes = [ctypes.c_void_p, ctypes.c_void_p,
+                                         ctypes.c_size_t]
+        dll.WintunReleaseBuffer.argtypes = [ctypes.c_void_p]
+        dll.WintunReleaseBuffer.restype = None
+        _W32["api"] = "0.x"
+    else:
+        _W32["reason"] = ("wintun.dll bez WintunReceivePacket i "
+                          "WintunReceiveEvent - neizvestnaya versiya")
+        raise OSError(_W32["reason"])
+    # A-820 (IZMERENO): adaptera v sisteme net, a kto-to ego sozdavat dolzhen.
+    if hasattr(dll, "WintunCreateAdapter"):
+        dll.WintunCreateAdapter.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p,
+                                            ctypes.c_wchar_p]
+        dll.WintunCreateAdapter.restype = ctypes.c_uint64
     _W32["dll"] = dll
     _W32["loaded"] = True
     return dll
 
 
-def _wintun_luid(dll):
-    """Ishet nash adapter po imeni cherez registry + WintunGetAdapterLUID."""
-    import winreg  # tolko pod Windows
-    key = r"SYSTEM\CurrentControlSet\Control\Class" \
-          r"\{4D36E972-E325-11CE-BFC1-08002BE10318}"
-    found = None
-    with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key) as root:
-        idx = 0
-        while True:
-            try:
-                sub = winreg.EnumKey(root, idx)
-            except OSError:
-                break
-            idx += 1
-            try:
-                with winreg.OpenKey(root, sub) as sk:
-                    try:
-                        guid = winreg.QueryValueEx(sk, "NetCfgInstanceId")[0]
-                    except OSError:
-                        continue
-                    try:
-                        alias = winreg.QueryValueEx(sk, "NetFriendlyName")[0]
-                    except OSError:
-                        alias = ""
-            except OSError:
-                continue
-            if str(alias).lower() != IF_NAME.lower():
-                continue
-            g = ctypes.create_string_buffer(str(guid).encode("ascii"))
-            luid = LUID()
-            rc = dll.WintunGetAdapterLUID(g, ctypes.byref(luid))
-            if rc == 0:
-                found = luid
-            break
-    if found is None:
-        raise OSError("adapter %s ne nayden v WinTun" % IF_NAME)
-    return found
-
-
 def _open_windows(name):
-    """Otkryvaet WinTun i startuet sessiyu. Vernet (adapter, session)."""
+    """A-819/A-820/A-826: otkryvaet adaptery PO IMENI.
+
+    Izmereno na zhivoy mashine s povyshsheniem (8 progonov, vse fakty):
+    - pervyy argument WintunCreateAdapter stanovitsya IMENEM adaptera (peredali
+      binarnyy GUID - poluchili krakozyashchiy alias; peredali tekst GUID - alias
+      stal raven etomu tekstu; peredali "aurora" - alias stal "aurora");
+    - GUID interfeysa generiruet sam draiver, "svoi" GUID ne prinimaetsya;
+    - WintunOpenAdapter(ime) vozvrashchaet rabochiy handle;
+    - WintunStartSession ne otrabotaly NI ODNOY iz pyati proverennykh
+      konvenciy (handle ukazatelem, handle znachением, handle+flag, imya,
+      imya+flag) - vsegda ERROR_INVALID_PARAMETER(87). Podnyatie interfeysa
+      cherez "netsh interface set interface admin=enabled" ne pomoglo.
+      Versiya draivera prilsa: WintunGetRunningDriverVersion = 14 (sovmesto).
+
+    Poetomu sozdat adaptER avtomaticheski MY NEDOLZNY: izmereno, chto sozdanie
+    prokhodit, no sessiya vse ravno ne otkryvaetsya, a v sisteme ostanetsya
+    neprigodnyy tunnel. Trogat' mashinu clienta bez polzy ne imeem prava -
+    luchshe chestnyy otkaz i sozdanie otlozheno na installer (zadacha otdelnaya).
+    """
     dll = _load_wintun()
-    luid = _wintun_luid(dll)
-    adapter = dll.WintunOpenAdapter(ctypes.byref(luid))
+    adapter = dll.WintunOpenAdapter(str(name))
     if not adapter:
-        raise OSError("WintunOpenAdapter ne udalas")
+        raise OSError("net adaptera %s - sozdat ego ustanovshchik Aurora "
+                      "(trebuetsya prava administratora)" % name)
     try:
         session = dll.WintunStartSession(adapter)
-        if session in (0, 0xFFFFFFFF):
+        # A-818: 1.x vozvrashchaet SESSION* (0 = oshibka), 0.x - HANDLE,
+        # gde 0xFFFFFFFF tozhe oshibka. Odin universalnyy prover ne podhodil.
+        if _W32.get("api") == "1.x":
+            if not session:
+                raise OSError("WintunStartSession vernul 0")
+        elif session in (0, 0xFFFFFFFF):
             raise OSError("WintunStartSession rc=%s" % session)
     except Exception:
         dll.WintunCloseAdapter(adapter)
         raise
+    _log("adapter %s otkryt" % name)
     return dll, adapter, session
 
 
 # --- obmen paketami --------------------------------------------------------
 
+def _win_send(pkt):
+    """A-818/A-821: zapis v WinTun cherez AllocateSendPacket + SendPacket.
+
+    V API 1.x net "WintunSendPacket(session, buf, size)" - paket peredavaetsya
+    cherez bufer, kotoryy vydet sam WinTun. Staraya troika argumentov est
+    tolko v 0.x, i s nejey v 1.x lомается.
+    """
+    dll = _W32.get("dll")
+    adapter = _STATE.get("adapter")
+    session = _STATE.get("session")
+    if not dll or not adapter or not session:
+        _stat("no_session")
+        return False
+    payload = bytes(pkt or b"")
+    if not payload:
+        _stat("bad_len")
+        return False
+    try:
+        if _W32.get("api") == "1.x":
+            alloc = getattr(dll, "WintunAllocateSendPacket", None)
+            if not callable(alloc):
+                _stat("no_alloc")
+                return False
+            buf = alloc(session, len(payload))
+            if not buf:
+                _stat("alloc_failed")
+                return False
+            ctypes.memmove(buf, payload, len(payload))
+            rc = dll.WintunSendPacket(adapter, buf)
+            if rc != 0:
+                _stat("send_failed")
+                _log("WintunSendPacket rc=%d" % int(rc))
+                return False
+            _stat("sent")
+            return True
+        rc = dll.WintunSendPacket(session, ctypes.create_string_buffer(payload),
+                                  len(payload))
+        _stat("sent")
+        return int(rc) == 0
+    except Exception as exc:
+        _stat("write_error")
+        _set(error="win_send: %s" % exc)
+        _log("zapis v WinTun ne udalas: %s" % exc)
+        return False
+
 def on_packet(pkt):
-    """Priymnik dlya meshtunnel.game_sink(): pishet syroy paket v adapter."""
+    """Priymnik dlya meshtunnel.game_sink(): pishet syroy paket v adapter.
+
+    A-821: na Windows fd po usloviyu raven 0 (adaptер ne FD), poetu staraya
+    proverka `if not fd` otvergala OTKAZ na kazhdyi paket - to est obratnyy
+    put' "relay -> uzhel" ne pisal NICHEGO. Teper kazhdaya platforma idet
+    svoim putyom, i Windows-real bez prostogo "net fd".
+    """
+    if _STATE.get("mode") == "wintun":
+        return _win_send(pkt)
     fd = _STATE.get("fd")
     if not fd:
         _stat("no_fd")
@@ -474,12 +548,49 @@ def _pump_posix(fd):
     _log("petlya Linux adaptera ostanovlena")
 
 
-def _pump_windows(dll, session):
+def _pump_windows(dll, adapter, session):
+    """A-822: start() peredavat (dll, adapter, session), a staraya funksiya
+    prinimala dva - tred umer by s TypeError tiho, kak nichego ne sluchalos.
+
+    A-818: dve raznye petli dlya dvuh versiy WinTun. V 1.x sessiya - ukazatel
+    na strukturu, sobitie chiteniya beretsya otdelno, a razmer paketa
+    vozvrashchaetsya cherez argument; v 0.x sessiya sama sobytie.
+    """
     k32 = ctypes.WinDLL("kernel32", use_last_error=True)
     k32.WaitForSingleObject.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
     k32.WaitForSingleObject.restype = ctypes.c_ulong
     WAIT_OBJECT_0 = 0
     WAIT_TIMEOUT = 258
+
+    if _W32.get("api") == "1.x":
+        event = dll.WintunGetReadWaitEvent(session)
+        if not event:
+            _set(error="net sobytiyachteniya WinTun")
+            _log("WintunGetReadWaitEvent vernul 0 - petlya ne zapushchena")
+            return
+        while not _STATE.get("stop"):
+            rc = k32.WaitForSingleObject(event, WIN_EVENT_TIMEOUT_MS)
+            if rc == WAIT_TIMEOUT:
+                continue
+            if rc != WAIT_OBJECT_0:
+                break
+            size = ctypes.c_size_t(READ_MAX)
+            buf = dll.WintunReceivePacket(session, ctypes.byref(size))
+            if not buf:
+                if ctypes.get_last_error() in (1223, 995):
+                    break            # sessiya otmenena - eto normalno
+                time.sleep(POLL_S)
+                continue
+            try:
+                pkt = ctypes.string_at(buf, int(size.value))
+                if pkt:
+                    _stat("read")
+                    _outbound(pkt)
+            finally:
+                dll.WintunReleaseReceivePacket(session, buf)
+        _log("petlya WinTun (1.x) ostanovlena")
+        return
+
     while not _STATE.get("stop"):
         rc = k32.WaitForSingleObject(session, WIN_EVENT_TIMEOUT_MS)
         if rc == WAIT_TIMEOUT:
@@ -501,6 +612,7 @@ def _pump_windows(dll, session):
             _outbound(pkt)
         finally:
             dll.WintunReleaseBuffer(buf)
+    _log("petlya WinTun (0.x) ostanovlena")
 
 
 # --- start / stop ----------------------------------------------------------
@@ -543,8 +655,11 @@ def start(addr="", mtu=None, use_ip=True):
     try:
         if os.name == "nt":
             dll, adapter, session = _open_windows(IF_NAME)
+            # A-821: adapter sohranyaem v sostoyanii - bez nego obratnyy put'
+            # "relay -> uzhel" ne imel by chem zapisat paket (on_packet).
             _set(mode="wintun", ifname=IF_NAME, addr=addr, mtu=mtu, opened=True,
-                 error="", fd=0, session=session)
+                 error="", fd=0, session=session, adapter=adapter,
+                 api=_W32.get("api", ""))
             target = (dll, adapter, session)
             runner = _pump_windows
         else:

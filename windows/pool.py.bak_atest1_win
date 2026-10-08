@@ -4,7 +4,6 @@
 import ipaddress
 import json
 import os
-import time
 import re
 import socket
 import threading
@@ -30,23 +29,6 @@ _DEAD = {}
 # закреплённые владельцем. Мёртвые ключи любых других источников (github, live)
 # удаляются, иначе они висят в пуле мёртвым грузом месяцами.
 _OWN_SOURCES = ("my", "manual", "pinned")
-
-# A-TEST-1: АВТОМАТИЧЕСКИЙ БЛЕКЛИСТ СТАРЕЕТ.
-# Раньше метки autodead_* были вечными, и это полностью запирало пул: refresh
-# пропускал такой ключ как "blocked", а keytest проверяет только ключи, которые
-# лежат В ПУЛЕ (cleanup мёртвые оттуда выбрасывает). Итог — ключ, однажды не
-# ответивший egress-ом, больше никогда не мог быть перепроверен, а пул за
-# несколько дней пустел полностью, хотя источник продолжал отдавать тысячи
-# валидных ключей ("из интернета не берёт ниоткуда").
-# Теперь авто-метка старше DEAD_AUTO_TTL_S перестаёт быть приговором: refresh
-# вправе снять её и вернуть ключ в пул на перепроверку.
-# user_removed — ВЕЧНЫЙ (правило владельца: удалённое не возвращается).
-try:
-    DEAD_AUTO_TTL_S = int(str(os.environ.get("AURORA_DEAD_TTL_S", "") or "").strip()) or 3 * 86400
-except (TypeError, ValueError):
-    DEAD_AUTO_TTL_S = 3 * 86400
-_AUTO_DEAD_REASONS = ("autodead_conn", "autodead_noip", "autodead_ping",
-                      "autodead_liveness", "autodead_unverified")
 
 
 def _canonical_host(value):
@@ -426,29 +408,19 @@ def set_keys(keys):
 def add_key(key, force=False):
     """Добавляет ключ в пул. Возвращает 'added' / 'exists' / 'limit' / 'blocked'.
 
-    Ключи из блеклиста (dead.json) НЕ добавляются автоматически :
-    мёртвые не возвращаются. ИСКЛЮЧЕНИЕ (A-TEST-1): авто-метка старше
-    DEAD_AUTO_TTL_S протухла — снимаем её и берём ключ на перепроверку.
-    user_removed протухнуть не может. force=True (ручное добавление своих)
-    разрешает отмену любой метки."""
+    Ключи из блеклиста (dead.json) НЕ добавляются автоматически — правило юзера:
+    мёртвые не возвращаются. force=True (ручное добавление своих) разрешает отмену."""
     global _KEYS, _STATUS, _DEAD
     uri = _norm_uri(key.get("uri", ""))
     with _LOCK:
         dead_key = _record_key(_DEAD, uri, "dead")
         status_key = _record_key(_STATUS, uri, "status")
+        if dead_key in _DEAD and not force:
+            return "blocked"
         for k in _KEYS:
             if _norm_uri(k.get("uri", "")) == uri:
                 return "exists"
-        # метку снимаем ТОЛЬКО если ключ действительно будет добавлен, иначе
-        # память разошлась бы с файлом (метка снята в RAM, на диске осталась)
-        revived = False
-        if dead_key in _DEAD and not force:
-            if not _dead_stale_locked(dead_key):
-                return "blocked"
-            if len(_KEYS) >= config.MAX_USER_KEYS:
-                return "limit"
-            revived = True
-        elif len(_KEYS) >= config.MAX_USER_KEYS:
+        if len(_KEYS) >= config.MAX_USER_KEYS:
             return "limit"
         keys_local = list(_KEYS)
         status_local = dict(_STATUS)
@@ -456,21 +428,18 @@ def add_key(key, force=False):
         if force:
             dead_local.pop(dead_key, None)
             status_local.pop(status_key, None)
-        elif revived:
-            dead_local.pop(dead_key, None)
-            status_local.pop(status_key, None)
         keys_local.append(_ensure_tag(dict(key)))
     old_keys = list(_KEYS)
     old_status = dict(_STATUS)
     old_dead = dict(_DEAD)
     rollback = [(KEYS_FILE, old_keys)]
-    if force or revived:
+    if force:
         rollback.extend((
             (DEAD_FILE, _opaque_map(old_dead, "dead")),
             (STATUS_FILE, _opaque_map(old_status, "status")),
         ))
     try:
-        if force or revived:
+        if force:
             crypt.save_json(DEAD_FILE, _opaque_map(dead_local, "dead"))
             crypt.save_json(STATUS_FILE, _opaque_map(status_local, "status"))
         crypt.save_json(KEYS_FILE, keys_local)
@@ -485,7 +454,6 @@ def add_key(key, force=False):
     _STATUS = status_local
     _DEAD = dead_local
     return "added"
-
 
 
 def remove_key(uri):
@@ -530,6 +498,7 @@ def set_status(uri, **fields):
 
 
 def status_mark(uri, status, ping_ms=0, exit_ip="-", sites_ok=0, reason=""):
+    import time
     fields = dict(status=status, ping_ms=ping_ms, exit_ip=exit_ip,
                   sites_ok=sites_ok, ts=int(time.time()))
     if reason:
@@ -557,73 +526,8 @@ def prune_status():
 
 
 # --- блеклист мёртвых ---
-def _dead_stale_locked(dead_key, dead_map=None):
-    """Авто-метка блеклиста старше TTL (зв��нок только под _LOCK).
-
-    user_removed (и любой не-авто-метки) НИКОГДА не стареет — это решение
-    владельца, его не переигрываем. Битый/пустой ts считаем протухшим."""
-    rec = (dead_map if dead_map is not None else _DEAD).get(dead_key)
-    if not isinstance(rec, dict):
-        return False
-    if rec.get("reason") not in _AUTO_DEAD_REASONS:
-        return False
-    try:
-        ts = int(rec.get("ts") or 0)
-    except (TypeError, ValueError):
-        return True
-    if ts <= 0:
-        return True
-    return (int(time.time()) - ts) >= DEAD_AUTO_TTL_S
-
-
-def dead_stale(uri):
-    """True — ключ помечен авто-блеклистом и метка старше TTL (можно вернуть)."""
-    with _LOCK:
-        return _dead_stale_locked(_record_key(_DEAD, uri, "dead"))
-
-
-def revive_stale(uris):
-    """Снять протухшие авто-метки блеклиста ПАЧКОЙ (одна запись файла).
-
-    Поштучный dead_remove() на тысяче ключей писал бы файл тысячу раз —
-    ровно та гонка с .tmp, что уже чинилась (A-DETECT-4). Возвращает число
-    снятых меток."""
-    global _DEAD, _STATUS
-    uris = list(uris or [])
-    if not uris:
-        return 0
-    with _LOCK:
-        dead_local = dict(_DEAD)
-        status_local = dict(_STATUS)
-        revived = 0
-        for uri in uris:
-            k = _record_key(dead_local, uri, "dead")
-            if k in dead_local and _dead_stale_locked(k, dead_local):
-                dead_local.pop(k, None)
-                s = _record_key(status_local, uri, "status")
-                status_local.pop(s, None)
-                revived += 1
-        if not revived:
-            return 0
-        old_dead = dict(_DEAD)
-        old_status = dict(_STATUS)
-        try:
-            crypt.save_json(DEAD_FILE, _opaque_map(dead_local, "dead"))
-            crypt.save_json(STATUS_FILE, _opaque_map(status_local, "status"))
-        except Exception:
-            for path, value in ((DEAD_FILE, _opaque_map(old_dead, "dead")),
-                                (STATUS_FILE, _opaque_map(old_status, "status"))):
-                try:
-                    crypt.save_json(path, value)
-                except Exception:
-                    pass
-            raise
-        _DEAD = dead_local
-        _STATUS = status_local
-        return revived
-
-
 def dead_add(uri, reason="user_removed"):
+    import time
     n = _norm_uri(uri)
     with _LOCK:
         dead_key = _record_key(_DEAD, n, "dead")

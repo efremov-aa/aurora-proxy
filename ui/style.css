@@ -671,3 +671,10 @@ body.pre-lang #tb-name {
 /* A-112: PRO-фичи не прячем - помечаем: видно прайс и кнопку «Купить» */
 .pro-tag{display:inline-block;margin-top:8px;padding:2px 8px;border-radius:999px;font-size:11px;background:rgba(255,183,77,.15);color:#ffb74d;border:1px solid rgba(255,183,77,.35)}
 .feature.pro-lock .f-price{opacity:.75}
+.kchk{margin:14px 0 2px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface)}
+.kchk-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.kchk-t{font-weight:800;font-size:12.5px;letter-spacing:.2px}
+.kchk-foot{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.kchk-head>.badge,.kchk-foot>.badge{max-width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:0 1 auto}
+.kchk-note{white-space:normal;overflow:visible;text-overflow:clip}
+.kchk-foot .badge{font-size:10.5px}

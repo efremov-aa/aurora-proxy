@@ -3173,6 +3173,13 @@ def _relay_raw(from_id, pkt, key=None):
             if nid != me and nid != from_id and nid not in _NO_GAME_IDS
             and isinstance(peers.get(nid), dict)
             and peers[nid].get("sock") is not None]
+    # A-827 (Ш8): ЗДЕСЬ галка allow_relay НЕ проверяется, и это не oversight.
+    # _relay_raw доставляет пакет ВЛАДЕЛЬЦУ адреса dst — то есть адресат
+    # в списке targets и есть тот самый узел. Это ПРЯМАЯ доставка через
+    # мастера, а не транзит чужого трафика. Гейт по галке здесь убил бы
+    # всю игру (нет галки => сеть молчит), и это была бы моя регрессия.
+    # Настоящий транзит (узел как выход для группы) в коде отсутствует —
+    # см. mesh.relay_eligible() и честный долг в SYNC.md.
     targets = []
     if segment or not grp:
         # broadcast / setevoy adres / vneshniy server - vsem, kak do A-489.
@@ -3523,6 +3530,14 @@ def direct_loop():
                 if not no_game() or str(_STATE.get("started", "") or "") == "master":
                     direct_announce_peers()
                 direct_try()
+                # A-827 (Ш7): сервер группы переключается ЗДЕСЬ, а не по кнопке
+                # в панели: панель могут закрыть, а переключиться всё равно надо.
+                if game_enabled():
+                    try:
+                        game_server_maybe_switch()
+                    except Exception as exc:
+                        _note("game-server-fail",
+                              "%s: %s" % (type(exc).__name__, exc), level="error")
                 # A-456: kazhdyy tsikl soobshchaem svoy pryamoy endpoint
                 # (idempotentno - tozhe, i vspyatku ne shlem).
                 try:
@@ -3693,6 +3708,236 @@ def direct_try():
             continue
         started += _direct_initiate(nid, addr, nonce)
     return started
+
+
+def _relay_allowed(nid):
+    """A-827 (Ш8): узел ИМЕЕТ ПРАВО релеить чужой игровой трафик.
+
+    Fail-closed по трём причинам разом. Первая — узла нет в реестре. Вторая —
+    галка не выставлена (владелец её не давал). Третья — узел служебный.
+
+    Модуль НЕ знает про mesh.py (иначе круговой импорт: mesh тянет эту же
+    подсистему), поэтому источник галок внедряется через mesh_optins(). Если
+    подсистема не подключена или узел не найден — отказ, а не «разрешить»."""
+    getter = _STATE.get("mesh_optins")
+    if not callable(getter):
+        return False
+    try:
+        flags = getter(nid)
+    except Exception:
+        return False
+    if not isinstance(flags, dict):
+        return False
+    if flags.get("no_relay") is True:
+        return False
+    return flags.get("allow_relay") is True
+
+
+# A-827 (Ш7): игровой сервер группы. Узел помнит, ЧЕЙ сервер выбран, сам
+# переключается при перегрузе и честно показывает причину смены.
+# Ключи состояния — в _STATE["game_server"], чтобы не плодить глобалы.
+_GAME_SERVER_KEYS = ("host", "since", "switches", "reason")
+
+
+def game_server_state():
+    """Текущий игровой сервер группы + счётчики. Без секретов."""
+    with _LOCK:
+        st = dict(_STATE.get("game_server", {}) or {})
+    for key in _GAME_SERVER_KEYS:
+        st.setdefault(key, 0 if key != "host" else "")
+    hosts = dict(_STATE.get("game_hosts", {}) or {})
+    st["candidates"] = sorted(hosts)
+    st["hosts"] = hosts
+    return st
+
+
+def game_server_candidates():
+    """Узлы группы, годные в игровые серверы: живые, не я, не служебные.
+
+    Сортируются по измеренному RTT (0 = не измерен -> в конец, чтобы
+    непомеченное не обгоняло замеренное по счастливой сортировке)."""
+    me = str(_STATE.get("node_id", "") or "")
+    with _LOCK:
+        rows = dict(_STATE.get("peers", {}) or {})
+    out = []
+    for nid, row in rows.items():
+        if nid == me or nid in _NO_GAME_IDS or nid.startswith(_NO_GAME_IDS):
+            continue
+        if not isinstance(row, dict) or row.get("sock") is None:
+            continue
+        rtt = int(row.get("rtt_ms", 0) or 0)
+        out.append({"node_id": nid, "address": game_address(nid), "rtt_ms": rtt,
+                    "measured": rtt > 0})
+    out.sort(key=lambda r: (0 if r["measured"] else 1, r["rtt_ms"] or 10 ** 6, r["node_id"]))
+    return out
+
+
+def game_server_set(host):
+    """Выбрать игровой сервер. Возвращает (ok, error).
+
+    Fail-closed: несуществующий/служебный/мёртвый узел не принимается,
+    потому что «сервер выбран, а играть не с кем» хуже, чем честный отказ."""
+    host = str(host or "").strip()
+    if not host:
+        return False, "не указан узел"
+    # A-827 (Ш4): свой игровой сервер есть только у владельца группы.
+    # В сценарии «свой прокси» и «гость» сервер выбрать нельзя — иначе
+    # панель показала бы сервер, на котором этот узел играть не будет.
+    if _scenario() != "friends":
+        return False, "свой игровой сервер доступен только в сценарии «играть с друзьями»"
+    with _LOCK:
+        me = str(_STATE.get("node_id", "") or "")
+    if host == me:
+        return False, "свой узел игровым сервером быть не может"
+    if host in _NO_GAME_IDS or host.startswith(_NO_GAME_IDS):
+        return False, "служебный узел игровым сервером быть не может"
+    cand = game_server_candidates()
+    row = next((c for c in cand if c["node_id"] == host), None)
+    if row is None:
+        return False, "узел не в игровой группе"
+    with _LOCK:
+        st = _STATE.setdefault("game_server", {})
+        st["host"] = host
+        st["since"] = int(time.time())
+        st["reason"] = "выбрано вручную"
+    return True, None
+
+
+def _server_overloaded(host, rows=None):
+    """A-827 (Ш7): перегружен ли выбранный сервер.
+
+    Основание — ИЗМЕРЕННЫЕ числа, не настроение: rtt выбранного сервера
+    хуже лучшего кандидата более чем в SERVER_OVERLOAD_RATIO раз. Если
+    кандидатов нет или измерений нет — перегрузки не утверждаем."""
+    ratio = _int_env("AURORA_MESH_GAME_OVERLOAD_RATIO", 2, 1, 10)
+    best = 0
+    cur = 0
+    for cand in game_server_candidates():
+        rtt = int(cand.get("rtt_ms", 0) or 0)
+        if rtt <= 0:
+            continue
+        if not best or rtt < best:
+            best = rtt
+        if cand["node_id"] == host:
+            cur = rtt
+    if not best or not cur:
+        return False, ""
+    if cur <= best * ratio:
+        return False, ""
+    return True, "rtt %d мс против лучших %d мс" % (cur, best)
+
+
+def game_server_maybe_switch():
+    """Переключить сервер, если выбранный перегружен. Возвращает (ok, msg).
+
+    Вызывать из цикла игрового контура, а не из панели: панель может быть
+    закрыта, а переключение всё равно обязано случиться."""
+    with _LOCK:
+        host = str((_STATE.get("game_server", {}) or {}).get("host", "") or "")
+    if not host:
+        cand = game_server_candidates()
+        if not cand:
+            return False, ""
+        pick = cand[0]
+        with _LOCK:
+            st = _STATE.setdefault("game_server", {})
+            st["host"] = pick["node_id"]
+            st["since"] = int(time.time())
+            st["reason"] = "выбран автоматически"
+        _diag_throttled("game-server", pick["node_id"],
+                        "avtovybor rtt=%d" % pick.get("rtt_ms", 0))
+        return True, "автовыбор сервера %s" % pick["node_id"]
+    over, why = _server_overloaded(host)
+    if not over:
+        return False, ""
+    for cand in game_server_candidates():
+        if cand["node_id"] == host or not cand["measured"]:
+            continue
+        with _LOCK:
+            st = _STATE.setdefault("game_server", {})
+            st["host"] = cand["node_id"]
+            st["since"] = int(time.time())
+            st["switches"] = int(st.get("switches", 0) or 0) + 1
+            st["reason"] = why
+        _diag_throttled("game-server", cand["node_id"],
+                        "pereklyuchenie: %s" % why)
+        return True, "сервер переключён на %s (%s)" % (cand["node_id"], why)
+    return False, ""
+
+
+SCENARIOS = ("friends", "proxy", "guest")
+_SCENARIO_LABELS = {
+    "friends": "играть с друзьями",
+    "proxy": "свой прокси",
+    "guest": "подключили к чужой Aurora",
+}
+_SCENARIO_HINTS = {
+    "friends": "поднимает игровую TUN-подсеть, ждёт группу и выбирает игровой сервер",
+    "proxy": "только прокси: туннель и ключи, игровой адаптер не поднимается",
+    "guest": "работает в чужой группе как гость: свой игровой сервер выбрать нельзя",
+}
+
+
+def _scenario():
+    """Текущий сценарий. Пусто = ещё не выбран (стартовый экран)."""
+    value = ""
+    try:
+        value = str(config.get("game_scenario", "") or "").strip().lower()
+    except Exception:
+        value = ""
+    return value if value in SCENARIOS else ""
+
+
+def game_scenarios():
+    """Все три сценария с честными подписями для панели."""
+    cur = _scenario()
+    out = []
+    for name in SCENARIOS:
+        out.append({"id": name, "label": _SCENARIO_LABELS[name],
+                    "hint": _SCENARIO_HINTS[name], "current": name == cur,
+                    # Гость не может быть своим игровым сервером — это право
+                    # владельца группы, а не гостя.
+                    "may_host": name != "guest"})
+    return out
+
+
+def game_scenario_set(name):
+    """Выбрать сценарий. Возвращает (ok, error).
+
+    Смена сценария меняет ТОЛЬКО этот узел: чужие Aurora он не трогает и
+    чужим узлам ничего не диктует."""
+    name = str(name or "").strip().lower()
+    if name not in SCENARIOS:
+        return False, "неизвестный сценарий: %s" % (name or "пусто")
+    if _scenario() == name:
+        return True, None
+    try:
+        config.set("game_scenario", name)
+    except Exception as exc:
+        return False, "не сохранился сценарий: %s" % exc
+    # A-291: модуль НЕ логирует сам (в нём циркулирует секрет сети).
+    # Диагностика идёт в буфер _note, откуда её читает панель.
+    _note("game-scenario", "сценарий '%s' (%s)"
+          % (name, _SCENARIO_LABELS[name]))
+    with _LOCK:
+        st = _STATE.setdefault("game_scenario", {})
+        st["name"] = name
+        st["since"] = int(time.time())
+        # Смена сценария сбрасывает выбор сервера: «свой прокси» вообще не
+        # про сервер, а «гость» не имеет права им владеть. Оставить старый
+        # выбор значило бы показать панели сервер, на который нельзя играть.
+        if name != "friends":
+            _STATE["game_server"] = {}
+    return True, None
+
+
+def game_scenario_state():
+    """Состояние сценария + что из этого реально включено (а не обещано)."""
+    cur = _scenario()
+    return {"name": cur, "label": _SCENARIO_LABELS.get(cur, "не выбран"),
+            "chosen": bool(cur), "tunnel": bool(enabled()),
+            "game": bool(game_enabled()), "server": game_server_state(),
+            "no_game": bool(no_game())}
 
 
 def game_address(node_id):
@@ -3909,6 +4154,10 @@ def raw_send(pkt, key=None):
         # A-433b: unicast idet TOLKO vladeltsu adresa naznacheniya, a veer
         # (broadcast / multicast / svoy segment) - vsem zhivym uzlam gruppy,
         # krome sebya. Inache kazhdyy kazhdomu poluchal by chuzhoy trafik.
+        # A-827 (Ш8): eto PRAMAYA DOSTAVKA (adresat - etot uzel), a ne rely,
+        # poetu zdes galka allow_relay NE proveryaetsya. Galka - eto pravo
+        # uzla byt VYHODOM dlya gruppy, reshaetsya v relay_candidates()/
+        # game_server, a ne zdes.
         if not bcast and not own_segment and game_address(nid) != dst:
             continue
         try:

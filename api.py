@@ -25,6 +25,7 @@ import rusegment
 import security
 import source
 import subs
+import warp  # A-WARP-PUB: rezervnyy kanal WARP
 import telemetry
 import tgws
 import ui
@@ -42,6 +43,9 @@ def _load_ui_token():
     _UI_TOKEN = str(config.get("ui_token", "") or "")
 
 
+# A-WARP-PUB-3: proba WARP idet v fonovom potoke (kak /api/keys/check),
+# otvet mgnovennyi, rezultat cherez /api/warp.
+_WARP_PROBE = {"running": False}
 def _json(data, status=200):
     body = json.dumps(data, ensure_ascii=False).encode("utf-8")
     return (status, "application/json; charset=utf-8", body)
@@ -787,6 +791,8 @@ def build_state(local=True):
     st["comm"] = st.pop("comm", {"state": "idle", "msg": ""})
     st["vless_ext"] = _vless_ext()
     st["mesh_tunnel"] = _tunnel_status()
+    st["game_tun"] = _game_tun_status()
+    st["game"] = _game_status()
     st["mesh_nodes"] = mesh.node_count()
     st["invite_available"] = False
     st["server_name"] = config.get("server_name", "Home")
@@ -811,7 +817,11 @@ def build_state(local=True):
     ext["packages"] = _ext_packages()
     if not local:
         ext["master"] = ""
-    st["ext"] = ext
+    st["ext"] = ext    # A-WARP-PUB-4: status rezerva WARP v /api/state
+    try:
+        st["warp"] = warp.status()
+    except Exception:
+        st["warp"] = {"loaded": False, "mode": "off", "active": False}
     if not local:
         v = dict(st["vless_ext"])
         for sec in ("link", "uuid", "pbk", "sid", "host", "port", "sni", "fp"):
@@ -986,6 +996,14 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, "image/svg+xml; charset=utf-8", _FAVICON_SVG.encode("utf-8"))
             return
         # --- публичная политика меша: без авторизации (нужна узлам) ---
+        # A-WARP-PUB-3: status rezerva WARP (uzel klegko znaet, zagruzhen li
+        # konfig i byl li posledniy zamerenyy vyhod)
+        if path == "/api/warp":
+            if not _trusted_read(self):
+                self._send(*_json({"error": "unauthorized"}, 401))
+                return
+            self._send(*_json(warp.status()))
+            return
         if path == "/api/mesh/policy":
             self._send(*_json(mesh.policy()))
             return
@@ -1165,6 +1183,10 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/security":
             self._send(*_json(_sec(include_secrets=trusted)))
             return
+        if path == "/api/game":
+            # A-827: игровой контур — сценарий, сервер группы, права узлов.
+            self._send(*_json({"ok": True, "game": _game_status()}))
+            return
         self._send(*_json({"error": "unknown endpoint"}, 404))
 
     def do_POST(self):
@@ -1251,6 +1273,11 @@ class Handler(BaseHTTPRequestHandler):
             "/api/keys/cleanup": self._keys_cleanup,
             "/api/keys/remove": self._keys_remove,
             "/api/keys/active": self._keys_active,
+            # A-WARP-PUB-3: rezervnyy kanal WARP
+            "/api/warp/upload": self._warp_upload,
+            "/api/warp/mode": self._warp_mode,
+            "/api/warp/probe": self._warp_probe,
+            "/api/warp/clear": self._warp_clear,
             "/api/recovery/limit": self._rc_limit,
             "/api/recovery/region": self._rc_region,
             "/api/recovery/conn": self._rc_conn,
@@ -1278,7 +1305,11 @@ class Handler(BaseHTTPRequestHandler):
             "/api/setup/complete": self._setup_complete,
             "/api/settings/reset": self._settings_reset,
             "/api/mesh/ping": self._mesh_ping,
-        "/api/mesh/signal": self._mesh_signal_post,
+            # A-827: игровой контур (Ш4 сценарий / Ш7 сервер / Ш8 галки).
+            "/api/mesh/signal": self._mesh_signal_post,
+            "/api/game/optin": self._game_optin_post,
+            "/api/game/scenario": self._game_scenario_post,
+            "/api/game/server": self._game_server_post,
             "/api/mesh/invite": self._mesh_invite,
             "/api/mesh/regenerate": self._mesh_regenerate,
             "/api/mesh/node/add": self._mesh_node_add,
@@ -1346,6 +1377,71 @@ class Handler(BaseHTTPRequestHandler):
             self._send(*_json({"ok": False, "error": r.get("msg", "проверка уже идёт")}, 400))
             return
         self._send(*_json(r))
+
+    # --- A-WARP-PUB: rezervnyy kanal Cloudflare WARP ---
+    def _warp_upload(self, data):
+        """Konfig ot vlaseltsa (generator -> panel)."""
+        raw = data.get("config") or data.get("raw") or ""
+        if not isinstance(raw, str) or not raw.strip():
+            self._send(*_json({"ok": False, "error": "no config"}, 400))
+            return
+        if len(raw.encode("utf-8", "ignore")) > warp.MAX_CONFIG_BYTES:
+            self._send(*_json({"ok": False, "error": "config too large"}, 400))
+            return
+        r = warp.install(raw)
+        if not r.get("ok"):
+            self._send(*_json(r, 400))
+            return
+        config.log("warp: konfig zagruzhen, endpoint %s" % r.get("endpoint", "-"))
+        st = warp.status()
+        st["ok"] = True
+        self._send(*_json(st))
+
+    def _warp_mode(self, data):
+        m = str(data.get("mode") or "").strip().lower()
+        if m not in warp.MODES:
+            self._send(*_json({"ok": False, "error": "bad mode"}, 400))
+            return
+        if not config.set("warp_mode", m):
+            self._send(*_json({"ok": False, "error": "save failed"}, 400))
+            return
+        config.log("warp: rezhim = %s" % m)
+        st = warp.status()
+        st["ok"] = True
+        self._send(*_json(st))
+
+    def _warp_probe(self, data):
+        """Fakticheskiy vyhod WARP cherez vremennyi xray (fon, ~15 s)."""
+        if _WARP_PROBE["running"]:
+            self._send(*_json({"ok": True, "started": True,
+                               "msg": "proba WARP uzhe idet"}))
+            return
+        if not warp.load():
+            self._send(*_json({"ok": False, "error": "no warp config"}, 400))
+            return
+        _WARP_PROBE["running"] = True
+
+        def _run():
+            try:
+                r = warp.probe()
+                config.log("warp: proba: %s" % (r.get("egress") or r.get("error")))
+            except Exception as exc:
+                config.log("warp: proba ne udalas: %s" % str(exc)[:120])
+            finally:
+                _WARP_PROBE["running"] = False
+        threading.Thread(target=_run, daemon=True).start()
+        self._send(*_json({"ok": True, "started": True,
+                           "msg": "proba WARP zapuschena, rezultat cherez ~15 s"}))
+
+    def _warp_clear(self, data):
+        r = warp.clear()
+        if not r.get("ok"):
+            self._send(*_json(r, 400))
+            return
+        config.log("warp: konfig udalen")
+        st = warp.status()
+        st["ok"] = True
+        self._send(*_json(st))
 
     def _keys_cleanup(self, data):
         removed = pool.cleanup()
@@ -2061,6 +2157,55 @@ class Handler(BaseHTTPRequestHandler):
             return
         self._send(*_json({"ok": True}))
 
+    def _game_optin_post(self, data):
+        """A-827 (Ш8): поставить/снять галку узла. Только владелец."""
+        nid = str(data.get("id") or "").strip()
+        flags = data.get("optins")
+        if not isinstance(flags, dict):
+            self._send(*_json({"ok": False, "error": "optins must be an object"}, 400))
+            return
+        ok, err = mesh.set_optin(nid, **flags)
+        if not ok:
+            self._send(*_json({"ok": False, "error": err}, 400))
+            return
+        config.log("game: galki uzla %s = %s" % (nid, mesh.optins(nid)))
+        self._send(*_json({"ok": True, "id": nid, "optins": mesh.optins(nid)}))
+
+
+    def _game_scenario_post(self, data):
+        """A-827 (Ш4): выбрать сценарий на старте."""
+        # A-827-fix: meshtunnel импортируется ЛЕНИВО (см. _tunnel_module).
+        # Обращение к имени как к модулю давало NameError -> 500 internal,
+        # поймано сквозной проверкой клиента против настоящей панели.
+        mt = _tunnel_module()
+        if mt is None:
+            self._send(*_json({"ok": False, "error": "module_unavailable"}, 503))
+            return
+        ok, err = mt.game_scenario_set(data.get("scenario"))
+        if not ok:
+            self._send(*_json({"ok": False, "error": err}, 400))
+            return
+        self._send(*_json({"ok": True, "scenario": mt.game_scenario_state()}))
+
+
+    def _game_server_post(self, data):
+        """A-827 (Ш7): выбрать или снять игровой сервер группы."""
+        mt = _tunnel_module()
+        if mt is None:
+            self._send(*_json({"ok": False, "error": "module_unavailable"}, 503))
+            return
+        host = str(data.get("host") or "").strip()
+        if not host:
+            with mt._LOCK:
+                mt._STATE["game_server"] = {}
+            self._send(*_json({"ok": True, "server": mt.game_server_state()}))
+            return
+        ok, err = mt.game_server_set(host)
+        if not ok:
+            self._send(*_json({"ok": False, "error": err}, 400))
+            return
+        self._send(*_json({"ok": True, "server": mt.game_server_state()}))
+
 
 # --- данные для новых вкладок UI (тарифы/статистика/маршруты/настройки/безопасность) ---
 def _versions_list():
@@ -2222,6 +2367,67 @@ def _tunnel_status():
     except Exception:
         return {}
     return data if isinstance(data, dict) else {}
+
+
+def _game_tun_status():
+    """A-817: sostoyanie igrovogo TUN BEZ sekretov.
+
+    Адаптер требует прав (root/CAP_NET_ADMIN на Linux, WinTun на Windows) и может
+    честно не подняться. Без этого блока панель не видит разницу между «TUN
+    работает» и «TUN выключен молча» — а это ровно тот случай, который нельзя
+    диагностировать по логу с чужого ПК.
+
+    Флаг выключен — не трогаем модуль вообще (probe() не вызываем).
+    """
+    if not config.get("game_tun", False):
+        return {}
+    try:
+        import meshtun
+    except Exception:
+        return {"error": "module_unavailable"}
+    getter = getattr(meshtun, "info", None)
+    if not callable(getter):
+        return {"error": "old_meshtun"}
+    try:
+        data = getter()
+    except Exception as exc:
+        return {"error": "probe_failed: %s" % type(exc).__name__}
+    return data if isinstance(data, dict) else {}
+
+
+def _game_status():
+    """A-827: честное состояние игрового контура — сценарий, сервер, права.
+
+    Ничего не обещает: если туннель выключен, здесь так и написано, а не
+    «будет работать». Секретов меша в ответе нет."""
+    out = {"scenarios": [], "scenario": {}, "server": {}, "candidates": [],
+           "optins": []}
+    try:
+        import meshtunnel
+    except Exception:
+        return {"error": "module_unavailable"}
+    try:
+        out["scenarios"] = meshtunnel.game_scenarios()
+        out["scenario"] = meshtunnel.game_scenario_state()
+        out["server"] = meshtunnel.game_server_state()
+        out["candidates"] = meshtunnel.game_server_candidates()
+    except Exception as exc:
+        return {"error": "probe_failed: %s" % type(exc).__name__}
+    # Галки узлов (Ш8) — без секретов, id/name/роль плюс сами галки.
+    try:
+        for node in mesh.all_nodes():
+            nid = node.get("id")
+            if not nid:
+                continue
+            out["optins"].append({
+                "id": nid, "name": node.get("name", ""),
+                "role": node.get("role", ""),
+                "game_address": meshtunnel.game_address(nid),
+                "optins": mesh.optins(nid),
+            })
+    except Exception:
+        pass
+    return out
 
 
 def _tunnel_peers():

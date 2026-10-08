@@ -142,39 +142,12 @@ def _key_from_uri(uri):
         return None
 
 
-def _tcp_alive_keys(keys, workers=24, timeout=3):
-    """Дешёвый параллельный TCP-отсев кандидатов (порядок сохраняется).
-
-    Без него refresh вливал в пул первые N ключей файла подряд, а keytest
-    потом уводил их в блеклист: из 2260 валидных reality-ключей TCP-живых
-    всего ~340, а в пул попадали в основном мёртвые."""
-    keys = list(keys)
-    if not keys:
-        return []
-
-    def probe(k):
-        try:
-            return k if _tcp_ping(k.get("host"), k.get("port"), timeout=timeout) else None
-        except Exception:
-            return None
-
-    out = []
-    from concurrent.futures import ThreadPoolExecutor  # как в check_all
-    with ThreadPoolExecutor(max_workers=workers) as ex:
-        for r in ex.map(probe, keys):
-            if r is not None:
-                out.append(r)
-    return out
-
-
 def refresh_from_github():
     """Скачивает все источники, мержит в пул (новые добавляет, старые оставляет)."""
     config.update_state(comm={"state": "loading", "msg": "загрузка ключей с github..."})
     pool.dedupe()
     before = len(pool.get_keys())
     total_new = 0
-    total_revived = 0
-    total_tcp_drop = 0
     for url in config.GITHUB_SOURCES:
         text = fetch_source(url)
         if not text:
@@ -184,7 +157,6 @@ def refresh_from_github():
         added = 0
         skipped = 0
         no_reality = 0
-        candidates = []
         for u in uris:
             key = _key_from_uri(u)
             if not key:
@@ -194,22 +166,6 @@ def refresh_from_github():
                 # в пул не берём, чтобы не копить несобираемый мусор
                 no_reality += 1
                 continue
-            candidates.append(key)
-        # A-TEST-1: сначала снимаем ПРОТУХШИЕ авто-метки блеклиста пачкой,
-        # иначе ключ, помеченный когда-то «нет egress», уже никогда не смог бы
-        # вернуться в пул (refresh его пропускал как blocked, а проверить
-        # можно только то, что лежит в пуле).
-        revived = pool.revive_stale([k.get("uri") for k in candidates])
-        total_revived += revived
-        # дальше — только те, кто сейчас не в блоке (метки свежие оставляем)
-        candidates = [k for k in candidates if not pool.blocked(k.get("uri", ""))]
-        room = max(0, int(config.MAX_USER_KEYS) - len(pool.get_keys()))
-        if candidates and room:
-            # TCP-отсев с запасом x3: сначала живая часть, доберём следующей пачкой
-            picked = _tcp_alive_keys(candidates[:room * 3])
-            total_tcp_drop += min(len(candidates), room * 3) - len(picked)
-            candidates = picked
-        for key in candidates:
             r = pool.add_key(key)
             if r == "added":
                 added += 1
@@ -217,16 +173,14 @@ def refresh_from_github():
                 # мёртвый ключ — в пул не возвращаем (правило юзера)
                 skipped += 1
         total_new += added
-        config.log("source: %s: %d uri (новых %d, в блоке пропущено %d, без reality %d, tcp отсеяно %d, ожило с блока %d)" % (
-            url, len(uris), added, skipped, no_reality, total_tcp_drop, revived))
+        config.log("source: %s: %d uri (новых %d, в блоке пропущено %d, без reality %d)" % (
+            url, len(uris), added, skipped, no_reality))
     after = len(pool.get_keys())
     if total_new:
         check_all(bg=True)
     _comm_done("github: добавлено %d ключей (всего %d)" % (total_new, after))
-    config.log("source: всего в пуле %d (было %d, новых %d, ожило с блока %d, tcp отсеяно %d)" % (
-        after, before, total_new, total_revived, total_tcp_drop))
+    config.log("source: всего в пуле %d (было %d, новых %d)" % (after, before, total_new))
     return total_new
-
 
 
 def _probe_host_allowed(host, port=443):
@@ -388,10 +342,6 @@ def keytest(key, timeout=15, port=None):
     if not cfg:
         return {"status": "bad", "reason": "bad-config", "exit_ip": "-", "ping_ms": 9999}
 
-    # A-TEST-2: порт занят в этом прогоне -> чужим туннелем не измеряем (см. _port_free).
-    if not _port_free(port):
-        return {"status": "noip", "reason": "port-busy", "exit_ip": "-", "ping_ms": ping_ms}
-
     cfg_path = crypt.secure_temp_path(config.DATA_DIR, "keytest_cfg_", ".json")
     try:
         _write_keytest_config(cfg_path, cfg)
@@ -408,10 +358,6 @@ def keytest(key, timeout=15, port=None):
             return {"status": "noip", "reason": "xray-start-fail", "exit_ip": "-", "ping_ms": ping_ms}
         if not _wait_port(port, timeout=4):
             return {"status": "noip", "reason": "test-port", "exit_ip": "-", "ping_ms": ping_ms}
-        # A-TEST-2: наш temp-xray обязан быть ЖИВ после подъёма порта;
-        # если процесс умер (занятый порт/битый конфиг) - чужим туннелем не считаем.
-        if proc.poll() is not None:
-            return {"status": "noip", "reason": "xray-died", "exit_ip": "-", "ping_ms": ping_ms}
         ip = _http_egress_check(port, timeout=8)
         if ip:
             return {"status": "ok", "exit_ip": ip, "sites_ok": 1, "ping_ms": ping_ms}
@@ -434,10 +380,6 @@ def keytest(key, timeout=15, port=None):
                     proc.wait(timeout=2)
                 except Exception:
                     pass
-            # A-TEST-2: дождаться освобождения порта, иначе следующий ключ в этом же прогоне получит ложный port-busy.
-            _free_until = time.time() + 3
-            while time.time() < _free_until and not _port_free(port):
-                time.sleep(0.2)
         crypt.unlink_quiet(cfg_path, "keytest config")
 
 
@@ -452,28 +394,6 @@ def _wait_port(port, timeout=4):
             time.sleep(0.3)
     return False
 
-
-
-# A-TEST-2: порт ДОЛЖЕН быть свободен ДО старта temp-xray.
-# Без этой проверки второй xray не умирает на занятом порту,
-# _wait_port() видит чужой слушающий сокет и возвращает True,
-# а _http_egress_check() уходит в ЧУЖОЙ туннель: ключ получает status=ok с exit_ip
-# чужого ключа. Воспроизведено на боевом сервере (vless-5 получил 162.249.126.228
-# = egress vless-pa6r26). Занятый порт = noip/port-busy, а не ok.
-def _port_free(port):
-    s = None
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind(("127.0.0.1", int(port)))
-        return True
-    except (OSError, TypeError, ValueError):
-        return False
-    finally:
-        try:
-            if s is not None:
-                s.close()
-        except Exception:
-            pass
 
 # --- фоновый прогон проверки всех ключей ---
 _CHECK_LOCK = threading.Lock()

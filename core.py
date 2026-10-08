@@ -20,6 +20,7 @@ import config
 import crypt
 import pool
 import subs
+import warp  # A-WARP-PUB: rezervnyy kanal WARP
 
 XRAY_CONFIG_LOCK = threading.RLock()  # RLock: read-modify-write оборачивается этим локом целиком
 EGRESS_LOCK = threading.Lock()
@@ -169,6 +170,13 @@ def _mesh_rule_position(rules):
     return len(rules)
 
 
+def _warp_outbounds():
+    """A-WARP-PUB: outbound-y WARP+noise iz zagruzhennogo konfiga (ili None)."""
+    if warp.mode() == "off":
+        return None
+    return warp.load()
+
+
 def build_xray_config(final_tag):
     """Полный xray-конфиг. outbounds: [пул vless..., direct, block]."""
     if final_tag == "direct":
@@ -192,6 +200,18 @@ def build_xray_config(final_tag):
         if tag != "direct" and ob["tag"] != tag and tag == k.get("tag"):
             tag = ob["tag"]
     # гарантируем наличие актуального direct/block
+    # A-WARP-PUB-1: rezervnyy kanal WARP. Esli final = warp - dobavlyaem ego
+    # outbound-y. Esli konfig ne zagruzhen - fail-closed v direct, inache
+    # pravilo ukazyvalo by v nikuda i xray run -test pal by.
+    if tag == warp.WARP_TAG:
+        _warp_obs = _warp_outbounds()
+        if not _warp_obs:
+            config.log("core: A-WARP-PUB-1 zaprashen WARP, konfig ne zagruzhen -> direct")
+            tag = "direct"
+        else:
+            for _wob in _warp_obs:
+                outbounds.append(_wob)
+                used_tags.add(_wob["tag"])
     outbounds.append({"tag": "direct", "protocol": "freedom",
                       "settings": {"domainStrategy": "UseIP"}})
     outbounds.append({"tag": "block", "protocol": "blackhole", "settings": {}})
@@ -400,6 +420,16 @@ def _authoritative_config(cfg, target):
     if mesh_ob and not any(isinstance(o, dict) and o.get("tag") == "mesh"
                            for o in (cfg.get("outbounds") or [])):
         cfg.setdefault("outbounds", []).append(mesh_ob)
+    # A-WARP-PUB-2: outbound-y WARP - ne "chuzhie", inache chistka po allowed
+    # vychistit i outbound, i pravlo marshrutizacii.
+    _warp_obs_auth = _warp_outbounds()
+    if _warp_obs_auth:
+        for _wob in _warp_obs_auth:
+            allowed.add(_wob["tag"])
+        for _wob in _warp_obs_auth:
+            if not any(isinstance(o, dict) and o.get("tag") == _wob["tag"]
+                       for o in (cfg.get("outbounds") or [])):
+                cfg.setdefault("outbounds", []).append(copy.deepcopy(_wob))
     allowed.update(("direct", "block"))
     outbounds = []
     used = set()
@@ -676,6 +706,12 @@ def _sync_impl():
     if vpn:
         if active_key:
             final_tag = active_key.get("tag") or "direct"
+        elif warp.active(0) and _warp_outbounds():
+            # A-WARP-PUB-5: pustoy pul i vklyuchen rezerv WARP -> ne padaem
+            # v direct, a idem cherez WARP. Eto DRUGOY vyhod s servera,
+            # a ne snizhenie trafika (analog A-408 v mastere).
+            final_tag = warp.WARP_TAG
+            config.log("core: A-WARP-PUB-5 pustoy pul, vklyuchaem rezerv WARP")
         else:
             final_tag = "direct"
 

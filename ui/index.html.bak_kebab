@@ -246,12 +246,12 @@
             </div>
             <div class="kchk-foot">
               <input type="file" id="warp-file" accept=".json,application/json" hidden>
-              <button class="btn small" data-act="warp-upload">⬆️ Загрузить конфиг</button>
-              <button class="btn small" data-act="warp-probe">🧪 Проверить</button>
-              <button class="btn small" id="warp-off" data-act="warp-mode" data-mode="off">⏹ Выключить</button>
-              <button class="btn small" id="warp-auto" data-act="warp-mode" data-mode="auto">🤖 Авто</button>
-              <button class="btn small" id="warp-on" data-act="warp-mode" data-mode="on">🔁 Всегда</button>
-              <button class="btn small" data-act="warp-clear">🗑 Удалить</button>
+              <button class="btn small" data-act="warpUpload">⬆️ Загрузить конфиг</button>
+              <button class="btn small" data-act="warpProbe">🧪 Проверить</button>
+              <button class="btn small" id="warp-off" data-act="warpMode" data-mode="off">⏹ Выключить</button>
+              <button class="btn small" id="warp-auto" data-act="warpMode" data-mode="auto">🤖 Авто</button>
+              <button class="btn small" id="warp-on" data-act="warpMode" data-mode="on">🔁 Всегда</button>
+              <button class="btn small" data-act="warpClear">🗑 Удалить</button>
             </div>
             <div class="hint" id="warp-note">Сгенерируй конфиг на ПК и загрузи сюда.</div>
           </div>

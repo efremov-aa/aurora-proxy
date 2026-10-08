@@ -2799,10 +2799,10 @@ function loadTG() {
     'ext-download': function (t) { window.extDownload(t.getAttribute('data-target') || 'chrome'); },
     'log-load': function () { window.loadLog(); },
     // A-WARP-PUB: rezervnyj kanal WARP
-    'warp-upload': function () { warpUpload(); },
-    'warp-probe': function () { warpProbe(); },
-    'warp-mode': function (t) { warpMode(t.getAttribute('data-mode') || 'off'); },
-    'warp-clear': function () { warpClear(); }
+    warpUpload: function () { warpUpload(); },
+    warpProbe: function () { warpProbe(); },
+    warpMode: function (t) { warpMode(t.getAttribute('data-mode') || 'off'); },
+    warpClear: function () { warpClear(); }
   };
   function actTarget(ev) {
     var node = ev && ev.target;

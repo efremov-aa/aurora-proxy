@@ -14,13 +14,14 @@ import urllib.request
 import uuid
 from collections import deque
 
-VERSION = "1.10.3"
-VERSION_NAME = "Кот-прибирщик"
+VERSION = "1.10.4"
+VERSION_NAME = "Кот-подсеть"
 APP_NAME = "Aurora"
 
 # История версий для вкладки «Версии» (v, имя, дата).
 # ВАЖНО: без дублей — иначе вкладка показывает одну версию несколько раз.
 VERSION_HISTORY = (
+    ("1.10.4", "Кот-подсеть", "07.10.2026"),
     ("1.10.3", "Кот-прибирщик", "07.10.2026"),
     ("1.10.2", "Кот-тополог", "06.10.2026"),
     ("1.10.1", "Кот-вольный", "05.10.2026"),
@@ -42,6 +43,20 @@ VERSION_HISTORY = (
 
 # Описания версий для вкладки «Версии» (v -> текст). Показываются в панели.
 VERSION_NOTES = {
+    "1.10.4":
+        "Кот-подсеть привёл игровой туннель к настоящему виду. Раньше "
+        "адаптер был написан под мёртвый API WinTun и не поднимался ни "
+        "разу: поставляемая библиотека оказалась WinTun 1.x, где нет "
+        "функций, которые звал код. Теперь версия API определяется по "
+        "настоящей библиотеке, обратный путь relay → узел на Windows "
+        "действительно пишет в адаптер, тред чтения не умирает, а сам "
+        "адаптер открывается по имени и не создаётся молча. Плюс новая "
+        "настройка game_tun: подсеть игровых узлов включается только "
+        "явно, по умолчанию выключена. Честно: полный проход пакета "
+        "через адаптер измерить не удалось — сессия WinTun на этой "
+        "машине не открывается ни при одной из пяти проверенных "
+        "конвенций вызова, поэтому Windows-ветка отказывает честно, "
+        "а не делает вид, что поднялась.",
     "1.10.3":
         "Кот-прибирщик вынес мусор из пула. Мёртвые ключи больше не"
         "копятся: чистка смотрит на метку смерти у ЛЮБОГО источника,"
@@ -635,6 +650,16 @@ _SETTINGS_DEFAULTS = {
     "continue_text": "",     # текст при отправке continue
     "ui_token": "",          # X-Auth-токен панели (пусто = как раньше, секреты видны в LAN)
     "mesh_tunnel": False,      # A-151: релей-туннель меш (по умолчанию выключен)
+    # A-WARP-PUB: rezervnyy kanal WARP (off/auto/on).
+    # off - ne ispolzuetsya, auto - tolko pri pustom pule kljuchey.
+    "warp_mode": "off",
+
+    "game_tun": False,         # A-816: TUN-подсеть игровых узлов (требует root/CAP_NET_ADMIN)
+    # A-827 (Ш4): три сценария на старте. Пусто = ещё не выбран.
+    #   friends — играть с друзьями (свой игровой сервер можно)
+    #   proxy   — свой прокси (игровой адаптер не поднимается)
+    #   guest   — подключили к чужой Aurora (гость чужой группы)
+    "game_scenario": "",
     # --- v1.4.0: сервер / меш / безопасность ---
     "server_name": "Home",       # имя сервера (хаб меша)
     "auto_refresh": True,        # автообновление github-ключей фоновым циклом
@@ -1045,6 +1070,18 @@ def _apply_mesh_env():
     log("mesh: релей-туннель включён через AURORA_MESH_TUNNEL")
 
 
+def _apply_game_env():
+    """A-816: env-флаг игрового TUN, тот же приём, что и для релея (A-275).
+
+    Только в памяти и только один ключ. На диск не пишем: источник истины - env,
+    иначе игнорирование env в юните навсегда записало бы дефолт.
+    """
+    if not GAME_TUN_ENV or _settings.get("game_tun"):
+        return
+    _settings["game_tun"] = True
+    log("mesh: игровой TUN включён через AURORA_MESH_GAME_TUN")
+
+
 def load_settings():
     """Читает data/settings.json (выживают только известные ключи)."""
     global _settings
@@ -1060,6 +1097,7 @@ def load_settings():
             if not _apply_port_overrides(_settings):
                 raise ValueError("ports are invalid")
             _apply_mesh_env()
+            _apply_game_env()
             return
         try:
             merged = _validate_settings(raw)
@@ -1074,6 +1112,7 @@ def load_settings():
             return
         _settings = merged
         _apply_mesh_env()
+        _apply_game_env()
 
 
 def _persist_settings(value):
@@ -1323,6 +1362,7 @@ def _read_mesh_flag(name):
 
 
 MESH_TUNNEL_ENV = _read_mesh_flag("AURORA_MESH_TUNNEL")
+GAME_TUN_ENV = _read_mesh_flag("AURORA_MESH_GAME_TUN")
 MESH_SECRET = (os.environ.get("AURORA_MESH_SECRET", "") or "").strip()
 MESH_PUBLIC_ADDR = (os.environ.get("AURORA_MESH_PUBLIC_ADDR", "") or "").strip()
 MESH_MASTER_ADDR = (os.environ.get("AURORA_MESH_MASTER_ADDR", "") or "").strip()
