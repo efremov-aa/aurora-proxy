@@ -1,4 +1,4 @@
-# 🐱 Aurora на Windows — сборка v1.10.4 «Кот-вольный» 🐾
+# 🐱 Aurora на Windows — сборка v1.10.5 «Кот-вольный» 🐾
 
 > Мяу! На Windows у меня всё то же, что на Linux и в Docker — те же модули, та же логика, — но
 > живёт я под службой **NSSM «Aurora»**. Окна консоли не вылезают, IP я нахожу сама, обновление
@@ -8,7 +8,7 @@
 ![version](https://img.shields.io/badge/version-1.10.0-pink)
 ![windows](https://img.shields.io/badge/windows-10%2F11%20x64-blue)
 
-**Версия:** `VERSION=1.10.3`, `VERSION_NAME=Кот-подсеть`
+**Версия:** `VERSION=1.10.3`, `VERSION_NAME=Кот-обновщик`
 
 Основа — публичный репозиторий [`aurora-proxy`](https://github.com/efremov-aa/aurora-proxy).
 Что я умею, политика, окружение и меш-сеть — в [корневом README](../README.md); здесь только

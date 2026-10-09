@@ -198,6 +198,27 @@ def _archive_rel(name, want):
     return None
 
 
+def _new_module_rel(name):
+    """A-UPD-1: rel для НОВЫХ .py, которых ещё нет на сервере.
+
+    Отдельная функция, потому что _archive_rel отсекает всё, чего нет в
+    списке want, — а новые модули доставлять как раз и нужно: обновляющий
+    процесс держит в памяти старый список _MODULES и новый файл из архива
+    молча пропускал, после чего новый же код падал на ModuleNotFoundError.
+    """
+    name = str(name or "").replace("\\", "/")
+    parts = [p for p in name.split("/") if p not in ("", ".")]
+    if len(parts) < 2 or any(p == ".." for p in parts):
+        return None
+    parts = parts[1:]
+    if not parts or any(p.lower() in ("linux", "windows") for p in parts):
+        return None
+    rel = "/".join(parts)
+    if not rel.endswith(".py") or rel.count("/") > 1:
+        return None
+    return rel
+
+
 def _digest(value):
     value = str(value or "").strip().lower()
     if value.startswith("sha256:"):
@@ -464,9 +485,31 @@ def _extract_and_replace(zip_bytes, name, digest, expected_version, signature=b"
                             raise RuntimeError("файл обновления слишком большой")
                         out.write(chunk)
                 staged[rel] = dst
-        if set(staged) != want:
-            missing = sorted(want - set(staged))
-            raise RuntimeError("неполный манифест обновления: %s" % ", ".join(missing))
+            # A-UPD-1: второй проход — модуль, добавленный в ЭТОТ же релиз.
+            # У обновляющего процесса список _MODULES в памяти старый, поэтому
+            # новый .py молча игнорировался, и узел падал на import. Доставляем
+            # только то, чего на сервере ещё нет: ничего не перезаписываем.
+            for info in infos:
+                if info.is_dir():
+                    continue
+                mode = (info.external_attr >> 16) & 0o170000
+                if mode == 0o120000:
+                    raise RuntimeError("символические ссылки в обновлении запрещены")
+                if _archive_rel(info.filename, want) is not None:
+                    continue
+                rel = _new_module_rel(info.filename)
+                if rel is None or rel in staged:
+                    continue
+                if os.path.exists(os.path.join(config.BASE_DIR, rel)):
+                    continue
+                dst = os.path.join(stage, *rel.split("/"))
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                with z.open(info) as src, open(dst, "wb") as out:
+                    out.write(src.read(_MAX_ENTRY_BYTES + 1))
+                staged[rel] = dst
+        missing = want - set(staged)
+        if missing:
+            raise RuntimeError("неполный манифест обновления: %s" % ", ".join(sorted(missing)))
         _validate_staged(staged, expected_version)
         return _replace_staged(staged, rollback)
 
