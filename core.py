@@ -234,9 +234,19 @@ def build_xray_config(final_tag):
         rules.insert(0, {"type": "field",
                          "domain": ["domain:" + d for d in ru_bypass],
                          "outboundTag": "direct"})
+    # A-WARP-M-15: ЛОКАЛЬНЫЕ АДРЕСА — ВСЕГДА НАПРЯМУЮ. Без этого правила весь
+    # трафик к 10.x / 192.168.x / 172.16-31.x / 127.x уходил в VPN-туннель:
+    # (а) локальные серверы домашней сети становились недоступны через прокси,
+    # (б) локальный трафик утекал на сторонний VPN-сервер.
+    # Измерено 09.10.2026: коллега не мог достаться до своего сервера 10.1.0.239
+    # через прокси Aurora — отсюда ложная диагностика «сервер мёртв», а он жил.
+    # Правило первым: локальная сеть не должна зависеть от живости ключа.
+    rules.insert(0, {"type": "field",
+                     "ip": ["geoip:private"],
+                     "outboundTag": "direct"})
     # Торрент-трафик на GitHub-сборках ВСЕГДА напрямую (правило юзера):
     # публичные сборки не гонят битторрент через туннель. Правило первым.
-    rules.insert(0, {"type": "field", "protocol": ["bittorrent"],
+    rules.insert(1, {"type": "field", "protocol": ["bittorrent"],
                      "outboundTag": "direct"})
     rules.insert(len(rules) - 1, {"type": "field", "protocol": ["quic"],
                                   "outboundTag": "block"})
