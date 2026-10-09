@@ -232,7 +232,7 @@
             <span class="spacer"></span>
             <span class="badge mono" data-i18n="keys.src">github + свои</span>
           </div>
-          <!-- A-WARP-PUB: rezervnyj kanal Cloudflare WARP -->
+          <!-- A-WARP-M: rezervnyy kanal Cloudflare WARP, SPISOK konfigov -->
           <div class="kchk" id="warp-box">
             <div class="kchk-head">
               <span class="kchk-t">🌀 Резерв WARP</span>
@@ -240,20 +240,27 @@
               <span class="badge mono" id="warp-mode">–</span>
             </div>
             <div class="metrics chk">
-              <div class="stat"><div class="k">🌐 Endpoint</div><div class="v" id="warp-ep">–</div></div>
+              <div class="stat"><div class="k">🌐 Активный конфиг</div><div class="v" id="warp-ep">–</div></div>
               <div class="stat"><div class="k">📤 Выход IP</div><div class="v" id="warp-ip">–</div></div>
               <div class="stat"><div class="k">⚡ Состояние</div><div class="v" id="warp-active">–</div></div>
             </div>
+            <div class="tbl-wrap" style="margin-top:8px">
+              <table>
+                <thead><tr><th>Конфиг</th><th>Server</th><th>Маскировка</th><th>Выход IP</th><th></th></tr></thead>
+                <tbody id="warp-configs"><tr><td colspan="5" class="empty">🜄 Конфигов пока нет — загрузи первый</td></tr></tbody>
+              </table>
+            </div>
             <div class="kchk-foot">
               <input type="file" id="warp-file" accept=".json,application/json" hidden>
-              <button class="btn small" data-act="warp-upload">⬆️ Загрузить конфиг</button>
-              <button class="btn small" data-act="warp-probe">🧪 Проверить</button>
+              <input type="text" id="warp-name" class="inp" placeholder="Имя конфига" maxlength="40" style="width:150px">
+              <button class="btn small" data-act="warp-upload">⬆️ Загрузить</button>
+              <button class="btn small primary" data-act="warp-use">▶️ Канал на WARP</button>
               <button class="btn small" id="warp-off" data-act="warp-mode" data-mode="off">⏹ Выключить</button>
               <button class="btn small" id="warp-auto" data-act="warp-mode" data-mode="auto">🤖 Авто</button>
               <button class="btn small" id="warp-on" data-act="warp-mode" data-mode="on">🔁 Всегда</button>
-              <button class="btn small" data-act="warp-clear">🗑 Удалить</button>
+              <button class="btn small" data-act="warp-clear">🗑 Удалить всё</button>
             </div>
-            <div class="hint" id="warp-note">Сгенерируй конфиг на ПК и загрузи сюда.</div>
+            <div class="hint" id="warp-note">Каждый конфиг — отдельный сервер WARP. Выбери рядом, каким каналом питать трафик.</div>
           </div>
           <div class="tbl-wrap" style="margin-top:12px">
             <table>

@@ -170,9 +170,15 @@ def _mesh_rule_position(rules):
     return len(rules)
 
 
-def _warp_outbounds():
-    """A-WARP-PUB: outbound-y WARP+noise iz zagruzhennogo konfiga (ili None)."""
-    if warp.mode() == "off":
+def _warp_outbounds(target=None):
+    """A-WARP-PUB: outbound-y WARP+noise iz zagruzhennogo konfiga (ili None).
+
+    A-WARP-M: `target` - eto teg, kotoryy my sobiraemsya sdelat final. Esli
+    target = warp, to rezhim "off" NE pomehaet: ruchoy vybor kanala dolzhen
+    rabotat, inache v paneli nevozmozhno ukazat "kormi trifik cherez WARP",
+    a rezhim "off" vsego byli by "avtomatika" dlya rezerva.
+    """
+    if warp.mode() == "off" and target != warp.WARP_TAG:
         return None
     return warp.load()
 
@@ -204,7 +210,8 @@ def build_xray_config(final_tag):
     # outbound-y. Esli konfig ne zagruzhen - fail-closed v direct, inache
     # pravilo ukazyvalo by v nikuda i xray run -test pal by.
     if tag == warp.WARP_TAG:
-        _warp_obs = _warp_outbounds()
+        # A-WARP-M: peredaiom target - ruchoy vybor razreshyon i pri mode=off
+        _warp_obs = _warp_outbounds(target=tag)
         if not _warp_obs:
             config.log("core: A-WARP-PUB-1 zaprashen WARP, konfig ne zagruzhen -> direct")
             tag = "direct"
@@ -422,7 +429,9 @@ def _authoritative_config(cfg, target):
         cfg.setdefault("outbounds", []).append(mesh_ob)
     # A-WARP-PUB-2: outbound-y WARP - ne "chuzhie", inache chistka po allowed
     # vychistit i outbound, i pravlo marshrutizacii.
-    _warp_obs_auth = _warp_outbounds()
+    # A-WARP-M: peredaiom final target - inache pri ruchom vybore WARP i
+    # mode="off" chistka po allowed sryet outbound i pravilo.
+    _warp_obs_auth = _warp_outbounds(target=target if isinstance(target, str) else None)
     if _warp_obs_auth:
         for _wob in _warp_obs_auth:
             allowed.add(_wob["tag"])
@@ -947,7 +956,19 @@ def set_active_tag(tag):
 
 
 def _set_active_tag_impl(tag):
-    """Переключение final на тег из xray.json (vless). Возвращает (ok, msg)."""
+    """Переключение final на тег из xray.json (vless ИЛИ WARP).
+
+    A-WARP-M: ranee lyuboy takoy "tag" otvergalsya kak "tag not in outbounds",
+    to est ruchoy pereklyucheniye kanala na WARP bylo nevozmozhno. Teper WARP
+    prinimaetsya, no tolko pri realno zagruzhennom konfige (inache lozhnyy
+    uspekh, a pravilo ukazalo by v nikuda).
+    """
+    # A-WARP-M: rezervnyy konfig - tozhe kanal, i on NE lezhit v pula klyuchey.
+    _warp_manual = (tag == warp.WARP_TAG)
+    if _warp_manual and not _warp_outbounds(target=tag):
+        config.update_state(comm={"state": "idle", "msg": ""})
+        config.log("core: A-WARP-M ruchoy vybor WARP, no konfig ne zagruzhen")
+        return False, "warp config not loaded"
     config.update_state(comm={"state": "syncing", "msg": "переключение ключа..."})
     with XRAY_CONFIG_LOCK:  # read-modify-write целиком под локом (TOCTOU)
         cfg = _read_config()

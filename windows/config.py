@@ -21,13 +21,13 @@ from collections import deque
 # (xray run/keytest/statsquery/netstat/netsh/taskkill/tg-ws-proxy и т.п.).
 HIDE_FLAG = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
 
-VERSION = "1.10.5"
-VERSION_NAME = "Кот-обновщик"
+VERSION = "1.10.6"
+VERSION_NAME = "Кот-переключатель"
 APP_NAME = "Aurora"
 
 # История версий для вкладки «Версии» (v, имя, дата).
 VERSION_HISTORY = (
-    ("1.10.5", "Кот-обновщик", "08.10.2026"),
+    ("1.10.6", "Кот-переключвавель", "09.10.2026"), ("1.10.5", "Кот-обновщик", "08.10.2026"),
     ("1.10.4", "Кот-подсеть", "07.10.2026"),
     ("1.10.3", "Кот-прибирщик", "07.10.2026"),
     ("1.10.2", "Кот-тополог", "06.10.2026"),

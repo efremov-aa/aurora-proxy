@@ -1277,6 +1277,9 @@ class Handler(BaseHTTPRequestHandler):
             "/api/warp/upload": self._warp_upload,
             "/api/warp/mode": self._warp_mode,
             "/api/warp/probe": self._warp_probe,
+            # A-WARP-M: obrabotchiki spiska - inache 404
+            "/api/warp/select": self._warp_select,
+            "/api/warp/remove": self._warp_remove,
             "/api/warp/clear": self._warp_clear,
             "/api/recovery/limit": self._rc_limit,
             "/api/recovery/region": self._rc_region,
@@ -1388,11 +1391,14 @@ class Handler(BaseHTTPRequestHandler):
         if len(raw.encode("utf-8", "ignore")) > warp.MAX_CONFIG_BYTES:
             self._send(*_json({"ok": False, "error": "config too large"}, 400))
             return
-        r = warp.install(raw)
+        # A-WARP-M: vlaselets zadayet IMYA konfiga (spisok, ne odin rezerv)
+        name = data.get("name") if isinstance(data.get("name"), str) else ""
+        r = warp.install(raw, name)
         if not r.get("ok"):
             self._send(*_json(r, 400))
             return
-        config.log("warp: konfig zagruzhen, endpoint %s" % r.get("endpoint", "-"))
+        config.log("warp: A-WARP-M konfig zagruzhen name=%s endpoint %s"
+                   % (str(r.get("name", ""))[:40], r.get("endpoint", "-")))
         st = warp.status()
         st["ok"] = True
         self._send(*_json(st))
@@ -1416,14 +1422,16 @@ class Handler(BaseHTTPRequestHandler):
             self._send(*_json({"ok": True, "started": True,
                                "msg": "proba WARP uzhe idet"}))
             return
-        if not warp.load():
+        # A-WARP-M: proba mozhet byt odnogo iz spiska, ne tolko aktivnogo
+        pname = data.get("name") if isinstance(data.get("name"), str) else ""
+        if not warp.load(pname):
             self._send(*_json({"ok": False, "error": "no warp config"}, 400))
             return
         _WARP_PROBE["running"] = True
 
         def _run():
             try:
-                r = warp.probe()
+                r = warp.probe(name=pname)
                 config.log("warp: proba: %s" % (r.get("egress") or r.get("error")))
             except Exception as exc:
                 config.log("warp: proba ne udalas: %s" % str(exc)[:120])
@@ -1432,6 +1440,34 @@ class Handler(BaseHTTPRequestHandler):
         threading.Thread(target=_run, daemon=True).start()
         self._send(*_json({"ok": True, "started": True,
                            "msg": "proba WARP zapuschena, rezultat cherez ~15 s"}))
+
+    def _warp_select(self, data):
+        """A-WARP-M: sdelat vybrannyy konfig aktivnym (rezerv ukazyvaet na nego)."""
+        name = data.get("name") if isinstance(data.get("name"), str) else ""
+        res = warp.select(name)
+        config.log("api: A-WARP-M vybor konfiga name=%s ok=%s"
+                   % (name[:40], bool(res.get("ok"))))
+        st = warp.status()
+        st["ok"] = bool(res.get("ok"))
+        if not res.get("ok"):
+            st["error"] = res.get("error", "select failed")
+            self._send(*_json(st, 400))
+            return
+        self._send(*_json(st))
+
+    def _warp_remove(self, data):
+        """A-WARP-M: udalit ODIN konfig, spisok ostaetsya zhivym."""
+        name = data.get("name") if isinstance(data.get("name"), str) else ""
+        res = warp.remove(name)
+        config.log("api: A-WARP-M udalen konfiga name=%s ok=%s"
+                   % (name[:40], bool(res.get("ok"))))
+        st = warp.status()
+        st["ok"] = bool(res.get("ok"))
+        if not res.get("ok"):
+            st["error"] = res.get("error", "remove failed")
+            self._send(*_json(st, 400))
+            return
+        self._send(*_json(st))
 
     def _warp_clear(self, data):
         r = warp.clear()

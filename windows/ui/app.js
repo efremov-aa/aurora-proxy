@@ -1332,7 +1332,12 @@
     var names = { off: 'выключен', auto: 'авто (пустой пул)', on: 'всегда' };
     var mode = String(w.mode || 'off');
     var put = function (id, v) { var el = $(id); if (el) el.textContent = String(v); };
-    put('warp-state', w.loaded ? ('конфиг загружен' + (w.noise ? ' + маскировка' : '')) : 'конфиг не загружен');
+    // A-WARP-M: razlichayum "net konfigov" i "est N, aktivnyy takoy-to"
+    var cfgs = (w.configs && w.configs.length) ? w.configs : [];
+    var cur = String(w.name || '');
+    put('warp-state', !w.loaded ? 'конфигов нет'
+      : (cfgs.length === 1 ? ('1 конфиг' + (cur ? ' · активен ' + cur : ''))
+                           : (cfgs.length + ' конфигов · активен ' + (cur || '—'))));
     put('warp-mode', names[mode] || mode);
     put('warp-ep', w.endpoint || '—');
     put('warp-ip', (w.egress && w.egress !== '-') ? w.egress : 'не проверено');
@@ -1341,15 +1346,83 @@
     var hint = $('warp-note');
     if (hint) {
       hint.textContent = !w.loaded
-        ? 'Сгенерируй конфиг на ПК (Cloudflare WARP generator, вкладка Xray) и загрузи сюда.'
-        : (active ? 'WARP сейчас несёт трафик.' : 'Трафик идёт через обычные ключи; WARP поднимется сам в режиме «авто».');
+        ? 'Сгенерируй конфиги на ПК (Cloudflare WARP generator, вкладка Xray) и загрузи сюда — можно несколько, каждый со своим именем.'
+        : ((S && S.vless_now) === 'warp'
+           ? 'Канал сейчас идёт через WARP-конфиг «' + (w.name || '—') + '».'
+           : (active ? 'WARP несёт трафик прямо сейчас.'
+           : 'Трафик идёт через обычные ключи. «Канал на WARP» переключит вручную, «авто» — когда в пуле не останется живых ключей.'));
+    }
+    // A-WARP-M: tablica konfigov
+    var box = $('warp-configs');
+    if (box) {
+      if (!cfgs.length) {
+        box.innerHTML = '<tr><td colspan="5" class="empty">🜄 Конфигов пока нет — загрузи первый</td></tr>';
+      } else {
+        box.innerHTML = cfgs.map(function (c) {
+          var n = c.name || '?';
+          var eg = (c.egress && c.egress !== '-') ? c.egress : 'не проверен';
+          return '<tr class="' + (c.active ? 'tr-active' : '') + '">' +
+            '<td><b>' + esc(n) + '</b>' + (c.active ? ' 🐈' : '') + '</td>' +
+            '<td class="mono">' + esc(c.endpoint || '—') + '</td>' +
+            '<td>' + (c.noise ? 'есть' : '—') + '</td>' +
+            '<td class="mono">' + esc(eg) + '</td>' +
+            '<td>' + (c.active ? '' :
+              '<button class="btn small primary" title="Сделать активным" data-name="' + esc(n) + '" data-act="warp-select" data-name2="' + esc(n) + '">📌 Активный</button> ') +
+            '<button class="btn small" title="Проверить" data-act="warp-probe-one" data-name2="' + esc(n) + '">🧪</button> ' +
+            '<button class="btn small" title="Удалить" data-act="warp-remove-one" data-name2="' + esc(n) + '">🗑</button>' +
+            '</td></tr>';
+        }).join('');
+      }
     }
     var off = $('warp-off'), au = $('warp-auto'), on = $('warp-on');
     if (au) au.className = 'btn small' + (mode === 'auto' ? ' primary' : '');
     if (on) on.className = 'btn small' + (mode === 'on' ? ' primary' : '');
     if (off) off.className = 'btn small' + (mode === 'off' ? ' primary' : '');
   }
-  function warpUpload() {
+  function warpSelect(name) {
+  if (!name) return toast('не выбран конфиг', false);
+  toast('Делаю активным: ' + name + '...', true);
+  postJSON('/api/warp/select', { name: String(name) }).then(function (j) {
+    toast(j && j.ok ? ('Активный конфиг: ' + (j.name || name)) : ('WARP: не удалось выбрать (' + ((j && (j.error || j.msg)) || 'нет ответа') + ')'), !!(j && j.ok));
+    if (j && j.configs) warpRender(j);
+    refresh();
+  }).catch(function () { toast('WARP: конфиг не выбран', false); });
+}
+function warpUse() {
+  toast('Переключаю канал на WARP...', true);
+  postJSON('/api/keys/active', { tag: 'warp', lane: 'lan' }).then(function (j) {
+    toast(j && j.ok ? ('Канал на WARP' + (j.msg ? ' · ' + j.msg : '')) : ('WARP: канал не переключён (' + ((j && (j.msg || j.error)) || 'нет ответа') + ')'), !!(j && j.ok));
+    refresh();
+  }).catch(function () { toast('WARP: канал не переключён', false); });
+}
+function warpProbeOne(name) {
+  if (!name) return toast('не выбран конфиг', false);
+  if (WARP_PROBE_BUSY) return toast('проба WARP уже идёт', false);
+  WARP_PROBE_BUSY = true;
+  toast('Проверяю ' + name + ': временный канал (~15 с)...', true);
+  postJSON('/api/warp/probe', { name: String(name) }).then(function () {
+    setTimeout(function () {
+      getJSON('/api/warp').then(function (w) {
+        warpRender(w);
+        var cfg = ((w && w.configs) || []).filter(function (c) { return c.name === name; })[0];
+        var ok = cfg && cfg.egress && cfg.egress !== '-';
+        toast(ok ? ('Проверено · ' + name + ' · выход ' + cfg.egress) : ('Проверка не дала выхода · ' + name), !!ok);
+        WARP_PROBE_BUSY = false;
+        refresh();
+      }).catch(function () { WARP_PROBE_BUSY = false; });
+    }, 18000);
+  }).catch(function () { WARP_PROBE_BUSY = false; });
+}
+function warpRemoveOne(name) {
+  if (!name) return toast('не выбран конфиг', false);
+  if (!confirm('Удалить конфиг WARP: ' + name + '?')) return;
+  postJSON('/api/warp/remove', { name: String(name) }).then(function (j) {
+    toast(j && j.ok ? ('Конфиг удалён: ' + name) : ('WARP: не удалось удалить (' + ((j && (j.error || j.msg)) || 'нет ответа') + ')'), !!(j && j.ok));
+    if (j && j.configs) warpRender(j);
+    refresh();
+  }).catch(function () { toast('WARP: конфиг не удалён', false); });
+}
+function warpUpload() {
     var inp = $('warp-file');
     if (!inp) return toast('нет поля загрузки', false);
     inp.value = '';
@@ -1362,9 +1435,11 @@
     var rd2 = new FileReader();
     toast('Загрузиваю конфиг WARP...', true);
     rd2.onload = function () {
-      postJSON('/api/warp/upload', { config: String(rd2.result || '') }).then(function (j) {
+      // A-WARP-M: vladelets zadayet IMYA konfiga (spisok, ne odin rezerv)
+      var nm = ($('warp-name') && $('warp-name').value || '').trim();
+      postJSON('/api/warp/upload', { config: String(rd2.result || ''), name: nm }).then(function (j) {
         if (j && j.ok) {
-          toast('WARP-конфиг принят, endpoint ' + (j.endpoint || '?'), true);
+          toast('WARP-конфиг принят: ' + (j.name || j.endpoint || '?'), true);
           warpRender(j);
         } else {
           toast('WARP: конфиг не принят (' + ((j && (j.error || j.msg)) || 'нет ответа') + ')', false);
@@ -2802,7 +2877,12 @@ function loadTG() {
     'warp-upload': function () { warpUpload(); },
     'warp-probe': function () { warpProbe(); },
     'warp-mode': function (t) { warpMode(t.getAttribute('data-mode') || 'off'); },
-    'warp-clear': function () { warpClear(); }
+    'warp-clear': function () { warpClear(); },
+    // A-WARP-M: spisok konfigov
+    'warp-select': function (t) { warpSelect(t.getAttribute('data-name2') || ''); },
+    'warp-use': function () { warpUse(); },
+    'warp-probe-one': function (t) { warpProbeOne(t.getAttribute('data-name2') || ''); },
+    'warp-remove-one': function (t) { warpRemoveOne(t.getAttribute('data-name2') || ''); }
   };
   function actTarget(ev) {
     var node = ev && ev.target;
