@@ -655,7 +655,7 @@ _SETTINGS_DEFAULTS = {
     "auto_recovery": True,   # авто-восстановление канала через агента
     "continue_text": "",     # текст при отправке continue
     "ui_token": "",          # X-Auth-токен панели (пусто = как раньше, секреты видны в LAN)
-    "mesh_tunnel": False,      # A-151: релей-туннель меш (по умолчанию выключен)
+    "mesh_tunnel": True,       # A-WARP-M-7: включён по умолчанию — клиенты подключаются к мастеру
     # A-WARP-PUB: rezervnyy kanal WARP (off/auto/on).
     # off - ne ispolzuetsya, auto - tolko pri pustom pule kljuchey.
     "warp_mode": "off",
