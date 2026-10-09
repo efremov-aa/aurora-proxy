@@ -630,9 +630,18 @@ def _xray_proc_start():
     try:
         kwargs = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
         if os.name == "nt":
-            kwargs["creationflags"] = config.HIDE_FLAG
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            breakaway = getattr(ctypes.windll.kernel32, "CREATE_BREAKAWAY_FROM_JOB", 0x01000000)
+            kwargs["creationflags"] = config.HIDE_FLAG | breakaway
+            _job_handle = getattr(core_module, "_JOB_HANDLE", None)
         _XRAY_PROC[0] = subprocess.Popen(
             [xbin, "run", "-c", config.XRAY_CONFIG], **kwargs)
+        if os.name == "nt" and _job_handle:
+            if kernel32.AssignProcessToJobObject(_job_handle, ctypes.windll.kernel32.OpenProcess(0x1000, False, _XRAY_PROC[0].pid)):
+                config.log("core: xray назначен в Job Object")
+            else:
+                config.log("core: xray не назначен в Job Object: %s" % ctypes.get_last_error())
     except OSError as e:
         config.log("core: proc-старт xray не удался: %s" % e)
         return False
@@ -663,6 +672,32 @@ def _xray_proc_stop():
 
 
 atexit.register(_xray_proc_stop)
+
+
+def _xray_proc_start():
+    """Запуск xray как подпроцесса (режим proc для Docker)."""
+    xbin = _xray_bin()
+    if not xbin:
+        config.log("core: xray-бинаря нет (proc)")
+        return False
+    if _XRAY_PROC[0] and _XRAY_PROC[0].poll() is None:
+        return True
+    try:
+        kwargs = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
+        if os.name == "nt":
+            kwargs["creationflags"] = config.HIDE_FLAG
+        _XRAY_PROC[0] = subprocess.Popen(
+            [xbin, "run", "-c", config.XRAY_CONFIG], **kwargs)
+    except OSError as e:
+        config.log("core: proc-старт xray не удался: %s" % e)
+        return False
+    end = time.time() + 15
+    while time.time() < end:
+        if _port_open(config.XRAY_PORT):
+            return True
+        time.sleep(1)
+    config.log("core: xray (proc) не поднял порт за 15с")
+    return False
 
 
 def _service_value(prop):
