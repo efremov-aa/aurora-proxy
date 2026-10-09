@@ -2,6 +2,7 @@
 # Принцип: final-тег — только живой ключ с реальным egress. VPN OFF -> direct.
 
 import warp  # A-WARP-PUB: rezervnyy kanal WARP
+import atexit
 import hashlib
 import ipaddress
 import json
@@ -627,9 +628,11 @@ def _xray_proc_start():
     if _XRAY_PROC[0] and _XRAY_PROC[0].poll() is None:
         return True
     try:
+        kwargs = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
+        if os.name == "nt":
+            kwargs["creationflags"] = config.HIDE_FLAG
         _XRAY_PROC[0] = subprocess.Popen(
-            [xbin, "run", "-c", config.XRAY_CONFIG],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            [xbin, "run", "-c", config.XRAY_CONFIG], **kwargs)
     except OSError as e:
         config.log("core: proc-старт xray не удался: %s" % e)
         return False
@@ -640,6 +643,26 @@ def _xray_proc_start():
         time.sleep(1)
     config.log("core: xray (proc) не поднял порт за 15с")
     return False
+
+
+def _xray_proc_stop():
+    """Остановка xray при завершении работы (atexit)."""
+    if XRAY_MANAGE != "proc":
+        return
+    proc = _XRAY_PROC[0]
+    if proc and proc.poll() is None:
+        try:
+            proc.terminate()
+            proc.wait(timeout=8)
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+    _XRAY_PROC[0] = None
+
+
+atexit.register(_xray_proc_stop)
 
 
 def _service_value(prop):
