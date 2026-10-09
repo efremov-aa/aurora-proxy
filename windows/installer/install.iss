@@ -6,10 +6,10 @@
   #define SrcDir "..\..\..\Temp\opencode\aurora_build\dist\Aurora"
 #endif
 #ifndef AuroraVersion
-  #define AuroraVersion "1.10.5"
+  #define AuroraVersion "1.10.6"
 #endif
 #ifndef AuroraVersionName
-  #define AuroraVersionName "Кот-обновщик"
+  #define AuroraVersionName "Кот-переключатель"
 #endif
 
 [Setup]
@@ -43,6 +43,11 @@ Source: "setup_service.cmd"; DestDir: "{app}"; Flags: ignoreversion
 
 [Run]
 Filename: "{app}\setup_service.cmd"; WorkingDir: "{app}"; Flags: runhidden waituntilterminated; StatusMsg: "Installing Aurora Windows service..."
+; A-WARP-M-8: после старта службы открываем панель - там первым делом
+; показываются ПРАВИЛА (политика, ревизия) и МАСТЕР настроек первого запуска.
+; Пауза 12 c нужна, чтобы xray и панель успели подняться, иначе вкладка
+; откроется до первого запроса и пользователь увидит пустую страницу.
+Filename: "{sys}\cmd.exe"; Parameters: "/c ping -n 13 127.0.0.1 >nul & start "" ""http://127.0.0.1:8890"""; Flags: runhidden; StatusMsg: "Opening Aurora panel..."
 
 [UninstallRun]
 Filename: "{app}\_internal\nssm\nssm.exe"; Parameters: "stop Aurora"; Flags: runhidden; StatusMsg: "Stopping Aurora service..."
