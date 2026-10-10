@@ -274,6 +274,15 @@ def build_xray_config(final_tag):
     rules.insert(len(rules) - 1, {"type": "field", "network": "udp",
                                   "outboundTag": "block"})
 
+    # A-544: правило для входа api-in (dokodemo-door на 127.0.0.1:XRAY_API_PORT)
+    # ОБЯЗАТЕЛЬНО идёт ПЕРВЫМ. Иначе трафик на API-порт ловит общее правило
+    # geoip:private -> direct (destination у этих пакетов сам 127.0.0.1),
+    # xray уходит в direct и дозванивается сам в свой же порт -> бесконечная
+    # петля соединений -> утечка fd "too many open files" и смерть прокси.
+    # Воспроизведено на мастере: 8 -> 63962 fd за ~9 c от ОДНОГО коннекта.
+    rules.insert(0, {"type": "field", "inboundTag": ["api-in"],
+                     "outboundTag": "api-in", "ruleTag": "aurora-xray-api"})
+
     cfg = {
         "log": {"loglevel": "warning", "access": "", "error": ""},
         "api": {"tag": "api-in", "services": ["StatsService"]},
@@ -835,13 +844,35 @@ def _sync_impl():
     # egress-проверка активного канала (4 попытки — cold start Reality >8с)
     ip = None
     if final_tag != "direct":
-        for i in range(1, 5):
-            ip = egress_probe(timeout=10)
+        # A-548: 2 попытки вместо 4, туннель спрашивается сразу после первой
+        # неудачи, обе проверки параллельно. Живой туннель = канал рабочий,
+        # откатывать в direct из-за молчащего ipify нельзя.
+        for i in range(2):
+            box = {}
+            def _sw(_b=box):
+                _b["v"] = _tunnel_alive(timeout=TUNNEL_ALIVE_S)
+            th = threading.Thread(target=_sw, daemon=True)
+            th.start()
+            try:
+                ip = egress_probe(timeout=10 if i == 0 else 6)
+            finally:
+                th.join(timeout=TUNNEL_ALIVE_S + 1.0)
             if ip:
                 break
-            config.log("core: sync final=%s egress probe %d/4 не дал IP" % (final_tag, i))
-            time.sleep(3)
+            tunnel_ok = box.get("v")
+            config.log("core: sync final=%s egress probe %d/2 не дал IP (туннель: %s)"
+                       % (final_tag, i + 1, tunnel_ok))
+            if tunnel_ok:
+                break
+            if i == 0:
+                time.sleep(2)
         if not ip:
+            if _tunnel_alive(timeout=TUNNEL_ALIVE_S):
+                config.log("core: final=%s туннель жив, IP-сервис молчит - канал оставляем"
+                           % final_tag)
+                config.update_state(vless_now=final_tag, final_mode=final_tag, egress_ip="-",
+                                    comm={"state": "idle", "msg": ""})
+                return True, final_tag
             config.log("core: final=%s БЕЗ egress, откат на direct" % final_tag)
             final_tag = "direct"
             cfg = build_xray_config("direct")
@@ -878,6 +909,36 @@ def _sync_impl():
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
+
+
+TUNNEL_ALIVE_S = 8.0
+
+
+def _tunnel_alive(timeout=TUNNEL_ALIVE_S):
+    """A-292/A-548: туннель жив, даже если IP-сервисы не отвечают.
+
+    Проверяем через тот же прокси xray заведомо доступные HTTP-адреса: ответил
+    хоть один - канал работает, значит отсутствие egress-IP не повод считать
+    ключ мёртвым и откатывать переключение.
+    """
+    import urllib.request
+    proxy_url = "http://127.0.0.1:%d" % config.XRAY_PORT
+    deadline = time.time() + max(1, timeout)
+    for url in ("http://example.com/", "http://cp.cloudflare.com/generate_204",
+                "http://www.msftconnecttest.com/connecttest"):
+        remaining = deadline - time.time()
+        if remaining <= 0:
+            break
+        try:
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler(
+                {"http": proxy_url, "https": proxy_url}))
+            req = urllib.request.Request(url, headers={"User-Agent": "curl"})
+            with opener.open(req, timeout=max(1, min(4, remaining))) as resp:
+                resp.read(512)
+            return True
+        except Exception:
+            continue
+    return False
 
 
 def egress_probe(timeout=10):
@@ -1082,11 +1143,35 @@ def _set_active_tag_impl(tag):
         config.update_state(comm={"state": "idle", "msg": ""})
         return False, "restart fail"
     ip = None
-    for i in range(1, 5):  # 4 попытки, cold start Reality >8с
-        ip = egress_probe(timeout=10)
-        if ip:
-            break
-        time.sleep(3)
+    tunnel_ok = None
+    if _warp_manual:
+        # A-546: Cloudflare WARP не обязан отдавать выходной IP тем сервисам,
+        # которыми мы его меряем. 4 пробы по 10 c тут были потерей времени.
+        config.log("core: switch -> %s (WARP: proverku egress propuskayu)" % tag)
+    else:
+        # A-548: раньше 4 пробы по 10 c с паузами (до 52 c), и только ПОТОМ
+        # проверка "туннель жив". Теперь после первой неудачной пробы туннель
+        # спрашивается сразу, попыток 2, и обе проверки идут ПАРАЛЛЕЛЬНО.
+        for i in range(2):
+            box = {}
+            def _tw(_b=box):
+                _b["v"] = _tunnel_alive(timeout=TUNNEL_ALIVE_S)
+            th = threading.Thread(target=_tw, daemon=True)
+            th.start()
+            try:
+                ip = egress_probe(timeout=10 if i == 0 else 6)
+            finally:
+                th.join(timeout=TUNNEL_ALIVE_S + 1.0)
+            if ip:
+                tunnel_ok = box.get("v")
+                break
+            tunnel_ok = box.get("v")
+            config.log("core: switch %s: probe %d/2 ne dal IP, tunnel=%s"
+                       % (tag, i + 1, tunnel_ok))
+            if tunnel_ok:
+                break
+            if i == 0:
+                time.sleep(2)
     if ip:
         with EGRESS_LOCK:
             _EGRESS_CACHE["ip"] = ip
@@ -1095,6 +1180,13 @@ def _set_active_tag_impl(tag):
                             comm={"state": "idle", "msg": ""})
         config.log("core: switch -> %s (egress %s)" % (tag, ip))
         return True, "egress %s" % ip
+    # A-292/A-548: IP-сервис не ответил, но туннель по этому же прокси живой -
+    # канал переключился, ключ в direct выбрасывать нельзя.
+    if tunnel_ok:
+        config.update_state(vless_now=tag, final_mode=tag, egress_ip="-",
+                            comm={"state": "idle", "msg": ""})
+        config.log("core: switch -> %s (туннель жив, IP неизвестен)" % tag)
+        return True, "tunnel alive, egress unknown"
     # откат
     rollback = prev if prev in tags else "direct"
     with XRAY_CONFIG_LOCK:
