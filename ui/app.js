@@ -1336,13 +1336,32 @@
     var cfgs = (w.configs && w.configs.length) ? w.configs : [];
     var cur = String(w.name || '');
     put('warp-state', !w.loaded ? 'конфигов нет'
-      : (cfgs.length === 1 ? ('1 конфиг' + (cur ? ' · активен ' + cur : ''))
-                           : (cfgs.length + ' конфигов · активен ' + (cur || '—'))));
+      : (cfgs.length === 1 ? ('1 конфиг' + (cur ? ' · выбран ' + cur : ''))
+                           : (cfgs.length + ' конфигов · выбран ' + (cur || '—'))));
     put('warp-mode', names[mode] || mode);
-    put('warp-ep', w.endpoint || '—');
+    // A-WARP-M-16: poly podpisyano "Выбранный конфиг", znachit tuda imya,
+  // a endpoint - v title. Ranee tuda shol endpoint, i chelovek chital
+  // "lv.tribukvy.tld:854" kak imya, hotya eto adres servera.
+  var warpNameEl = $('warp-ep');
+  if (warpNameEl) {
+    warpNameEl.textContent = cur || (w.loaded ? 'без имени' : '—');
+    warpNameEl.title = w.endpoint ? ('server: ' + w.endpoint) : '';
+  }
     put('warp-ip', (w.egress && w.egress !== '-') ? w.egress : 'не проверено');
+    // A-WARP-M-16: "ждёт" ne znachit nichego. Tri sostoianiya imeyut smysl:
+    // konfigov net / konfig vybran, no kanal idet po obychnym klyucham / kanal na WARP.
     var active = w.active === true;
-    put('warp-active', active ? '✅ активен' : (w.loaded ? 'ждёт' : '—'));
+    var onWarp = (S && S.vless_now) === 'warp';
+    put('warp-active', !w.loaded ? 'конфигов нет'
+      : (onWarp ? '✅ на WARP'
+      : (active ? 'на ключах' : 'конфиг готов')));
+    // knopka primary tolko kogda kanal NE na WARP - inache ona vyglyadit
+    // kak uzhe vklyuchennaya
+    var wb = document.querySelector('[data-act="warp-use"]');
+    if (wb) {
+      wb.className = 'btn small' + (onWarp ? '' : ' primary');
+      wb.textContent = onWarp ? '✅ Канал на WARP' : '▶️ Канал на WARP';
+    }
     var hint = $('warp-note');
     if (hint) {
       hint.textContent = !w.loaded
