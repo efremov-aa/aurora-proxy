@@ -16,21 +16,21 @@
 ![mascot](https://img.shields.io/badge/mascot-%F0%9F%90%B1-pink)
 ![python](https://img.shields.io/badge/python-3.12%20stdlib-blue)
 ![xray](https://img.shields.io/badge/xray-v26.9.9-blue)
-![version](https://img.shields.io/badge/version-1.10.10-pink)
+![version](https://img.shields.io/badge/version-1.10.11-pink)
 
-**Версия:** `VERSION=1.10.10`, `VERSION_NAME=Кот-компас` · **Политика:** ревизия 2 (принимается при первом запуске)
+**Версия:** `VERSION=1.10.11`, `VERSION_NAME=Кот-чистый` · **Политика:** ревизия 2 (принимается при первом запуске)
 
 ---
 
 ## 📥 Загрузка
 
-Мяу! Всё лежит в [Release v1.10.10 «Кот-компас»](https://github.com/efremov-aa/aurora-proxy/releases).
+Мяу! Всё лежит в [Release v1.10.11 «Кот-чистый»](https://github.com/efremov-aa/aurora-proxy/releases).
 
 | Ассет | Что внутри |
 |---|---|
-| `Aurora-v1.10.10-linux.zip` | Linux-версия: модули, `ui/`, `proxy/`, `Dockerfile`, `docker-compose.yml`, systemd-юниты |
-| `Aurora-v1.10.10-windows.zip` | Windows-версия (папка `windows/`): те же модули + `bin/`, `nssm/`, `installer/`, `download_xray.ps1` |
-| `Aurora-Setup-1.10.10.exe` 🪟 | **Установщик для Windows**: ставит Aurora как службу **NSSM «Aurora»**, xray и TG-WS внутри, авто-обновление |
+| `Aurora-v1.10.11-linux.zip` | Linux-версия: модули, `ui/`, `proxy/`, `Dockerfile`, `docker-compose.yml`, systemd-юниты |
+| `Aurora-v1.10.11-windows.zip` | Windows-версия (папка `windows/`): те же модули + `bin/`, `nssm/`, `installer/`, `download_xray.ps1` |
+| `Aurora-Setup-1.10.11.exe` 🪟 | **Установщик для Windows**: ставит Aurora как службу **NSSM «Aurora»**, xray и TG-WS внутри, авто-обновление |
 | `*.sig` | Подпись Ed25519 каждого ассета: авто-обновление не примет неподписанный файл 🐾 |
 
 Подпись релизов проверена подписно: Ed25519, fingerprint `ca4f87c9999e0282…`. Скачанный архив
@@ -185,7 +185,7 @@ docker compose up -d --build
 
 ### Вариант 3 — Windows 🪟
 
-Скачайте `Aurora-Setup-1.10.10.exe` и запустите: ставится служба **NSSM «Aurora»**.
+Скачайте `Aurora-Setup-1.10.11.exe` и запустите: ставится служба **NSSM «Aurora»**.
 Данные — в `%LOCALAPPDATA%\Aurora`. Альтернатива — ручная установка из `windows/README-windows.md`.
 
 ## ⚙️ Мои настройки через env

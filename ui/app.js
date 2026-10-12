@@ -1456,12 +1456,20 @@ function warpRemoveOne(name) {
     refresh();
   }).catch(function () { toast('WARP: конфиг не удалён', false); });
 }
-function warpUpload() {
+  function warpUpload() {
     var inp = $('warp-file');
     if (!inp) return toast('нет поля загрузки', false);
     inp.value = '';
     inp.click();
   }
+  // A-839: obrabotchik change s capture - KAK NA MASTERE. Delegaciya ACTS
+  // ostanetsya, no osnovnoy put' idet cherez etot pryamoy slushatel, on
+  // proveden u vladeltsa na mastere.
+  document.addEventListener('change', function (ev) {
+    var t = ev.target;
+    if (!t || t.id !== 'warp-file') return;
+    warpOnFile(ev);
+  }, true);
   function warpOnFile(ev) {
     var f = ev && ev.target && ev.target.files && ev.target.files[0];
     if (!f) return;
@@ -2935,7 +2943,6 @@ function loadTG() {
     'ext-download': function (t) { window.extDownload(t.getAttribute('data-target') || 'chrome'); },
     'log-load': function () { window.loadLog(); },
     // A-WARP-PUB: rezervnyj kanal WARP
-    'warp-upload': function () { warpUpload(); },
     'warp-probe': function () { warpProbe(); },
     'warp-mode': function (t) { warpMode(t.getAttribute('data-mode') || 'off'); },
     'warp-clear': function () { warpClear(); },
@@ -2947,7 +2954,11 @@ function loadTG() {
     // A-828: vybor fayla. Bez etogo akta sobytie 'change' na #warp-file
     // ne dohodilo ni do odnogo obrabotchika: warpOnFile() byla napisana,
     // no ne vyzyvalasya, i knopka "Zagruzit" molchala posle vybora.
-    'warp-file': function (t, ev) { warpOnFile(ev); }
+    'warp-file': function (t, ev) { warpOnFile(ev); },
+    // A-839: kak na mastere - pryamoy vyzyov warpUpload(), kotoryy
+    // otkryvaet dialog nativno. Label (A-837) u menya dialog ne
+    // otkryval, vozvrayom button + inp.click().
+    'warp-upload': function () { warpUpload(); },
   };
   function actTarget(ev) {
     var node = ev && ev.target;

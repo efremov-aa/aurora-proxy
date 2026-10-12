@@ -1,14 +1,14 @@
-# 🐱 Aurora на Windows — сборка v1.10.10 «Кот-компас» 🐾
+# 🐱 Aurora на Windows — сборка v1.10.11 «Кот-чистый» 🐾
 
 > Мяу! На Windows у меня всё то же, что на Linux и в Docker — те же модули, та же логика, — но
 > живёт я под службой **NSSM «Aurora»**. Окна консоли не вылезают, IP я нахожу сама, обновление
 > подписано и проверяется. Мягкие лапки, острый туннель. 🐾
 
 ![mascot](https://img.shields.io/badge/mascot-%F0%9F%90%B1-pink)
-![version](https://img.shields.io/badge/version-1.10.10-pink)
+![version](https://img.shields.io/badge/version-1.10.11-pink)
 ![windows](https://img.shields.io/badge/windows-10%2F11%20x64-blue)
 
-**Версия:** `VERSION=1.10.10`, `VERSION_NAME=Кот-компас`
+**Версия:** `VERSION=1.10.11`, `VERSION_NAME=Кот-чистый`
 
 Основа — публичный репозиторий [`aurora-proxy`](https://github.com/efremov-aa/aurora-proxy).
 Что я умею, политика, окружение и меш-сеть — в [корневом README](../README.md); здесь только
@@ -16,7 +16,7 @@
 
 ## 📥 Установка (рекомендуется)
 
-1. Скачайте **`Aurora-Setup-1.10.10.exe`** из [Releases](https://github.com/efremov-aa/aurora-proxy/releases)
+1. Скачайте **`Aurora-Setup-1.10.11.exe`** из [Releases](https://github.com/efremov-aa/aurora-proxy/releases)
    и запустите от администратора.
 2. Установщик собирает `Aurora.exe` + `_internal\` (xray v26.9.9, geoip/geosite, `wintun.dll`,
    `tg-ws-proxy.exe`, nssm, `ui\`), ставит службу **NSSM «Aurora»** (автозапуск, авто-рестарт)
