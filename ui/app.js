@@ -12,6 +12,7 @@
   ];
   var I18N = {  
     ru: {
+      'check.left': 'Проверено', 'check.idle': 'проверка не запускалась',
       'pol.head': 'Политика сервиса', 'pol.readOnly': 'Просмотр', 'pol.accept': 'Принимаю условия', 'ru.regions': 'Сегменты', 'ru.custom-ph': 'Свои домены через запятую (необязательно)',
       'dash.manage': 'Управление', 'pool.refresh-btn': 'Обновить ключи', 'pool.check-btn': 'Проверить ключи', 'mesh.ping-btn': 'Пинг меш',
       'nav.dash': 'Обзор', 'nav.keys': 'Ключи', 'nav.devices': 'Устройства',
@@ -131,6 +132,7 @@
 
     },  
     en: {
+      'check.left': 'Checked', 'check.idle': 'no check run yet',
       'pol.head': 'Service policy', 'pol.readOnly': 'View', 'pol.accept': 'I accept the terms', 'ru.regions': 'Segments', 'ru.custom-ph': 'Custom domains, comma separated (optional)',
       'dash.manage': 'Manage', 'pool.refresh-btn': 'Refresh keys', 'pool.check-btn': 'Check keys', 'mesh.ping-btn': 'Mesh ping',
       'nav.dash': 'Dashboard', 'nav.keys': 'Keys', 'nav.devices': 'Devices',
@@ -250,6 +252,7 @@
 
     },  
     es: {
+      'check.left': 'Comprobado', 'check.idle': 'sin comprobación aún',
       'pol.head': 'Política del servicio', 'pol.readOnly': 'Ver', 'pol.accept': 'Acepto los términos', 'ru.regions': 'Segmentos', 'ru.custom-ph': 'Dominios propios separados por comas (opcional)',
       'dash.manage': 'Gestión', 'pool.refresh-btn': 'Actualizar claves', 'pool.check-btn': 'Comprobar claves', 'mesh.ping-btn': 'Ping mesh',
       'nav.dash': 'Panel', 'nav.keys': 'Claves', 'nav.devices': 'Dispositivos',
@@ -369,6 +372,7 @@
 
     },  
     de: {
+      'check.left': 'Geprüft', 'check.idle': 'noch keine Prüfung',
       'pol.head': 'Dienstrichtlinie', 'pol.readOnly': 'Ansehen', 'pol.accept': 'Ich akzeptiere die Bedingungen', 'ru.regions': 'Segmente', 'ru.custom-ph': 'Eigene Domains, durch Komma getrennt (optional)',
       'dash.manage': 'Verwaltung', 'pool.refresh-btn': 'Schlüssel aktualisieren', 'pool.check-btn': 'Schlüssel prüfen', 'mesh.ping-btn': 'Mesh-Ping',
       'nav.dash': 'Übersicht', 'nav.keys': 'Schlüssel', 'nav.devices': 'Geräte',
@@ -488,6 +492,7 @@
 
     },  
     fr: {
+      'check.left': 'Vérifié', 'check.idle': 'aucune vérification',
       'pol.head': 'Politique du service', 'pol.readOnly': 'Voir', 'pol.accept': 'J\'accepte les conditions', 'ru.regions': 'Segments', 'ru.custom-ph': 'Domaines personnalisés séparés par des virgules (optionnel)',
       'dash.manage': 'Gestion', 'pool.refresh-btn': 'Actualiser les clés', 'pool.check-btn': 'Vérifier les clés', 'mesh.ping-btn': 'Ping mesh',
       'nav.dash': 'Tableau de bord', 'nav.keys': 'Clés', 'nav.devices': 'Appareils',
@@ -607,6 +612,7 @@
 
     },  
     tr: {
+      'check.left': 'Kontrol edildi', 'check.idle': 'henüz kontrol yok',
       'pol.head': 'Hizmet politikası', 'pol.readOnly': 'Görüntüle', 'pol.accept': 'Koşulları kabul ediyorum', 'ru.regions': 'Segmentler', 'ru.custom-ph': 'Virgülle ayrılmış özel alan adları (isteğe bağlı)',
       'dash.manage': 'Yönetim', 'pool.refresh-btn': 'Anahtarları güncelle', 'pool.check-btn': 'Anahtarları kontrol et', 'mesh.ping-btn': 'Mesh ping',
       'nav.dash': 'Genel Bakış', 'nav.keys': 'Anahtarlar', 'nav.devices': 'Cihazlar',
@@ -726,6 +732,7 @@
 
     },  
     pt: {
+      'check.left': 'Verificado', 'check.idle': 'sem verificação ainda',
       'pol.head': 'Política do serviço', 'pol.readOnly': 'Ver', 'pol.accept': 'Aceito os termos', 'ru.regions': 'Segmentos', 'ru.custom-ph': 'Domínios personalizados separados por vírgulas (opcional)',
       'dash.manage': 'Gestão', 'pool.refresh-btn': 'Atualizar chaves', 'pool.check-btn': 'Verificar chaves', 'mesh.ping-btn': 'Ping mesh',
       'nav.dash': 'Painel', 'nav.keys': 'Chaves', 'nav.devices': 'Dispositivos',
@@ -845,6 +852,7 @@
 
     },  
     zh: {
+      'check.left': '已检查', 'check.idle': '尚未检查',
       'pol.head': '服务政策', 'pol.readOnly': '查看', 'pol.accept': '我接受条款', 'ru.regions': '分段', 'ru.custom-ph': '自定义域名，逗号分隔（可选）',
       'dash.manage': '管理', 'pool.refresh-btn': '更新密钥', 'pool.check-btn': '检查密钥', 'mesh.ping-btn': '网格ping',
       'nav.dash': '概览', 'nav.keys': '密钥', 'nav.devices': '设备',
@@ -964,6 +972,7 @@
 
     },  
     ar: {
+      'check.left': 'تم التحقق', 'check.idle': 'لم يتم الفحص بعد',
       'pol.head': 'سياسة الخدمة', 'pol.readOnly': 'عرض', 'pol.accept': 'أوافق على الشروط', 'ru.regions': 'القطاعات', 'ru.custom-ph': 'نطاقات مخصصة مفصولة بفواصل (اختياري)',
       'dash.manage': 'إدارة', 'pool.refresh-btn': 'تحديث المفاتيح', 'pool.check-btn': 'فحص المفاتيح', 'mesh.ping-btn': 'بنج الشبكة',
       'nav.dash': 'لوحة التحكم', 'nav.keys': 'المفاتيح', 'nav.devices': 'الأجهزة',
@@ -1083,6 +1092,7 @@
 
     },  
     hi: {
+      'check.left': 'जाँचा गया', 'check.idle': 'अभी जाँच नहीं हुई',
       'pol.head': 'सेवा नीति', 'pol.readOnly': 'देखें', 'pol.accept': 'मैं शर्तें स्वीकार करता हूँ', 'ru.regions': 'सेगमेंट', 'ru.custom-ph': 'कस्टम डोमेन, अल्पविराम से अलग (वैकल्पिक)',
       'dash.manage': 'प्रबंधन', 'pool.refresh-btn': 'कुंजियाँ अपडेट करें', 'pool.check-btn': 'कुंजियाँ जाँचें', 'mesh.ping-btn': 'मेश पिंग',
       'nav.dash': 'डैशबोर्ड', 'nav.keys': 'कुंजियाँ', 'nav.devices': 'डिवाइस',
@@ -1351,7 +1361,12 @@
     // A-WARP-M-16: "ждёт" ne znachit nichego. Tri sostoianiya imeyut smysl:
     // konfigov net / konfig vybran, no kanal idet po obychnym klyucham / kanal na WARP.
     var active = w.active === true;
-    var onWarp = (S && S.vless_now) === 'warp';
+    // B-01: warpRender(w) obuchaet TOL'KO w. Zdes bylo `S` - peremennoi v
+    // etoi funkcii net voobsche, a app.js nachinaetsya s 'use strict', tak
+    // chto zdes bylo ReferenceError: S is not defined. Funkciya padala
+    // ROOVNO na etoy stroke: badges vyshe (warp-state/mode/ep/ip) ushli,
+    // a "Kanal" i tablica konfigov net. Ot-etogo ne rabotali knopki WARP.
+    var onWarp = !!(V.S && V.S.vless_now === 'warp');
     put('warp-active', !w.loaded ? 'конфигов нет'
       : (onWarp ? '✅ на WARP'
       : (active ? 'на ключах' : 'конфиг готов')));
@@ -1366,7 +1381,7 @@
     if (hint) {
       hint.textContent = !w.loaded
         ? 'Сгенерируй конфиги на ПК (Cloudflare WARP generator, вкладка Xray) и загрузи сюда — можно несколько, каждый со своим именем.'
-        : ((S && S.vless_now) === 'warp'
+        : (onWarp
            ? 'Канал сейчас идёт через WARP-конфиг «' + (w.name || '—') + '».'
            : (active ? 'WARP несёт трафик прямо сейчас.'
            : 'Трафик идёт через обычные ключи. «Канал на WARP» переключит вручную, «авто» — когда в пуле не останется живых ключей.'));
@@ -1509,6 +1524,7 @@ function warpUpload() {
     renderHero(S);
     renderPills();
     renderKeys(S);
+    renderCheckProgress(S);
     warpRender(S.warp);
     renderDevices(S);
     renderConnect(S);
@@ -1551,6 +1567,32 @@ function warpUpload() {
   }
 
   /* ================= KEYS ================= */
+  function renderCheckProgress(S) {
+    // A-831: «не понятно, на каком этапе всё». Показываем прогресс ПРОВЕРКИ
+    // ключей отдельной полосой: сколько проверено, сколько всего, и в каком
+    // состоянии (идёт / закончилась / упала). Не путаем с comm - тот занят
+    // состоянием канала.
+    var box = $('check-bar');
+    if (!box) return;
+    var c = (S && S.check_progress) || {};
+    var st = String(c.state || 'idle');
+    var msg = String(c.msg || '');
+    var cur = Number(c.current || 0), tot = Number(c.total || 0);
+    var pct = Math.max(0, Math.min(100, Number(c.pct || 0)));
+    if (st === 'idle' && !msg) { box.style.display = 'none'; return; }
+    box.style.display = '';
+    box.className = st === 'error' ? 'is-error' : (st === 'done' ? 'is-done' : '');
+    var left = _t('check.left');
+    var txt = msg || _t('check.idle');
+    if (st === 'running' && tot > 0) {
+      txt = left + ': ' + (cur + '/' + tot) + ' · ' + msg;
+    } else if (st === 'done' && tot > 0) {
+      txt = left + ' ' + tot + ' · ' + msg;
+    }
+    var m = $('check-msg'); if (m) m.textContent = txt;
+    var p = $('check-pct'); if (p) p.textContent = pct + '%';
+    var f = $('check-fill'); if (f) f.style.width = pct + '%';
+  }
   function renderKeys(S) {
     var rows = $('keyrows');
     if (!rows) return;

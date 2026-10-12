@@ -678,3 +678,11 @@ body.pre-lang #tb-name {
 .kchk-head>.badge,.kchk-foot>.badge{max-width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:0 1 auto}
 .kchk-note{white-space:normal;overflow:visible;text-overflow:clip}
 .kchk-foot .badge{font-size:10.5px}
+
+/* A-831: polos progressa proverki klyuchey. Bez etogo stilya element .bar
+   voobshche ne risovalsya - polosa byla nevidima, hotya razmetka eyo est. */
+.bar{height:7px;border-radius:999px;background:var(--surface);border:1px solid var(--line);overflow:hidden;margin-top:6px}
+.bar-fill{height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,#ffb74d,#ff8fa3);transition:width .35s ease}
+#check-bar.is-error .bar-fill{background:linear-gradient(90deg,#ef5350,#ff8fa3)}
+#check-bar.is-done .bar-fill{background:linear-gradient(90deg,#81c784,#a0e7e5)}
+#check-msg{white-space:normal;overflow:visible}

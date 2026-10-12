@@ -789,6 +789,28 @@ def build_state(local=True):
     st["vless_now"] = core.get_vless_now() or "-"
     st["egress_ip"] = core.egress_ip()
     st["comm"] = st.pop("comm", {"state": "idle", "msg": ""})
+    # A-831: прогресс проверки ключей - ОТДЕЛЬНЫМ полем. comm занят
+    # состоянием канала, и в нём «проверено 40 из 120» неотличимо от
+    # «синхронизация с xray». Владелец жаловался, что непонятно, на каком
+    # этапе всё. Здесь честный этап с процентами (пишет source.check_all).
+    check = st.pop("check_progress", None)
+    if not isinstance(check, dict):
+        check = {}
+    check.setdefault("state", "idle")
+    check.setdefault("msg", "")
+    check.setdefault("current", 0)
+    check.setdefault("total", 0)
+    try:
+        check["pct"] = max(0, min(100, int(check.get("pct") or 0)))
+    except (TypeError, ValueError):
+        check["pct"] = 0
+    for _k in ("current", "total"):
+        try:
+            check[_k] = max(0, int(check.get(_k) or 0))
+        except (TypeError, ValueError):
+            check[_k] = 0
+    check["msg"] = str(check.get("msg") or "")[:160]
+    st["check_progress"] = check
     st["vless_ext"] = _vless_ext()
     st["mesh_tunnel"] = _tunnel_status()
     st["game_tun"] = _game_tun_status()

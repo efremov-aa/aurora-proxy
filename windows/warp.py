@@ -591,7 +591,10 @@ def probe(timeout=PROBE_TIMEOUT_S, port=PROBE_PORT, name=""):
             return {"ok": True, "egress": ip}
         record_probe("-", "no egress", name)
         return {"ok": False, "error": "no egress"}
-    except OSError as exc:
+    except (OSError, TypeError, ValueError) as exc:
+        # A-829: TypeError тоже сюда. Раньше несовпадение сигнатур
+        # (например _wait_port без параметра proc) улетало наружу и
+        # превращалось в безликое "proba ne udalas" без указания причины.
         return {"ok": False, "error": str(exc)[:120]}
     finally:
         if proc is not None:

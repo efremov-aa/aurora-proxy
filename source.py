@@ -447,7 +447,20 @@ def keytest(key, timeout=15, port=None):
     return {"status": "noip", "reason": "no-egress", "exit_ip": "-", "ping_ms": ping_ms}
 
 
-def _wait_port(port, timeout=4):
+def _wait_port(port, timeout=4, proc=None):
+    """Ждёт, пока порт начнёт слушать.
+
+    A-829: параметр `proc` добавлен потому, что warp.probe() звал
+    `_wait_port(port, timeout=4, proc=proc)`, а такого параметра не было
+    ни в одном дереве. Проба WARP падала с TypeError на КАЖДЫЙ вызов,
+    и обёртка в api.py превращала это в "proba ne udalas" - то есть
+    проверка WARP не работала никогда, с первого дня. Тип ошибки
+    терялся, потому что TypeError не входит в OSError.
+
+    Если процесс передан и он умер - ждать дальше бессмысленно,
+    порт уже не появится. Это ровно та же проверка, что keytest делает
+    отдельной строкой после ожидания (source.py `proc.poll()`).
+    """
     end = time.time() + timeout
     while time.time() < end:
         try:
@@ -455,6 +468,13 @@ def _wait_port(port, timeout=4):
             s.close()
             return True
         except OSError:
+            # A-829: процесс умер - порт уже не поднимется, не ждём таймаут.
+            if proc is not None:
+                try:
+                    if proc.poll() is not None:
+                        return False
+                except Exception:
+                    return False
             time.sleep(0.3)
     return False
 
@@ -506,6 +526,19 @@ def check_all(bg=True):
             keys = pool.get_keys()
             n = len(keys)
             config.update_state(comm={"state": "running", "msg": "проверка %d ключей..." % n})
+            # A-831: ОТДЕЛЬНЫЙ check_progress. Жалоба владельца: «не понятно,
+            # на каком этапе всё». comm занят состоянием КАНАЛА (syncing/
+            # running/idle/error), и прогресс проверки в нём терялся:
+            # панель не показывала, сколько ключей уже проверено. Здесь
+            # пишем честный прогресс с процентами — его читает /api/state
+            # и рисует панель.
+            def _prog(cur, total, msg, st="running"):
+                config.update_state(check_progress={
+                    "state": st, "msg": msg, "current": cur,
+                    "total": total,
+                    "pct": int(round(100.0 * cur / total)) if total else 0,
+                })
+            _prog(0, n, "проверка %d ключей..." % n)
             stats = {"total": n, "ok": 0, "bad": 0, "noip": 0, "slow": 0, "sysfail": 0, "dead": 0}
             t0 = time.time()
             # каждый воркер-ключ получает СВОЙ temp-порт (иначе bind-конфликт на KEYTEST_PORT)
@@ -526,6 +559,9 @@ def check_all(bg=True):
                     if done_n % 5 == 0 or done_n == n:
                         config.update_state(comm={"state": "running",
                                                   "msg": "проверено %d из %d..." % (done_n, n)})
+                        # A-831: тот же прогресс отдельным полем - панель
+                        # показывает этап и сколько осталось.
+                        _prog(done_n, n, "проверено %d из %d..." % (done_n, n))
                     s = r.get("status")
                     if s == "ok":
                         stats["ok"] += 1
@@ -566,6 +602,15 @@ def check_all(bg=True):
                 stats["sysfail"], stats["dead"], dt)
             _comm_done(msg)
             config.log("source: " + msg)
+            # A-831: итог проверки должен быть виден в панели вместе с
+            # разбивкой по статусам, иначе «✓N» читается как «всё сломано»
+            # или как «всё хорошо» в зависимости от того, посчитали мы
+            # только ok или все статусы.
+            _prog(n, n,
+                  "%d/%d ok, %d noip, %d bad, %d slow, %d sysfail, %d dead"
+                  % (stats["ok"], n, stats["noip"], stats["bad"], stats["slow"],
+                     stats["sysfail"], stats["dead"]),
+                  st="done")
             # чистка мёртвых после проверки + подъём канала, если появился живой ключ
             try:
                 removed = pool.cleanup()
@@ -581,6 +626,18 @@ def check_all(bg=True):
             except Exception:
                 pass
             return stats
+        except Exception as exc:
+            # A-831: падение проверки тоже должно быть видно. Раньше исключение
+            # просто уходило в поток, _CHECK_RUNNING сбрасывался, а панель
+            # молчала - выглядело как «проверка ничего не делает».
+            config.log("source: проверка ключей упала: %s" % str(exc)[:160])
+            try:
+                config.update_state(check_progress={
+                    "state": "error", "msg": "проверка упала: %s" % str(exc)[:120],
+                    "current": 0, "total": 0, "pct": 0})
+            except Exception:
+                pass
+            raise
         finally:
             _CHECK_RUNNING[0] = False
 

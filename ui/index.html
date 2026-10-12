@@ -232,6 +232,15 @@
             <span class="spacer"></span>
             <span class="badge mono" data-i18n="keys.src">github + свои</span>
           </div>
+          <!-- A-831: на каком этапе проверка ключей. comm занят каналом, поэтому
+     прогресс проверки показывается отдельно, с процентами. -->
+          <div id="check-bar" style="display:none;margin:10px 0 2px">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+              <span class="hint" id="check-msg" style="margin:0">—</span>
+              <span class="badge mono" id="check-pct">0%</span>
+            </div>
+            <div class="bar"><div class="bar-fill" id="check-fill" style="width:0%"></div></div>
+          </div>
           <!-- A-WARP-M: rezervnyy kanal Cloudflare WARP, SPISOK konfigov -->
           <div class="kchk" id="warp-box">
             <div class="kchk-head">
