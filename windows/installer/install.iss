@@ -6,10 +6,10 @@
   #define SrcDir "..\..\..\Temp\opencode\aurora_build\dist\Aurora"
 #endif
 #ifndef AuroraVersion
-  #define AuroraVersion "1.10.7"
+  #define AuroraVersion "1.10.8"
 #endif
 #ifndef AuroraVersionName
-  #define AuroraVersionName "Кот-оберег"
+  #define AuroraVersionName "Кот-подхват"
 #endif
 
 [Setup]

@@ -2901,7 +2901,11 @@ function loadTG() {
     'warp-select': function (t) { warpSelect(t.getAttribute('data-name2') || ''); },
     'warp-use': function () { warpUse(); },
     'warp-probe-one': function (t) { warpProbeOne(t.getAttribute('data-name2') || ''); },
-    'warp-remove-one': function (t) { warpRemoveOne(t.getAttribute('data-name2') || ''); }
+    'warp-remove-one': function (t) { warpRemoveOne(t.getAttribute('data-name2') || ''); },
+    // A-828: vybor fayla. Bez etogo akta sobytie 'change' na #warp-file
+    // ne dohodilo ni do odnogo obrabotchika: warpOnFile() byla napisana,
+    // no ne vyzyvalasya, i knopka "Zagruzit" molchala posle vybora.
+    'warp-file': function (t, ev) { warpOnFile(ev); }
   };
   function actTarget(ev) {
     var node = ev && ev.target;
