@@ -21,6 +21,8 @@ import crypt
 import pool
 import subs
 import warp  # A-WARP-PUB: rezervnyy kanal WARP
+import mesh  # A-855: mesh-piry
+import meshtunnel  # A-855: mesh-piry
 
 XRAY_CONFIG_LOCK = threading.RLock()  # RLock: read-modify-write оборачивается этим локом целиком
 EGRESS_LOCK = threading.Lock()
@@ -199,6 +201,277 @@ _PRIVATE_CIDRS = (
     "fe80::/10",
     "::1/128",
 )
+
+
+# A-855: блок mesh-пиров перенесён из эталона (_dom_v4_tmp/core.py).
+# Без него meshtunnel._peer_dial_target() всегда получал (None, 0, '', 0):
+# вызов core._mesh_peers() падал в except и молчал.
+
+MESH_TUNNEL_PORT = 51821
+MESH_PEER_BASE_PORT = int(os.environ.get("AURORA_MESH_PEER_BASE_PORT") or 0
+                          or (MESH_TUNNEL_PORT + 2))
+
+
+def _mesh_dist():
+    """A-165: порт туннеля из meshtunnel ЛЕНИВО (в старте импорта не нужен)."""
+    try:
+        import meshtunnel
+        return int(meshtunnel.MESH_PORT)
+    except Exception:
+        return 0
+
+
+def _mesh_tunnel_on():
+    """A-165: флаг туннеля БЕЗ import meshtunnel и БЕЗ enabled().
+
+    meshtunnel.enabled() = config.get("mesh_tunnel", False) + кэш; вызывать
+    его из сборки конфига xray нельзя (лишний side-effect + зависимость от
+    кэша). Здесь достаточно ровно того же флага из config.
+    """
+    try:
+        return bool(config.get("mesh_tunnel", False))
+    except Exception:
+        return False
+
+
+def _peer_profile(node_id):
+    """A-164: клиентские VLESS-параметры пира из записи узла (A-161)."""
+    try:
+        import mesh as _mesh
+    except Exception:
+        return None
+    try:
+        node_id = str(node_id or "").strip()
+        if not node_id:
+            return None
+        block = _mesh.vless_client(node_id)
+    except Exception:
+        return None
+    if not isinstance(block, dict) or not block:
+        return None
+    return block
+
+
+def _peer_tag(node_id, index):
+    return "peer-%d-%s" % (int(index),
+                           re.sub(r"[^A-Za-z0-9]", "", str(node_id or ""))[:24])
+
+
+def _peer_order_blocks():
+    """A-372-P5-6: ODIN prohod - profil kazhdogo uzla schitaetsya raz.
+
+    Ranee _peer_profile zvalsya 2N raz (v _peer_order i v _mesh_peers), a kazhdyy
+    vyvov - eto mesh.vless_client, lineinyi prohod pod globalnym _LOCK mesh.
+    Dopolnitelnaya O(N^2) byla v `item not in out` (spisok pered kazhdym
+    sravneniem). Teper mnozhestvo `seen` i odin vyvov na uzel.
+    """
+    pairs = []
+    seen = set()
+    try:
+        import meshtunnel as _mt
+        for item in (_mt.status().get("peers") or []):
+            node_id = str(item or "").strip()
+            if not node_id or node_id in seen:
+                continue
+            block = _peer_profile(node_id)
+            if not block:
+                continue
+            seen.add(node_id)
+            pairs.append((node_id, block))
+    except Exception:
+        pass
+    try:
+        import mesh as _mesh
+        for node in _mesh.all_nodes():
+            if not isinstance(node, dict):
+                continue
+            node_id = str(node.get("id") or "").strip()
+            if not node_id or node_id in seen:
+                continue
+            block = _peer_profile(node_id)
+            if not block:
+                continue
+            seen.add(node_id)
+            pairs.append((node_id, block))
+    except Exception:
+        pass
+    return pairs
+
+
+def _peer_order():
+    """A-164: poryadok uzlov mesh (sohraneno kak spisok id dlya sovmestnosti)."""
+    return [node_id for node_id, _block in _peer_order_blocks()]
+
+
+def _mesh_peers():
+    """A-164: пиры с опубликованным профилем (индекс -> порт)."""
+    out = []
+    if not _mesh_tunnel_on():
+        return out
+    order = _peer_order_blocks()
+    for index, pair in enumerate(order):
+        node_id, block = pair
+        out.append({"node_id": node_id, "index": index, "profile": block})
+    return out[:32]
+
+
+def _peer_inbound_base_port():
+    """A-164: база портов локальных socks-inbound пиров."""
+    base = MESH_PEER_BASE_PORT
+    dist = _mesh_dist()
+    if dist:
+        try:
+            base = int(dist) + 2
+        except Exception:
+            base = MESH_PEER_BASE_PORT
+    if base <= 0 or base > 65500:
+        base = MESH_PEER_BASE_PORT
+    return base
+
+
+def _peer_dial_addr(node_id, index):
+    """A-164: (127.0.0.1, base+index) для пира с профилем, иначе (None, 0)."""
+    if not _peer_profile(node_id):
+        return None, 0
+    port = _peer_inbound_base_port() + int(index)
+    if port <= 0 or port > 65535:
+        return None, 0
+    return "127.0.0.1", port
+
+
+def _peer_dial_dest_port():
+    """A-164: порт туннеля НА пире (dokodemo-door слушает его у себя)."""
+    dist = _mesh_dist()
+    if dist:
+        try:
+            return int(dist)
+        except Exception:
+            return MESH_TUNNEL_PORT
+    return MESH_TUNNEL_PORT
+
+
+def _peer_chain(block, peer_tag):
+    """A-164/A-171: Realnyy vxod v pira = KLIENT VLESS Reality.
+
+    A-171 (najdeno skvoznym testom s dvuma realnymi xray): chain byl sobран kak
+    socks-outbound s `streamSettings.security = "reality"`. Socks ne umeet byt
+    klientom VLESS Reality - on proksiruet TCP kak est, avtentifikaciyu VLESS ne
+    delayaet, i na vhode pira poluchalsya `proxy/vless/encoding: invalid request
+    version`. `xray run -test` takoy config prinimal, poetomu bug byl nevidim do
+    zhivogo progona. Teper zdes polnocennyy VLESS-klient s parametrami pira.
+    """
+    server = str(block.get("host") or "")
+    port = int(block.get("port") or 8443)
+    return {
+        "tag": peer_tag,
+        "protocol": "vless",
+        "settings": {
+            "vnext": [{
+                "address": server,
+                "port": port,
+                "users": [{
+                    "id": str(block.get("uuid") or ""),
+                    "encryption": "none",
+                    "flow": "xtls-rprx-vision",
+                }],
+            }],
+        },
+        "streamSettings": {
+            "network": "tcp",
+            "security": "reality",
+            "realitySettings": {
+                "fingerprint": "chrome",
+                "serverName": str(block.get("sni") or server),
+                "publicKey": str(block.get("pbk") or ""),
+                "shortId": str(block.get("short_id") or ""),
+                "spiderX": "/",
+            },
+        },
+    }
+
+
+def _peer_outbound(peer_tag):
+    """A-164: выход в интернет через пира (freedom с proxySettings на сокс)."""
+    return {
+        "tag": peer_tag + "-out",
+        "protocol": "freedom",
+        # A-533: streamSettings.sockopt вместо устаревшей settings.domainStrategy.
+        "streamSettings": {"sockopt": {"domainStrategy": "UseIP"}},
+        # A-167: xray 26.9.9 udalil outbound "proxySettings" - cepochka tolko
+        # cherez streamSettings.sockopt.dialerProxy (inache rc=23 na xray -test).
+        "streamSettings": {"sockopt": {"dialerProxy": peer_tag}},
+    }
+
+
+def _peer_local_inbound(inbound_tag, dial_port):
+    """A-164: локальный SOCKS5, который всегда ходит на порт туннеля ПИРА."""
+    return {
+        "tag": inbound_tag,
+        "listen": "127.0.0.1",
+        "port": int(dial_port),
+        "protocol": "socks",
+        "settings": {"auth": "noauth", "udp": False},
+    }
+
+
+def _is_peer_rule(rule, peer_tags):
+    """A-164: правило относится к ПИРУ, которого больше нет в списке."""
+    if not isinstance(rule, dict):
+        return False
+    tags = rule.get("inboundTag")
+    if isinstance(tags, str):
+        tags = [tags]
+    if not isinstance(tags, list):
+        return False
+    for tag in tags:
+        name = str(tag)
+        if name.startswith("peer-") and name not in peer_tags:
+            return True
+    return False
+
+
+def _apply_peers(cfg, peers):
+    """A-164 (идемпотентно): inbound/chain/outbound/правило на каждого пира."""
+    if not peers or not isinstance(cfg, dict):
+        return 0
+    inbounds = cfg.get("inbounds")
+    outbounds = cfg.get("outbounds")
+    routing = cfg.get("routing")
+    if (not isinstance(inbounds, list) or not isinstance(outbounds, list)
+            or not isinstance(routing, dict) or not isinstance(routing.get("rules"), list)):
+        return 0
+    rules = routing["rules"]
+    added = 0
+    for peer in peers:
+        node_id = peer.get("node_id")
+        index = peer.get("index")
+        block = peer.get("profile")
+        if not node_id or not isinstance(index, int) or not isinstance(block, dict):
+            continue
+        peer_tag = _peer_tag(node_id, index)
+        inbound_tag = peer_tag + "-in"
+        # A-166: проверяем КАЖДЫЙ объект отдельно (inbound+rule != наличие
+        # outbound-ов: раньше это скрывало потерю chain/out у пира).
+        dial_port = _peer_dial_addr(node_id, index)[1]
+        if not dial_port:
+            continue
+        if not any(isinstance(item, dict) and item.get("tag") == inbound_tag
+                   for item in inbounds):
+            inbounds.append(_peer_local_inbound(inbound_tag, dial_port))
+        for tag, item in ((peer_tag, _peer_chain(block, peer_tag)),
+                          (peer_tag + "-out", _peer_outbound(peer_tag))):
+            if not any(isinstance(row, dict) and row.get("tag") == tag for row in outbounds):
+                outbounds.append(item)
+        if not any(isinstance(item, dict) and item.get("inboundTag") == [inbound_tag]
+                   for item in rules):
+            rules.append({"type": "field", "inboundTag": [inbound_tag],
+                          "outboundTag": peer_tag})
+        added += 1
+    return added
+
+
+_MESH_LIVE = {"ts": 0.0, "ok": False}
+MESH_LIVE_TTL = 60.0
 
 
 def build_xray_config(final_tag):
@@ -385,6 +658,11 @@ def build_xray_config(final_tag):
             })
         else:
             cfg["inbounds"][0]["listen"] = "127.0.0.1"
+    # A-855: локальный socks-inbound на каждого mesh-пира с известным
+    # профилем (A-164/A-168). Без этого путь «дозвониться до пира через
+    # его локальный xray» не собирался, и core._mesh_peers() был пуст.
+    if _mesh_tunnel_on():
+        _apply_peers(cfg, _mesh_peers())
     return cfg
 
 
@@ -1087,6 +1365,18 @@ def _set_active_tag_impl(tag):
             return False, "нет конфига"
         tags = [o.get("tag") for o in cfg.get("outbounds", [])]
         if tag not in tags:
+            # A-857: outbound-y WARP est' tol'ko v konfige, sobRannom s final=warp.
+            # Poka kanal na klyuchakh - tega net, i ruchoy vybor otkazyvalsya
+            # ("tag not in outbounds"). Pere sobiraem config s etim tegom
+            # (kak v etalone cherez _authoritative_config), a ne pravim staryj.
+            rebuilt = build_xray_config(tag)
+            if not rebuilt or tag not in [o.get("tag") for o in rebuilt.get("outbounds", [])]:
+                config.update_state(comm={"state": "idle", "msg": ""})
+                return False, "tag not in outbounds"
+            cfg = rebuilt
+            tags = [o.get("tag") for o in cfg.get("outbounds", [])]
+            config.log("core: A-857 config pere sobran s final=%s (outbound %s dobavlYON)" % (tag, tag))
+        if tag not in tags:
             config.update_state(comm={"state": "idle", "msg": ""})
             return False, "tag not in outbounds"
         prev = get_vless_now()
@@ -1107,6 +1397,11 @@ def _set_active_tag_impl(tag):
     if _warp_manual:
         # A-546: Cloudflare WARP не обязан отдавать выходной IP тем сервисам,
         # которыми мы его меряем. 4 пробы по 10 c тут были потерей времени.
+        # A-858: proba propushchena (A-546), no eto ne znachit "kluch ne zhiv".
+        # Bez tunnel_ok=True upravlenie upalo v otkat i ruchoy vybor WARP byl
+        # nevozmozhen. S tunnel_ok=True my idem v shag "tunnel alive, egress
+        # unknown" (A-292) -> ok=True, egress="-" (WARP ne obyazan otdavat IP).
+        tunnel_ok = True
         config.log("core: switch -> %s (WARP: proverku egress propuskayu)" % tag)
     else:
         # A-548: раньше 4 пробы по 10 c с паузами (до 52 c), и только ПОТОМ

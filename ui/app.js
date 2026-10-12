@@ -1409,9 +1409,17 @@
       }
     }
     var off = $('warp-off'), au = $('warp-auto'), on = $('warp-on');
+    // A-850: rezhim «on» bez konfigov ne primenyaetsya - ne podsvetivaem,
+    // inache kнопka «Всегда» gorit zelyonym, kak budto WARP vklyuchen.
+    var anyCfg = ((w.configs || []).length > 0);
     if (au) au.className = 'btn small' + (mode === 'auto' ? ' primary' : '');
-    if (on) on.className = 'btn small' + (mode === 'on' ? ' primary' : '');
+    if (on) on.className = 'btn small' + ((mode === 'on' && anyCfg) ? ' primary' : '');
     if (off) off.className = 'btn small' + (mode === 'off' ? ' primary' : '');
+    var wNote = $('warp-note');
+    if (wNote && !anyCfg && mode === 'on') {
+      wNote.textContent = 'Конфигов нет — режим «Всегда» пока не действует. '
+        + 'Загрузите конфиг, и канал сможет уйти на WARP.';
+    }
   }
   function warpSelect(name) {
   if (!name) return toast('не выбран конфиг', false);
@@ -1462,6 +1470,7 @@ function warpRemoveOne(name) {
     inp.value = '';
     inp.click();
   }
+
   // A-839: obrabotchik change s capture - KAK NA MASTERE. Delegaciya ACTS
   // ostanetsya, no osnovnoy put' idet cherez etot pryamoy slushatel, on
   // proveden u vladeltsa na mastere.
@@ -1747,10 +1756,12 @@ function warpRemoveOne(name) {
   }
 
   /* ================= UPDATE DASH ================= */
-  function loadUpdate() {
-    getJSON('/api/update/status').then(function (j) {
+  // A-851: otrisovka otdelena ot zaprosa. renderUpdateDash() vyzvaetsya
+  // na kazhdym tipe paneli, poetomu zapros zdes' byl by 20 raz v minutu.
+  function paintUpdate(j) {
+    {
       j = j || {};
-      V.UPD = j;
+      if (j) V.UPD = j;
       var avail = !!(j.update === true || (j.latest && j.current && j.latest !== j.current));
       var s = j.state || '';
       var stateText = _t('upd.cur');
@@ -1786,12 +1797,20 @@ function warpRemoveOne(name) {
       $('upd-msg').textContent = msgText;
       $('upd-repo').textContent = j.repo || '–';
       $('upd-last').textContent = _t('upd.checked') + fmtDate(j.ts);
-    }).catch(function (e) {
+    }
+  }
+  function loadUpdate() {
+    getJSON('/api/update/status').then(paintUpdate).catch(function (e) {
       var m = $('du-msg');
       if (m) m.textContent = _t('upd.check-err') + ' ' + String(e && e.message ? e.message : e || '');
     });
   }
-  function renderUpdateDash() { loadUpdate(); }
+  // A-851: risuem iz togo, chto uzhe est. Esli nichego eshche ne bylo -
+  // odin zapros, no ne na kazhdyy tik.
+  function renderUpdateDash() {
+    if (V.UPD) { paintUpdate(V.UPD); return; }
+    loadUpdate();
+  }
 
   /* ================= VERSIONS ================= */
   function loadVersions() {
@@ -2954,7 +2973,6 @@ function loadTG() {
     // A-828: vybor fayla. Bez etogo akta sobytie 'change' na #warp-file
     // ne dohodilo ni do odnogo obrabotchika: warpOnFile() byla napisana,
     // no ne vyzyvalasya, i knopka "Zagruzit" molchala posle vybora.
-    'warp-file': function (t, ev) { warpOnFile(ev); },
     // A-839: kak na mastere - pryamoy vyzyov warpUpload(), kotoryy
     // otkryvaet dialog nativno. Label (A-837) u menya dialog ne
     // otkryval, vozvrayom button + inp.click().
@@ -2973,8 +2991,12 @@ function loadTG() {
     fn(t, ev);
   }
   function bindActions() {
-    document.addEventListener('click', actDispatch);
-    document.addEventListener('change', actDispatch);
+    // A-852: capture=true KAK NA MASTERE. V capture-faze sobыtie
+    // obrabotano do dostizheniya celi - tam otkryvaetsya nativnoe
+    // okno vybora fayla. V bubbl-faze u Yandex.Brauzere ono ne
+    // poveryalos', hotya sobytie i inp.click() generиrovalis'.
+    document.addEventListener('click', actDispatch, true);
+    document.addEventListener('change', actDispatch, true);
     $('btn-vpn') && ($('btn-vpn').onclick = function () {
       var on = !(V.S && V.S.vpn_mode);
       postJSON('/api/vpn_mode', { on: on }).then(function (j) {
