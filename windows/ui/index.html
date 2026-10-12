@@ -27,6 +27,7 @@
         <div class="ngroup-title" data-short="🏠">🏠 <span data-i18n="nav.group.home">Домашний прокси</span></div>
         <button data-t="dashboard" class="on"><span class="ic">📊</span><span class="lb" data-i18n="nav.dash">Обзор</span></button>
         <button data-t="keys"><span class="ic">🔑</span><span class="lb" data-i18n="nav.keys">Ключи</span></button>
+        <button data-t="warp"><span class="ic">🌀</span><span class="lb" data-i18n="nav.warp">WARP</span></button>
         <button data-t="devices"><span class="ic">📱</span><span class="lb" data-i18n="nav.conn">Устройства</span></button>
         <button data-t="connect"><span class="ic">🌐</span><span class="lb" data-i18n="nav.connect">Внешний доступ</span></button>
         <button data-t="rusegment"><span class="ic">🇷🇺</span><span class="lb" data-i18n="nav.rusegment">Ру-сегмент</span></button>
@@ -241,6 +242,21 @@
             </div>
             <div class="bar"><div class="bar-fill" id="check-fill" style="width:0%"></div></div>
           </div>
+          <div class="tbl-wrap" style="margin-top:12px">
+            <table>
+              <thead><tr><th data-i18n="th.tag">Тег</th><th data-i18n="th.source">Источник</th><th data-i18n="th.status">Статус</th><th data-i18n="th.ping">Пинг</th><th data-i18n="th.exit">Exit IP</th><th data-i18n="th.sites">Sites</th><th></th></tr></thead>
+              <tbody id="keyrows"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================================================
+           УСТРОЙСТВА
+           ================================================== -->
+      <section class="tab" id="t-warp">
+        <div class="card">
+          <h3><span class="ic">🌀</span><span data-i18n="warp.head">Резервный канал Cloudflare WARP</span></h3>
           <!-- A-WARP-M: rezervnyy kanal Cloudflare WARP, SPISOK konfigov -->
           <div class="kchk" id="warp-box">
             <div class="kchk-head">
@@ -271,18 +287,8 @@
             </div>
             <div class="hint" id="warp-note">Каждый конфиг — отдельный сервер WARP. Выбери рядом, каким каналом питать трафик.</div>
           </div>
-          <div class="tbl-wrap" style="margin-top:12px">
-            <table>
-              <thead><tr><th data-i18n="th.tag">Тег</th><th data-i18n="th.source">Источник</th><th data-i18n="th.status">Статус</th><th data-i18n="th.ping">Пинг</th><th data-i18n="th.exit">Exit IP</th><th data-i18n="th.sites">Sites</th><th></th></tr></thead>
-              <tbody id="keyrows"></tbody>
-            </table>
-          </div>
         </div>
       </section>
-
-      <!-- ==================================================
-           УСТРОЙСТВА
-           ================================================== -->
       <section class="tab" id="t-devices">
         <div class="card">
           <h2><span class="ic">📱</span><span data-i18n="dev.conn">Устройства в сети</span></h2>

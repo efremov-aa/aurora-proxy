@@ -48,6 +48,39 @@ def _json(data, status=200):
     return (status, "application/json; charset=utf-8", body)
 
 
+def _extra_hosts():
+    """A-835: dopolnitelnye hosty paneli cherez env (zapryataya, cherez ";").
+
+    Zachem: server znaet tol'ko svoi adresa (VM_HOST/AURORA_HOST i sohranennyy
+    v nastroykah "host"). Esli panel otkryvayut po drugomu adresu - naprimer po
+    adresu Tailnet (100.x) ili po aliyas meny - server otdayot
+    {"error": "host not allowed"} s kodom 421 i stranitsa vsego ne rabotaet.
+
+    Spisok cherez ";" (a ne cherez zapryatuyu) - tak zapis chasto zagnayotsya v
+    .env i systemd override, gde zapyataya mozhet slomatsya.
+    Fail-closed: tol'ko hosty, kotorye vypisany yavno. Nichego ne rasshiryаetsya
+    avtomaticheski - tol'ko to, chto vlinedil operator.
+    """
+    values = set()
+    raw = str(os.environ.get("AURORA_EXTRA_HOSTS", "") or "")
+    for item in re.split(r"[;,\s]+", raw):
+        host = item.strip().lower().rstrip(".")
+        if not host or len(host) > 253:
+            continue
+        # tol'ko imya/adres, bez portov, probelov i skhem
+        if any(ch in host for ch in "/:@?#"):  
+            continue
+        try:
+            values.add(str(ipaddress.ip_address(host)))
+            continue
+        except ValueError:
+            pass
+        if re.fullmatch(r"[a-z0-9]([a-z0-9-]*[a-z0-9])?"
+                        r"(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*", host):
+            values.add(host)
+    return values
+
+
 def _configured_hosts():
     values = {"127.0.0.1", "::1", "localhost"}
     # A-264: хост, сохранённый в настройках, тоже разрешён. Раньше гейт знал
@@ -58,6 +91,8 @@ def _configured_hosts():
         host = str(value or "").strip().lower().rstrip(".")
         if host:
             values.add(host)
+    # A-835: явно разрешённые доп. адреса (Tailnet, алиасы).
+    values |= _extra_hosts()
     return values
 
 
