@@ -129,6 +129,8 @@ RELAY_MAX = _int_env("AURORA_MESH_RELAY_MAX", MAX_RAW_PAYLOAD,
                       DIRECT_UDP_MAX, MAX_RAW_PAYLOAD)
 T_DIRECT = 17
 T_GAME_PEERS = 16
+# A-940: razdacha VLESS-profiley peirov ot mastera k piru.
+T_PEER_PROFILES = 18
 T_RAW = 15
 _GAME_DIAG_LAST = {}
 _GAME_DIAG_LOCK = threading.Lock()
@@ -1796,7 +1798,19 @@ def _peer_reader(conn, key, node_id):
     # answers T_PING with T_PONG (handler exists since A-191), so even a node
     # that predates the client-side keepalive stops tripping PEER_IDLE_S.
     ping_every = _int_env("AURORA_MESH_PING_S", 60, 10, 600)
+    # A-940: kak chasto master shlet uzlu spisok profiley peirov
+    profile_share_s = _int_env("AURORA_MESH_PROFILE_SHARE_S", 300, 30, 3600)
+    share_sent = 0.0
     try:
+        # A-940: pervyi raz snachu, chtoby uzel uvidel profiley do sleduyushchego
+        # cikla, a ne cherez PROFILE_SHARE_S sekund posle podklyucheniya
+        try:
+            _blob = _peer_profiles_payload(node_id)
+            if _blob:
+                share_sent = time.time()
+                _send(conn, T_PEER_PROFILES, _blob, key)
+        except Exception:
+            share_sent = 0.0
         conn.settimeout(None)
         while not _STATE.get("stop"):
             try:
@@ -1828,6 +1842,18 @@ def _peer_reader(conn, key, node_id):
             if not chunk:
                 break
             last = time.time()
+            # A-940: razdacha profiley peirov raz v PROFILE_SHARE_S sekund
+            _share_now = time.time()
+            if _share_now - share_sent >= profile_share_s:
+                share_sent = _share_now
+                try:
+                    _blob = _peer_profiles_payload(node_id)
+                    if _blob:
+                        _send_row(row, T_PEER_PROFILES, _blob, key)
+                except OSError:
+                    pass
+                except Exception:
+                    pass
             buf += chunk
             if _oversize(buf):
                 break
@@ -1988,6 +2014,87 @@ def _peer_reader(conn, key, node_id):
             pass
 
 
+def _peer_profiles_payload(exclude_id=""):
+    """A-940: base64url(JSON) со списком профилей пиров для узла.
+
+    Отдаём ТОЛЬКО то, что мастер и так использует для соединения к пиру, и
+    ТОЛЬКО валидные профили (mesh._vless_client_valid). Свой профиль не шлём.
+    """
+    import base64 as _b64
+    import json as _json
+    rows = []
+    try:
+        import mesh as _mesh
+        peers = _mesh.all_nodes()
+    except Exception:
+        return b""
+    for peer in (peers or []):
+        if not isinstance(peer, dict):
+            continue
+        pid = str(peer.get("id") or "").strip()
+        block = peer.get("vless_client") or {}
+        if not pid or (exclude_id and pid == str(exclude_id)):
+            continue
+        if not _mesh._vless_client_valid(block):
+            continue
+        rows.append({"id": pid,
+                     "name": str(peer.get("name") or pid)[:40],
+                     "vless": dict(block)})
+        if len(rows) >= 32:
+            break
+    if not rows:
+        return b""
+    raw = _json.dumps(rows, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    return _b64.urlsafe_b64encode(raw).rstrip(b"=")
+
+
+def _apply_peer_profiles(blob):
+    """A-940 (сторона узла): принять профили пиров и записать в реестр.
+
+    Возвращает число применённых записей. Неизвестное/битое - молча пропускаем
+    (fail-closed, как в остальном протоколе).
+    """
+    import base64 as _b64
+    import json as _json
+    try:
+        import mesh as _mesh
+    except Exception:
+        return 0
+    if not blob:
+        return 0
+    try:
+        pad = "=" * (-len(blob) % 4)
+        rows = _json.loads(_b64.urlsafe_b64decode(blob + pad.encode("ascii")).decode("utf-8"))
+    except Exception:
+        return 0
+    if not isinstance(rows, list):
+        return 0
+    applied = 0
+    for row in rows[:32]:
+        if not isinstance(row, dict):
+            continue
+        pid = str(row.get("id") or "").strip()
+        block = row.get("vless") or {}
+        if not pid or pid == str(_node_id()):
+            continue
+        if not _mesh._vless_client_valid(block):
+            continue
+        try:
+            if not _mesh.vless_client(pid):
+                # zapisi u uzla net - sozdayom iz proflya, inache set_vless_client
+                # vozvrashchaet False i molcha nichego ne pishet
+                if _mesh.all_nodes() and not any(
+                        str(n.get("id")) == pid for n in _mesh.all_nodes() if isinstance(n, dict)):
+                    _mesh.add(str(row.get("name") or pid)[:40], "",
+                              str(block.get("host") or ""),
+                              int(block.get("port") or 0), role="node")
+            if _mesh.set_vless_client(pid, block):
+                applied += 1
+        except Exception:
+            continue
+    return applied
+
+
 def _peer_pump(conn, key):
     """A-191 (storona pira): zhdem komandu mastera (T_PIPE_OPEN) i kazhdyy
     potok obsluzhivaem v svoikh dvukh potokakh. Odno masterskoe soedinenie
@@ -2069,6 +2176,13 @@ def _peer_pump(conn, key):
                     break
                 if msg_type == T_PING:
                     send(T_PONG, b"")
+                    continue
+                if msg_type == T_PEER_PROFILES:
+                    # A-940: master pridalyet profiley drugikh uzlov, chtoby
+                    # _mesh_peers() na uzle ne byl pustym (dogovor A-889 byl
+                    # tolko v odnu storonu - tolko svoi profiley masteru).
+                    used = True
+                    _apply_peer_profiles(payload)
                     continue
                 if msg_type == T_BYE:
                     raise OSError("master closed the tunnel")
