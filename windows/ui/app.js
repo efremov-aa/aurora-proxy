@@ -1433,7 +1433,16 @@
 function warpUse() {
   toast('Переключаю канал на WARP...', true);
   postJSON('/api/keys/active', { tag: 'warp', lane: 'lan' }).then(function (j) {
-    toast(j && j.ok ? ('Канал на WARP' + (j.msg ? ' · ' + j.msg : '')) : ('WARP: канал не переключён (' + ((j && (j.msg || j.error)) || 'нет ответа') + ')'), !!(j && j.ok));
+    // A-892: server otvechaet "already active", kogda kanal UZHE na WARP.
+    // Ranee etot sluchay pokazyvalsya kak "kanal ne pereklyuchyon", hotya
+    // na samom dele vse rabotalo (zhaloba vladel'tsa 13.10.2026).
+    if (j && j.ok) {
+      var m = String(j.msg || '');
+      if (m.indexOf('already') >= 0) toast('Уже на WARP 🐾', true);
+      else toast('Канал на WARP' + (m ? ' · ' + m : ''), true);
+    } else {
+      toast('WARP: канал не переключён (' + ((j && (j.msg || j.error)) || 'нет ответа') + ')', false);
+    }
     refresh();
   }).catch(function () { toast('WARP: канал не переключён', false); });
 }

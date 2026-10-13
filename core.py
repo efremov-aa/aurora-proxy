@@ -1049,7 +1049,21 @@ def _sync_impl():
     active_key = pool.pick_final() if vpn else None
     final_tag = "direct"
     if vpn:
-        if active_key:
+        # A-890: rezhim WARP "Vsegda" (warp_mode=on) - eto NE avtorezhim.
+        # V avtorezhime ("auto") WARP tolko pri pustom pule, a v "on" kanal
+        # dolzhen idti cherez WARP VSEGDA, dazhe esli v pule est zhivye klyuchi.
+        # Inache kazhdyy sync sniyal kanal s WARP na vless (zhaloba vladel'tsa
+        # 13.10.2026: "slivaetsya postoyanno na vless kogda stoit chtoby vsegda
+        # byl warp").
+        _warp_always = False
+        try:
+            _warp_always = (warp.mode() == "on")
+        except Exception:
+            _warp_always = False
+        if _warp_always and _warp_outbounds(target=warp.WARP_TAG):
+            final_tag = warp.WARP_TAG
+            config.log("core: A-890 rezhim WARP 'on' - kanal idet cherez WARP")
+        elif active_key:
             final_tag = active_key.get("tag") or "direct"
         elif warp.active(0) and _warp_outbounds():
             # A-WARP-PUB-5: pustoy pul i vklyuchen rezerv WARP -> ne padaem
@@ -1479,6 +1493,22 @@ def _rotate_impl():
             return None
         _LAST_ROTATE[0] = time.time()
     cur = get_vless_now()
+    # A-891: rezhim WARP "Vsegda" - rotaciya KLYUCHEY ne dolzhna snyat kanal
+    # s WARP. Esli uzhe na WARP - nechego rotirovat; esli net - vozvrashchaem
+    # WARP, a ne sleduyushchiy klyuch.
+    try:
+        if warp.mode() == "on" and _warp_outbounds(target=warp.WARP_TAG):
+            if cur == warp.WARP_TAG:
+                config.log("core: A-891 rotate: uzhe na WARP, klyuchi ne trogaem")
+                return warp.WARP_TAG
+            config.log("core: A-891 rotate: rezhim WARP 'on', vozvrat na WARP")
+            ok, msg = _set_active_tag_impl(warp.WARP_TAG)
+            if ok:
+                return warp.WARP_TAG
+            config.log("core: A-891 rotate: WARP ne pereklyuchilsya (%s)" % msg)
+            return None
+    except Exception as exc:
+        config.log("core: A-891 rotate: provershka rezhima WARP ne udalas (%s)" % exc)
     pool.dedupe()
     keys = pool.get_keys()
     cands = []
@@ -1511,6 +1541,20 @@ def _final_watch():
         tag = get_vless_now()
         # VPN OFF -> просто наблюдаем
         if not config.get("vpn_mode", True):
+            continue
+        # A-891: kanal WARP ne trogaem ostrgovami klyuchei. Cloudflare WARP
+        # ne obyazan otdayat vyhodnoi IP tem servisam, kotorymi my ego meryaem
+        # (A-546), poetomu "net egress" zdes ne smert kanala. Ranee watchdog
+        # na etom delal rotate() i kanal uezhal na vless (zhaloba 13.10.2026).
+        if tag == warp.WARP_TAG:
+            try:
+                _warp_alive = bool(_warp_outbounds(target=warp.WARP_TAG))
+            except Exception:
+                _warp_alive = False
+            if _warp_alive:
+                continue
+            config.log("core: A-891 watchdog: kanal warp, konfig nedostupen -> sync")
+            sync()
             continue
         if tag in ("", "-", "direct", None):
             if pool.pick_final():

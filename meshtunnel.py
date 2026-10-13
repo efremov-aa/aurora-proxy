@@ -13,6 +13,7 @@ SNI) идёт второй независимый слой: keystream BLAKE2b + 
 nonce-антиреплей и фрагментация с padding.
 """
 
+import base64
 import errno
 import hmac
 import hashlib
@@ -139,6 +140,11 @@ PAD_MAX = _int_env("AURORA_MESH_PAD", FRAG_PAD_MAX, 0, 4096)
 HEARTBEAT = _int_env("AURORA_MESH_HEARTBEAT", HEARTBEAT_S, 5, 300)
 TTL = _int_env("AURORA_MESH_PEER_TTL", PEER_TTL_S, 30, 3600)
 ANNOUNCE = _int_env("AURORA_MESH_ANNOUNCE", ANNOUNCE_S, 10, 3600)
+
+# A-883: profil pira publikuetsya povtorno, a ne odin raz pri starte.
+PROFILE_RETRY_MIN_S = _int_env("AURORA_MESH_PROFILE_RETRY_MIN", 30, 5, 3600)
+PROFILE_RETRY_MAX_S = _int_env("AURORA_MESH_PROFILE_RETRY_MAX", 600, 30, 3600)
+PROFILE_REFRESH_S = _int_env("AURORA_MESH_PROFILE_REFRESH", 3600, 300, 86400)
 # A-191: limit odnovremennyh potokov v ODNOM soedinenii pira i
 # pokoi, posle kotorogo masterskoe soedinenie pikaet (povtor).
 MAX_STREAMS = _int_env("AURORA_MESH_MAX_STREAMS", 32, 1, 256)
@@ -1200,23 +1206,87 @@ def _announce_loop(key):
             time.sleep(min(60, 2 ** backoff))
 
 
+def _own_vless_block():
+    """A-889: moy sobstvennyy VLESS-profil iz config.VLESS_PUBLIC.
+
+    Poly tem zhe, chto zhdet mesh._vless_client_valid na drugoi storone:
+    uuid, pbk, short_id, sni, host, port."""
+    vln = getattr(config, "VLESS_PUBLIC", {}) or {}
+    if not vln.get("enabled") or not vln.get("uuid"):
+        return {}
+    try:
+        port = int(vln.get("port", 8443))
+    except (TypeError, ValueError):
+        return {}
+    return {"uuid": str(vln.get("uuid") or ""),
+            "pbk": str(vln.get("public_key") or ""),
+            "short_id": str(vln.get("short_id") or ""),
+            "sni": str(vln.get("sni") or vln.get("host") or ""),
+            "host": str(vln.get("host") or ""),
+            "port": port}
+
+
+def _encode_vless_profile(block):
+    """A-889: profil v 8-e pole HELLO (base64url JSON, bez paddinga).
+
+    Pustaya stroka - profila net, master nichego ne zapishet. "|"
+    vnutri byt ne mozhet: base64url alfarit ego ne soderzhit."""
+    if not isinstance(block, dict) or not block.get("uuid"):
+        return ""
+    try:
+        raw = json.dumps(block, separators=(",", ":"), sort_keys=True)
+        return base64.urlsafe_b64encode(raw.encode("utf-8")).decode("ascii").rstrip("=")
+    except Exception:
+        return ""
+
+
+def _decode_vless_profile(blob):
+    """A-889: obratnoe preobrazovanie. Ploskiy dict libo pustoy dict."""
+    text = str(blob or "").strip()
+    if not text:
+        return {}
+    try:
+        raw = base64.urlsafe_b64decode(text + "=" * (-len(text) % 4))
+        value = json.loads(raw.decode("utf-8"))
+    except Exception:
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _publish_loop():
+    """A-883: povtoryayushchaya sya publikaciya sobstvennogo VLESS-profilya.
+
+    Pervaya popytka - sразу, potom backoff do `PROFILE_RETRY_MAX_S`, posle
+    uspekha - raz v `PROFILE_REFRESH_S` (rotaciya sekretov, sbros zapisI).
+    Znacheniya nikuda ne logiruyutsya. Potok daemon, exit - tolko interpreter."""
+    delay = PROFILE_RETRY_MIN_S
+    while True:
+        try:
+            done = bool(_publish_profile())
+        except Exception:
+            done = False
+        if done:
+            delay = PROFILE_REFRESH_S
+        else:
+            delay = min(delay * 2, PROFILE_RETRY_MAX_S)
+        time.sleep(delay)
+
+
 def _publish_profile():
     """A-163: my own VLESS client params -> my mesh node record.
 
     The master needs them to build a vless outbound and dial our tunnel
     port through xray, so a peer behind NAT stays reachable (variant A1).
     Values never go to the log."""
+    # A-889: vmesto zapisi v SVOYU zapis (A-163) - otdayom profil v kadre
+    # HELLO. Prichina: v lokalnom mesh._NODES net zapisi o sebe (all_nodes()
+    # na uzle = 1, tolko hub), poetomu set_vless_client(svoi_id) vsegda
+    # vozvrashchal False i peer-profil nikogda ne poevalisya masteru.
+    block = _own_vless_block()
+    if not block:
+        return False
     try:
         import mesh as _mesh
-        vln = getattr(config, "VLESS_PUBLIC", {}) or {}
-        if not vln.get("enabled") or not vln.get("uuid"):
-            return False
-        block = {"uuid": vln["uuid"],
-                 "pbk": vln.get("public_key", ""),
-                 "short_id": vln.get("short_id") or "",
-                 "sni": vln.get("sni") or vln.get("host", ""),
-                 "host": vln.get("host", ""),
-                 "port": int(vln.get("port", 8443))}
         return bool(_mesh.set_vless_client(_node_id(), block))
     except Exception:
         return False
@@ -1234,7 +1304,17 @@ def _client_serve():
     if first:
         threading.Thread(target=_announce_loop, args=(key,),
                          name="mesh-announce", daemon=True).start()
-    _publish_profile()
+        # A-883: ranee zdes byl ODINKRA tnyy vysov _publish_profile(). Esli v
+        # etot moment uzhebi mesh ne podtyanut ot mastera (set_vless_client
+        # vozvrashchaet False, uzla net v _NODES), profil propadal navsegda do
+        # sleduyushchego restarta. Teper - fonovyy potok s povtorom.
+        threading.Thread(target=_publish_loop, name="mesh-publish",
+                         daemon=True).start()
+    elif _publish_profile():
+        # A-883: server-side uzhe got zapisannyy profil, no posle restarta
+        # klient zapis mog byt zality starym - odna popytka pri starte.
+        threading.Thread(target=_publish_loop, name="mesh-publish",
+                         daemon=True).start()
     _accept_loop(listener, lambda conn: _serve_dispatch(conn, key, peer_id, False))
 
 
@@ -1308,9 +1388,13 @@ def _hello_frame(node_id, secret, addr, key):
     # Kadr uzh zashishchjon obshchim sekretom seti (keystream + MAC), a
     # master otvechaet tem zhe kadrom, no s resheniem o licenzii.
     lic_token, lic_cred = _license_identity()
+    # A-889: 8-e pole - sobstvennyy VLESS-profil (base64url JSON), chtoby
+    # master smog postroit outbound pira. Pustaya stroka = profil net.
+    vless_blob = _encode_vless_profile(_own_vless_block())
     payload = (_keybytes(node_id) + b"|" + proof + b"|" + nonce + b"|"
                + _keybytes(addr) + b"|" + _keybytes(str(_self_policy_port()))
-               + b"|" + _keybytes(lic_token) + b"|" + _keybytes(lic_cred))
+               + b"|" + _keybytes(lic_token) + b"|" + _keybytes(lic_cred)
+               + b"|" + _keybytes(vless_blob))
     return nonce, payload
 
 
