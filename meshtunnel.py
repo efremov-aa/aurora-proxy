@@ -2080,15 +2080,12 @@ def _apply_peer_profiles(blob):
         if not _mesh._vless_client_valid(block):
             continue
         try:
-            if not _mesh.vless_client(pid):
-                # zapisi u uzla net - sozdayom iz proflya, inache set_vless_client
-                # vozvrashchaet False i molcha nichego ne pishet
-                if _mesh.all_nodes() and not any(
-                        str(n.get("id")) == pid for n in _mesh.all_nodes() if isinstance(n, dict)):
-                    _mesh.add(str(row.get("name") or pid)[:40], "",
-                              str(block.get("host") or ""),
-                              int(block.get("port") or 0), role="node")
-            if _mesh.set_vless_client(pid, block):
+            # A-943: `add()` generiruet SVOY uuid4, a id zdes - iz kadra
+            # mastera; put add()+set_vless_client(pid) sozdal zapis s chuzhim
+            # id i TIKHO ne zapisyval profil. Teper odin vyzyv s zadannym id.
+            if not hasattr(_mesh, "ensure_peer_profile"):
+                continue
+            if _mesh.ensure_peer_profile(pid, row.get("name"), block):
                 applied += 1
         except Exception:
             continue

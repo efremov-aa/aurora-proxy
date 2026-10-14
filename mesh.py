@@ -813,6 +813,77 @@ def set_vless_client(node_id, value):
     return True
 
 
+def ensure_peer_profile(node_id, name=None, value=None):
+    """A-943/A-944: sozdaet ili obnovlyaet zapis uzla s ZADANNYM id + profilem.
+
+    Nuzhno A-940: profil pira prihodit s id iz kadra mastera, a `add()`
+    generiruet SVOY id - posle `add()` zapis pira pisalsya pod chuzhim id i
+    `set_vless_client` TIHO vozvrashchal False. Zdes id beretsya iz kadra.
+
+    Fail-closed: id cherez `_valid_node_id`, profil cherez
+    `_vless_client_valid`, imya cherez `_valid_node_name`/`_used_names`,
+    limit - MAX_NODES, zapis prohodyat `_validate_nodes` i `_save`.
+    Zapis `role="test"` ne trogaetsya."""
+    if not _valid_node_id(node_id) or not _vless_client_valid(value):
+        return False
+    target = str(node_id)
+    raw_name = _valid_node_name(str(name or "").strip()) or ""
+    if not raw_name:
+        raw_name = generate_name()
+    with _LOCK:
+        rows = [dict(item) for item in _NODES]
+        index = -1
+        for position, item in enumerate(rows):
+            if isinstance(item, dict) and item.get("id") == target:
+                index = position
+                break
+        if index >= 0:
+            item = rows[index]
+            if item.get("role") == "test":
+                return False
+            updated = dict(item)
+            updated["name"] = raw_name[:40]
+            updated["vless_client"] = dict(value)
+        else:
+            if len(_NODES) >= MAX_NODES:
+                return False
+            if raw_name in _used_names():
+                raw_name = generate_name()
+            updated = {"id": target,
+                       "name": raw_name[:40],
+                       "region": "\u2014",
+                       "host": str(value.get("host")),
+                       "port": int(value.get("port")),
+                       "role": "node",
+                       "added": int(time.time()),
+                       "vless_client": dict(value)}
+            try:
+                policy_port = int(getattr(config, "UI_PORT", 0) or 0)
+            except (TypeError, ValueError):
+                policy_port = 0
+            if _valid_port(policy_port):
+                updated["policy_port"] = policy_port
+            for flag in OPTIN_FLAGS:
+                updated[flag] = OPTIN_DEFAULTS[flag]
+        if index >= 0:
+            rows[index] = updated
+        else:
+            rows.append(updated)
+        try:
+            rows = _validate_nodes(rows)
+        except (TypeError, ValueError):
+            return False
+        previous = _NODES
+        globals()["_NODES"] = rows
+        try:
+            _save()
+        except Exception:
+            globals()["_NODES"] = previous
+            return False
+    _invalidate_ping_cache()
+    return True
+
+
 def vless_client(node_id):
     """Копия профиля внешнего VLESS узла (пусто, если профиля нет или он битый)."""
     if not _valid_node_id(node_id):
