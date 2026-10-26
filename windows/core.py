@@ -116,6 +116,10 @@ def _xray_bin():
     cands = [
         os.path.join(_base, "bin", "xray.exe"),   # frozen onedir: _internal\bin
         os.path.join(_base, "bin", "xray"),
+        # A-949: zip/manual-ustanovka. Staryy download_xray.ps1 klad bin na
+        # uroven vyshe (ryadom s papkoy windows), poetomu ischem i tam.
+        os.path.join(os.path.dirname(_base), "bin", "xray.exe"),
+        os.path.join(os.path.dirname(_base), "bin", "xray"),
         shutil.which("xray.exe"),
         shutil.which("xray"),
         os.path.join(os.path.expanduser("~"), "xray"),
@@ -1438,12 +1442,24 @@ def _set_active_tag_impl(tag):
         config.update_state(comm={"state": "idle", "msg": ""})
         config.log("core: A-WARP-M ruchoy vybor WARP, no konfig ne zagruzhen")
         return False, "warp config not loaded"
+    # A-949: bez binarnika xray lyuboe pereklyuchenie zakanchivalos "restart fail"
+    # uzhe POSLE zapisi xray.json, i polzovatel videl tolko "kanal ne pereklyuchen".
+    # Proveryaem do zapisi i govorim prichinu.
+    if not _xray_bin():
+        config.update_state(comm={"state": "idle", "msg": ""})
+        config.log("core: switch %s otklonen - binarnika xray net" % tag)
+        return False, "xray не найден: положите xray.exe в bin рядом с run.py"
     config.update_state(comm={"state": "syncing", "msg": "переключение ключа..."})
+    disk_before = None
+    expected = None
     with XRAY_CONFIG_LOCK:  # read-modify-write целиком под локом (TOCTOU)
         cfg = _read_config()
         if not cfg:
             config.update_state(comm={"state": "idle", "msg": ""})
             return False, "нет конфига"
+        # A-949: glubokaya kopiya togo, chto lezhit na diske DO nashey pravki -
+        # dlya otkata, esli xray ne prinyat novyy konfig.
+        disk_before = json.loads(json.dumps(cfg))
         tags = [o.get("tag") for o in cfg.get("outbounds", [])]
         if tag not in tags:
             # A-857: outbound-y WARP est' tol'ko v konfige, sobRannom s final=warp.
@@ -1467,12 +1483,24 @@ def _set_active_tag_impl(tag):
         for rule in cfg.get("routing", {}).get("rules", []):
             if _is_final_http_rule(rule):
                 rule["outboundTag"] = tag
+        # A-949: ne nachinaem restart s konfigom, kotoryy xray zavedomo otklonit.
+        if not _xray_config_valid(cfg):
+            config.update_state(comm={"state": "idle", "msg": ""})
+            config.log("core: switch %s otklonen - xray otverg konfig (preflight)" % tag)
+            return False, "xray отклонил конфиг (проверка перед запуском)"
         if not _write_config(cfg):
             config.update_state(comm={"state": "idle", "msg": ""})
-            return False, "write fail"
-    if not _restart_xray():
+            config.log("core: switch %s otklonen - zapis xray.json ne udalas" % tag)
+            return False, "не удалось записать xray.json (права/диск)"
+        expected = _config_fingerprint(cfg)
+    if not _restart_xray() or _current_fingerprint() != expected:
+        # A-949: ne ostavlyaem xray.json s tegom, kotoryy xray ne prinyal, -
+        # inache sleduyushchiy sync schitaet kanal uzhe pereklyuchennym.
+        if disk_before is not None and _restore_config_cas(expected, disk_before):
+            _restart_xray()
         config.update_state(comm={"state": "idle", "msg": ""})
-        return False, "restart fail"
+        config.log("core: switch %s: restart fail (xray ne podnyalsya)" % tag)
+        return False, "xray не перезапустился — смотрите журнал и bin\\xray.exe"
     ip = None
     tunnel_ok = None
     if _warp_manual:

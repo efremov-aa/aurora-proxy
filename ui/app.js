@@ -1283,13 +1283,14 @@
     var m = Math.floor(a.length / 2);
     return a.length % 2 ? a[m] : Math.round((a[m - 1] + a[m]) / 2);
   }
-  function toast(msg, ok) {
+  function toast(msg, ok, ms) {
     var t = $('toast');
     if (!t) return;
     t.textContent = msg;
     t.className = 'show' + (ok ? '' : ' err');
     clearTimeout(t._tm);
-    t._tm = setTimeout(function () { t.className = ''; }, 2500);
+    // A-949: oshibku s prichinoy nuzhno uspet prochitat (byla 2.5 s).
+    t._tm = setTimeout(function () { t.className = ''; }, ms || 2500);
   }
   function secTok() { return localStorage.getItem(LS.sec) || ''; }
   function authHdr() {
@@ -1337,8 +1338,12 @@
 
   // ================= A-WARP-PUB: rezervnyj kanal Cloudflare WARP =================
   var WARP_PROBE_BUSY = false;
+  // A-949: posledniy status WARP (dlya podskazki do zaprosa) i odin zapros za raz.
+  var WARP_STATE = null;
+  var WARP_USE_BUSY = false;
   function warpRender(w) {
     w = (w && typeof w === 'object') ? w : {};
+    WARP_STATE = w;
     var names = { off: 'выключен', auto: 'авто (пустой пул)', on: 'всегда' };
     var mode = String(w.mode || 'off');
     var put = function (id, v) { var el = $(id); if (el) el.textContent = String(v); };
@@ -1376,6 +1381,9 @@
     if (wb) {
       wb.className = 'btn small' + (onWarp ? '' : ' primary');
       wb.textContent = onWarp ? '✅ Канал на WARP' : '▶️ Канал на WARP';
+      // A-949: knopka chestno podskazyvaet, chto bez konfiga ona nichego ne sdelat.
+      wb.title = w.loaded ? 'Переключить канал на WARP'
+                          : 'Сначала загрузите WARP-конфиг';
     }
     var hint = $('warp-note');
     if (hint) {
@@ -1431,8 +1439,18 @@
   }).catch(function () { toast('WARP: конфиг не выбран', false); });
 }
 function warpUse() {
+  if (WARP_USE_BUSY) return;
+  // A-949: bez konfiga server chestno otvechaet "warp config not loaded", no
+  // v toste bylo tolko "kanal ne pereklyuchen" - eto chitalos kak polomka
+  // GitHub-sborki. Prichinu i deystvie pokazyvaem srazu.
+  if (WARP_STATE && !WARP_STATE.loaded) {
+    toast('WARP: конфиг не загружен — сначала загрузите его на этой вкладке', false, 8000);
+    return;
+  }
+  WARP_USE_BUSY = true;
   toast('Переключаю канал на WARP...', true);
   postJSON('/api/keys/active', { tag: 'warp', lane: 'lan' }).then(function (j) {
+    WARP_USE_BUSY = false;
     // A-892: server otvechaet "already active", kogda kanal UZHE na WARP.
     // Ranee etot sluchay pokazyvalsya kak "kanal ne pereklyuchyon", hotya
     // na samom dele vse rabotalo (zhaloba vladel'tsa 13.10.2026).
@@ -1441,10 +1459,21 @@ function warpUse() {
       if (m.indexOf('already') >= 0) toast('Уже на WARP 🐾', true);
       else toast('Канал на WARP' + (m ? ' · ' + m : ''), true);
     } else {
-      toast('WARP: канал не переключён (' + ((j && (j.msg || j.error)) || 'нет ответа') + ')', false);
+      var why = String((j && (j.msg || j.error)) || 'нет ответа');
+      // A-949: starye korotkie kody -> ponyatnaya prichina.
+      var human = {
+        'warp config not loaded': 'конфиг не загружен — загрузите его на этой вкладке',
+        'tag not in outbounds': 'в конфиге нет WARP-выхода — выберите конфиг и повторите',
+        'write fail': 'не удалось записать xray.json (права/диск)',
+        'restart fail': 'xray не перезапустился — смотрите журнал и bin\\xray.exe'
+      };
+      toast('WARP: канал не переключён — ' + (human[why] || why), false, 8000);
     }
     refresh();
-  }).catch(function () { toast('WARP: канал не переключён', false); });
+  }).catch(function () {
+    WARP_USE_BUSY = false;
+    toast('WARP: канал не переключён — сервер не ответил', false, 8000);
+  });
 }
 function warpProbeOne(name) {
   if (!name) return toast('не выбран конфиг', false);

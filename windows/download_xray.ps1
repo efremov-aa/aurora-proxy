@@ -2,8 +2,10 @@
 # Запуск:  powershell -ExecutionPolicy Bypass -File download_xray.ps1
 $ErrorActionPreference = 'Stop'
 $XrayVer = 'v26.9.9'
-$Root   = Split-Path -Parent $PSScriptRoot
-$BinDir = Join-Path $Root 'bin'
+# A-949: bin\ dolzhen lezhat RYADOM s run.py (config.BASE_DIR), inache
+# _xray_bin() ego ne nahodit i lyuboe pereklyuchenie kanala padaet
+# "restart fail". Ranee zdes byl put na uroven vyshe papki windows.
+$BinDir = Join-Path $PSScriptRoot 'bin'
 $Zip    = Join-Path $env:TEMP 'Xray-windows-64.zip'
 
 if (-not (Test-Path $BinDir)) { New-Item -ItemType Directory -Path $BinDir | Out-Null }

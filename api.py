@@ -1557,6 +1557,9 @@ class Handler(BaseHTTPRequestHandler):
     def _keys_active(self, data):
         tag = data.get("tag", "")
         ok, msg = core.set_active_tag(tag)
+        # A-949: prichina otkaza dolzhna byt v zhurnale, a ne tolko v toste
+        # na 2.5 s - inache "kanal ne pereklyuchen" nevozmozhno diagnostirovat.
+        config.log("api: keys/active tag=%s ok=%s msg=%s" % (tag, ok, msg))
         self._send(*_json({"ok": ok, "msg": msg}))
 
     def _rc_limit(self, data):
