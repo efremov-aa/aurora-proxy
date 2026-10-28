@@ -21,12 +21,13 @@ from collections import deque
 # (xray run/keytest/statsquery/netstat/netsh/taskkill/tg-ws-proxy и т.п.).
 HIDE_FLAG = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
 
-VERSION = "1.10.14"
+VERSION = "1.10.15"
 VERSION_NAME = "Кот-диагност"
 APP_NAME = "Aurora"
 
 # История версий для вкладки «Версии» (v, имя, дата).
 VERSION_HISTORY = (
+    ("1.10.15", "Кот-диагност", "28.10.2026"),
     ("1.10.14", "Кот-диагност", "26.10.2026"),
     ("1.10.13", "Кот-постоянный", "13.10.2026"),
     ("1.10.12", "Кот-переключатель", "12.10.2026"),
@@ -56,6 +57,7 @@ VERSION_HISTORY = (
 )
 
 VERSION_NOTES = {
+    "1.10.15": "Кот-диагност: исправлена обработка ответа «Канал на WARP». При сетевом сбое UI больше не показывает ложное «сервер не ответил», если ответ уже получен, и чётче сообщает причину отказа.",
     "1.10.14": "Кот-диагност перестал отвечать одной фразой на разные поломки. Кнопка «Канал на WARP» теперь говорит причину: конфиг WARP не загружен (Aurora его не генерирует — его загружает владелец), не найден xray.exe или xray не принял конфиг. Сервер проверяет бинарь и конфиг ДО записи xray.json и откатывает файл, если xray не поднялся, поэтому следующий синк больше не считает канал переключённым. Причина отказа пишется в журнал, ошибка видна 8 секунд. В Windows-сборке download_xray.ps1 теперь кладёт xray в bin рядом с run.py — раньше он попадал на уровень выше, и переключение падало уже после записи конфига. Честно: WARP-конфиг по-прежнему готовит и загружает человек, сборка его не создаёт.",
     "1.10.13": u"Rezhim Cloudflare WARP Vsegda teper po-nastoyashchemu vsegda: kot bolshe ne soskalkzyvaet na VPN-klyuchi pri avtosinxronizacii, rotacii i proverke zhivogo kanala. Cloudflare ne obyazan otdayat vyhodnoi IP tem servisam, kotorymi my ego meryaem, i ranshe watchdog prinimal eto za smert kanala. Pereklyuchenie na WARP peresobiraet config, esli kanala eshche net, i chestno govorit uzhe na WARP, esli on uzhe vklyuchen. Zadno poyavilis knopka zagruzki configov WARP i relei-tunnel mesh-seti s publikaciej VLESS-profilya v 8-m pole HELLO.",
     "1.10.12": "Кот-переключатель довел до конца то, что началось в прошлых выпусках: загрузка конфига Cloudflare WARP теперь действительно открывает диалог выбора файла. Причина была не в сервере, а в кнопке - обработчик клика перехватывал и отменял искусственный клик по скрытому полю, поэтому окно выбора открывалось и сразу исчезало. Второе: кнопка «Канал на WARP» теперь действительно переключает канал - раньше она честно отвечала «такого канала нет», потому что резервный канал WARP появляется в конфигурации только при сборке под него, теперь система пересобирает конфигурацию под выбранный канал. И третье: панель перестала дёргать проверку обновлений каждые несколько секунд, поэтому список версий не перерисовывался сам и не мешал. Честно: у канала WARP выходной адрес показывается прочерком, если WARP не отвечает нашим проверочным сервисам, - это нормальное поведение Cloudflare, канал при этом живой.",
@@ -211,6 +213,21 @@ UPDATE_REPO = "efremov-aa/aurora-proxy"
 UPDATE_PUBKEY = "6159031f0fd9ab6c5074f9bef99f5ac125df75e05bdeaa772860236fb85e3371"
 UPDATE_CHECK_INTERVAL = 15 * 60  # проверка признаков обновления каждые 15 минут
 
+# --- A-945: закреплённая личность головного сервера --------------------------
+# Здесь НЕТ env-переопределения намеренно. Сборка публичная: если бы ключ или
+# master_id читались из окружения, кто угодно подставил бы свои значения и
+# подписал под них поддельную политику - подмена ключа и подмена данных шли бы
+# одной подписью. Ключ мастера публичен, подделать им подпись нельзя.
+# Смена ключа на мастере = перепривязка узла (node rebind), не env-переменная.
+MASTER_ED_PUBKEY = "zNoKk_FNrNjrx3rKAHyYeozU6AKg8bgeT1lq0-Pe57o"  # base64url, 32 байта
+MASTER_ID = "aurora-home-b953902a8beb"
+
+# Публичные адреса мастера. Панель :8890 - только LAN: узлу она не нужна и не
+# должна быть доступна (A-945).
+MASTER_PUBLIC_URL = "https://5.141.235.56.sslip.io:8445"
+MASTER_POLICY_URL = "http://5.141.235.56:8891"
+MESH_POLICY_PORT = 8891
+
 # --- пути (относительно корня проекта) ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 _FROZEN = getattr(sys, "frozen", False)
@@ -234,23 +251,12 @@ SUBS_PLANS_FILE = os.path.join(DATA_DIR, "plans.json")
 SUBS_EXTRAS_FILE = os.path.join(DATA_DIR, "extras.json")
 AUTO_REFRESH_INTERVAL = 1800   # фоновый цикл обновления github-ключей (сек)
 
-SUBS_PLANS = {
-    # A-548: VPN-доступ не продаётся. В клиентской сборке остаётся одно бесплатное
-    # состояние по умолчанию — без квот и счётчиков: свой прокси, своя Aurora, общая
-    # меш-сеть, до 5 mesh-клиентов для игр, чат и голос. Платные тарифы VPN и покупка
-    # подписки убраны. Цены и описания дополнительных возможностей приходят
-    # с головного сервера (SUBS_EXTRAS, data/extras.json).
-    "free": {"name": "Бесплатно", "price": 0, "bytes": 0, "days": 0,
-             "devices": 5, "keys": 1,
-             "features": ["🐾 Свой прокси, свои ключи",
-                          "🐾 Своя Aurora",
-                          "🐾 Общая меш-сеть",
-                          "🐾 До 5 mesh-клиентов для игр",
-                          "🐾 Чат и голос",
-                          "Без квот и счётчиков"],
-             "features_no": []},
-  }  # A-548: VPN-доступ не продаётся, тарифы приходят с головного сервера}
-SUBS_PLAN_DEFAULT = "free"
+# A-945: локальных тарифов в сборке НЕТ. Числа не зашиты в код - витрина
+# строится из catalog.plans, приходящего в подписанной политике мастера.
+# Пока мастер не ответил, магазин честно пуст ("цены задаёт головной сервер"),
+# вместо того чтобы показывать уровень, которого никто не продаёт.
+SUBS_PLANS = {}
+SUBS_PLAN_DEFAULT = ""   # A-945: нет тарифа по умолчанию, пока не пришёл каталог мастера
 SUBS_MASK_UUID = True  # в UI показывать маскированные uuid подключений
 
 # A-109: цены и описания витрины задаёт ТОЛЬКО головной сервер.
@@ -357,10 +363,14 @@ def load_extras():
 
 
 def save_catalog(plans=None, extras=None, buy_url=None):
-    """Принять каталог мастера целиком: тарифы, витрина и ссылка оплаты."""
+    """Принять каталог мастера целиком: тарифы, витрина и ссылка оплаты.
+
+    A-945: тарифы ЗАМЕЩАЮТ локальный набор, а не дополняют его - иначе сборка
+    продолжала бы продавать витрину тарифа, который мастер уже убрал.
+    """
     ok = False
     if isinstance(plans, dict) and plans:
-        ok = bool(save_plans(plans)) or ok
+        ok = bool(save_plans(plans, replace=True)) or ok
     if isinstance(extras, dict):
         ok = bool(save_extras(extras, buy_url)) or ok
     return ok
@@ -388,7 +398,7 @@ def _ext_int_env(name, default):
     return value if value > 0 else default
 
 
-EXT_MASTER_URL = os.environ.get("AURORA_EXT_MASTER", "http://10.1.0.238:8890").rstrip("/")
+EXT_MASTER_URL = os.environ.get("AURORA_EXT_MASTER", MASTER_PUBLIC_URL).rstrip("/")
 EXT_TOKEN = os.environ.get("AURORA_EXT_TOKEN", "").strip()          # token из device-ссылки
 EXT_CREDENTIAL = os.environ.get("AURORA_EXT_CREDENTIAL", "").strip()  # credential из device-ссылки
 EXT_CHECK_INTERVAL_S = _ext_int_env("AURORA_EXT_CHECK_INTERVAL", 3600)
@@ -1479,6 +1489,15 @@ def normalize_plan(plan_id, value, base=None):
         clean = []
         for item in items:
             if not isinstance(item, str) or not 1 <= len(item) <= _PLAN_ITEM_MAX:
+                if isinstance(item, str) and item.strip():
+                    # A-945: текст фичи обрезаем и пишем в лог, а не роняем
+                    # тариф целиком. Числа (price/bytes/days/devices/keys)
+                    # остаются строгими - обрезать их нельзя.
+                    short = item.strip()[:_PLAN_ITEM_MAX].rstrip()
+                    log("plans: %s обрезан с %d до %d символов"
+                        % (field, len(item), len(short)))
+                    clean.append(short)
+                    continue
                 raise ValueError("invalid plan field %s" % field)
             clean.append(item)
         out[field] = clean
@@ -1490,17 +1509,35 @@ def _plans_snapshot():
                 if isinstance(value, dict))
 
 
-def save_plans(plans=None):
-    """Сохраняет тарифы в data/plans.json (атомарно, шифрование AURORA2)."""
+def save_plans(plans=None, replace=False):
+    """Сохранить тарифы в data/plans.json (атомарно, шифрование AURORA2).
+
+    replace=True - каталог пришёл с мастера и ЗАМЕЩАЕТ локальный набор целиком.
+    Иначе сборка годами показывала бы тариф, которого мастер уже не продаёт
+    (A-945: триал и тариф free удалены приказом владельца).
+    """
     with _SUBS_PLANS_LOCK:
         source = SUBS_PLANS if plans is None else plans
         if not isinstance(source, dict) or not source:
             raise ValueError("no plans")
         payload = {}
+        dropped = []
         for key, value in source.items():
-            payload[key] = normalize_plan(key, value, base=SUBS_PLANS.get(key))
+            try:
+                payload[key] = normalize_plan(key, value, base=SUBS_PLANS.get(key))
+            except ValueError as e:
+                # Один плохой тариф не должен ронять весь каталог: мастер мог
+                # прислать длинный текст фичи. Итог честно пишем в лог.
+                dropped.append("%s (%s)" % (key, e))
+        if not payload:
+            raise ValueError("no valid plans")
+        for entry in dropped:
+            log("plans: тариф отброшен: %s" % entry)
         if plans is not None:
+            if replace:
+                SUBS_PLANS.clear()
             SUBS_PLANS.update(payload)
+            _sync_plan_default()
         try:
             import crypt
             crypt.save_json(SUBS_PLANS_FILE, payload)
@@ -1508,6 +1545,14 @@ def save_plans(plans=None):
             log("plans: не удалось сохранить: %s" % e)
             return False
         return True
+
+
+def _sync_plan_default():
+    """Тариф по умолчанию обязан существовать. Если мастер его убрал (free),
+    лучше честное «нет тарифа», чем показ несуществующего уровня."""
+    global SUBS_PLAN_DEFAULT
+    if SUBS_PLAN_DEFAULT not in SUBS_PLANS:
+        SUBS_PLAN_DEFAULT = ""
 
 
 def _validate_plans(raw):
@@ -1521,7 +1566,7 @@ def _validate_plans(raw):
 
 def _load_plans_override():
     """Переопределение тарифов из data/plans.json (валидные планы перезаписывают)."""
-    global _PLANS_GOOD
+    global _PLANS_GOOD, SUBS_PLAN_DEFAULT
     try:
         import crypt
         raw = crypt.load_bytes(SUBS_PLANS_FILE)
@@ -1544,8 +1589,15 @@ def _load_plans_override():
             SUBS_PLANS.clear()
             SUBS_PLANS.update(_PLANS_GOOD)
             log("plans: восстановлены последние корректные тарифы")
-    if SUBS_PLAN_DEFAULT not in SUBS_PLANS:
-        raise ValueError("default plan is missing")
+    if SUBS_PLANS.pop("free", None) is not None:
+        # A-945: устаревший локальный тариф free не должен вернуться после
+        # обновления - триала больше нет по приказу владельца.
+        log("plans: устаревший локальный тариф free убран")
+    if SUBS_PLAN_DEFAULT and SUBS_PLAN_DEFAULT not in SUBS_PLANS:
+        # A-945: дефолтного тарифа может не быть - мастер его не продаёт
+        # (триал и free удалены приказом владельца). Это НЕ поломка хранилища:
+        # молча уводим дефолт в «нет тарифа» и живём дальше.
+        SUBS_PLAN_DEFAULT = ""
 
 
 # --- меш: общий ключ подписи приглашений/политики с головным сервером ---

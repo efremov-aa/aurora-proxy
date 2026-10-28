@@ -44,6 +44,9 @@
       'routes.empty': 'маршрутов пока нет', 'routes.active': 'активен', 'routes.off': 'выкл',
       'plans.na': 'тарифы недоступны в этой сборке', 'plans.traffic': 'Трафик:', 'plans.devices': 'Устройств:', 'plans.keys': 'Ключей:',
       'plans.free': 'Бесплатно', 'plans.per-mo': '/мес', 'plans.current': 'текущий',
+      // A-945: срок задаёт мастер (days=0 = бессрочно). Остальные языки
+      // наследуют русский через _t().
+      'plans.forever': 'бессрочно',
       'bill.empty': 'платежей пока нет',
       'sec.on': 'включён', 'sec.off': 'выключен', 'sec.access': 'LAN-only: ', 'sec.da': 'да', 'sec.no': 'нет', 'sec.blk': 'блок',
       'sec.rat': 'вкл', 'sec.rat-off': 'выкл',
@@ -1451,28 +1454,44 @@ function warpUse() {
   toast('Переключаю канал на WARP...', true);
   postJSON('/api/keys/active', { tag: 'warp', lane: 'lan' }).then(function (j) {
     WARP_USE_BUSY = false;
-    // A-892: server otvechaet "already active", kogda kanal UZHE na WARP.
-    // Ranee etot sluchay pokazyvalsya kak "kanal ne pereklyuchyon", hotya
-    // na samom dele vse rabotalo (zhaloba vladel'tsa 13.10.2026).
-    if (j && j.ok) {
-      var m = String(j.msg || '');
-      if (m.indexOf('already') >= 0) toast('Уже на WARP 🐾', true);
-      else toast('Канал на WARP' + (m ? ' · ' + m : ''), true);
-    } else {
+    try {
+      // A-892: server otvechaet "already active", kogda kanal UZHE na WARP.
+      if (j && j.ok) {
+        var m = String(j.msg || '');
+        if (m.indexOf('already') >= 0) toast('Уже на WARP 🐾', true);
+        else toast('Канал на WARP' + (m ? ' · ' + m : ''), true);
+        refresh();
+        return;
+      }
       var why = String((j && (j.msg || j.error)) || 'нет ответа');
       // A-949: starye korotkie kody -> ponyatnaya prichina.
       var human = {
         'warp config not loaded': 'конфиг не загружен — загрузите его на этой вкладке',
         'tag not in outbounds': 'в конфиге нет WARP-выхода — выберите конфиг и повторите',
         'write fail': 'не удалось записать xray.json (права/диск)',
-        'restart fail': 'xray не перезапустился — смотрите журнал и bin\\xray.exe'
+        'restart fail': 'xray не перезапустился — смотрите журнал и bin\\xray.exe',
+        'network error': 'нет связи с сервером (проверьте, что панель открыта с того же адреса/порта)',
+        'xray не найден: положите бинарь в bin рядом с run.py': 'xray не найден — положите бинарь в bin рядом с run.py'
       };
-      toast('WARP: канал не переключён — ' + (human[why] || why), false, 8000);
+      if (why === 'network error') {
+        toast('WARP: канал не переключён — нет связи с сервером', false, 8000);
+      } else {
+        toast('WARP: канал не переключён — ' + (human[why] || why), false, 8000);
+      }
+      refresh();
+    } catch (e) {
+      toast('WARP: канал не переключён — ошибка обработки ответа', false, 8000);
+      refresh();
+    }
+  }).catch(function (e) {
+    WARP_USE_BUSY = false;
+    var em = e && e.message ? String(e.message) : '';
+    if (em.indexOf('network') >= 0 || em.indexOf('Failed to fetch') >= 0) {
+      toast('WARP: канал не переключён — нет связи с сервером', false, 8000);
+    } else {
+      toast('WARP: канал не переключён — сервер не ответил', false, 8000);
     }
     refresh();
-  }).catch(function () {
-    WARP_USE_BUSY = false;
-    toast('WARP: канал не переключён — сервер не ответил', false, 8000);
   });
 }
 function warpProbeOne(name) {
@@ -2045,7 +2064,10 @@ function warpRemoveOne(name) {
     var load = $('plans-loading');
     if (!grid) return;
     var pl = j.plans || {};
-    var def = j.default || 'free';
+    // A-945: дефолта может не быть вовсе (тариф free удалён приказом владельца,
+    // регистрация != лицензия). Тогда ни один тариф не помечается текущим -
+    // честнее, чем подставлять несуществующий.
+    var def = j.default || '';
     load.style.display = 'none';
     var ids = Object.keys(pl);
     if (!ids.length) {
@@ -2053,12 +2075,17 @@ function warpRemoveOne(name) {
       $('plans-loading').innerHTML = '<span class="empty"><span class="ic">💎</span>' + _t('plans.na') + '</span>';
       return;
     }
-    var order = { free: 0, basic: 1, prem: 2, premium: 2 };
-    ids.sort(function (a, b) { return (order[a] != null ? order[a] : 9) - (order[b] != null ? order[b] : 9); });
+    // Порядок - по цене из политики мастера, не по захардкоженным именам:
+    // мастер может добавить или убрать тариф, и витрина не должна врать.
+    ids.sort(function (a, b) {
+      var pa = (pl[a] && pl[a].price) || 0, pb = (pl[b] && pl[b].price) || 0;
+      if (pa !== pb) return pa - pb;
+      return String(a).localeCompare(String(b));
+    });
     var h = '';
     ids.forEach(function (id) {
       var p = pl[id] || {};
-      var hot = id === 'prem' || id === 'premium' || p.hot;
+      var hot = p.hot;
       var cur = id === def;
       var feats = [];
       if (p.bytes !== undefined) feats.push({ t: _t('plans.traffic') + bytesPlan(p.bytes), no: false });
@@ -2067,9 +2094,11 @@ function warpRemoveOne(name) {
       (p.features || []).forEach(function (f) { feats.push({ t: f, no: false }); });
       (p.features_no || []).forEach(function (f) { feats.push({ t: f, no: true }); });
       var priceTxt = p.price != null ? (p.price === 0 ? _t('plans.free') : +p.price + ' ₽') : '—';
+      // Срок задаёт мастер: days=0 = бессрочно. Не пишем "/мес" всем подряд.
+      var term = p.days ? _t('plans.per-mo') : _t('plans.forever');
       h += '<div class="plan' + (hot ? ' hot' : '') + (cur ? ' current' : '') + '">'
         + '<h3>' + esc(p.name || id) + (cur ? ' <span class="chip st-act">' + _t('plans.current') + '</span>' : '') + '</h3>'
-        + '<div class="price">' + priceTxt + '<small>' + _t('plans.per-mo') + '</small></div>'
+        + '<div class="price">' + priceTxt + '<small>' + term + '</small></div>'
         + '<ul>' + feats.map(function (f) { return '<li' + (f.no ? ' class="no"' : '') + '>' + esc(f.t) + '</li>'; }).join('') + '</ul>'
         + '<button class="btn' + (hot ? ' gold' : '') + '" data-act="plan-buy" data-plan-id="' + esc(id) + '">' + _t('btn.buy-tg') + '</button>'
         + '</div>';
@@ -2083,7 +2112,8 @@ function warpRemoveOne(name) {
     var table = body.parentNode && body.parentNode.parentNode;
     var head = table ? table.querySelector('thead tr') : null;
     var pl = (j && j.plans) || {};
-    var def = (j && j.default) || 'free';
+    // A-945: дефолта может не быть (триал и free удалены приказом владельца).
+    var def = (j && j.default) || '';
     var ids = Object.keys(pl);
     var order = { free: 0, basic: 1, prem: 2, premium: 2 };
     ids.sort(function (a, b) { return (order[a] != null ? order[a] : 9) - (order[b] != null ? order[b] : 9); });
@@ -2171,14 +2201,16 @@ function warpRemoveOne(name) {
   }
   /* Оплата и продление: форма владельца (контракт мастер-панели) */
   function renderPlanWidget(j) {
-    var cur = j.default || 'free';
-    if (j.plans) { $('plan-st').textContent = cur; var pn = (j.plans[cur] || {}).name || cur; $('plan-name').textContent = pn; $('pill-plan').textContent = '💎 ' + cur; }
+    // A-945: тарифа по умолчанию может не быть - показываем честное «—».
+    var cur = j.default || '';
+    if (j.plans) { $('plan-st').textContent = cur || '—'; var pn = (j.plans[cur] || {}).name || cur || '—'; $('plan-name').textContent = pn; $('pill-plan').textContent = '💎 ' + (cur || '—'); }
     var active = (j.subs || []).find(function (s) { return s.access_ok === true || s.access_status === 'ok'; });
     $('w-plan-body').innerHTML = _t('w.plan') + ' <b>' + esc(active ? (active.plan || cur) : cur) + '</b>'
       + (active && active.expires ? ' · до ' + fmtDate(active.expires) : '');
   }
   function renderBilling(j) {
-    var cur = j.default || 'free';
+    // A-945: тарифа по умолчанию может не быть.
+    var cur = j.default || '';
     var subs = j.subs || [];
     var active = subs.find(function (s) { return s.access_ok === true || s.access_status === 'ok'; });
     var stats = V.STATS && !V.STATS.error ? V.STATS : null;
