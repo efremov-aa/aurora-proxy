@@ -14,13 +14,14 @@ import urllib.request
 import uuid
 from collections import deque
 
-VERSION = "1.10.15"
+VERSION = "1.10.16"
 VERSION_NAME = "Кот-диагност"
 APP_NAME = "Aurora"
 
 # История версий для вкладки «Версии» (v, имя, дата).
 # ВАЖНО: без дублей — иначе вкладка показывает одну версию несколько раз.
 VERSION_HISTORY = (
+    ("1.10.16", "Кот-диагност", "28.10.2026"),
     ("1.10.15", "Кот-диагност", "28.10.2026"),
     ("1.10.14", "Кот-диагност", "26.10.2026"),
     ("1.10.13", "Кот-постоянный", "13.10.2026"),
@@ -52,6 +53,7 @@ VERSION_HISTORY = (
 
 # Описания версий для вкладки «Версии» (v -> текст). Показываются в панели.
 VERSION_NOTES = {
+    "1.10.16": "Кот-диагност: исправлена обработка ответа «Канал на WARP». postJSON теперь надёжно парсит JSON, не падает в catch при ошибке обработчика.",
     "1.10.15": "Кот-диагност: исправлена обработка ответа «Канал на WARP». При сетевом сбое UI больше не показывает ложное «сервер не ответил», если ответ уже получен, и чётче сообщает причину отказа.",
     "1.10.14": "Кот-диагност перестал отвечать одной фразой на разные поломки. Кнопка «Канал на WARP» теперь говорит причину: конфиг WARP не загружен (Aurora его не генерирует — его загружает владелец), не найден xray.exe или xray не принял конфиг. Сервер проверяет бинарь и конфиг ДО записи xray.json и откатывает файл, если xray не поднялся, поэтому следующий синк больше не считает канал переключённым. Причина отказа пишется в журнал, ошибка видна 8 секунд. В Windows-сборке download_xray.ps1 теперь кладёт xray в bin рядом с run.py — раньше он попадал на уровень выше, и переключение падало уже после записи конфига. Честно: WARP-конфиг по-прежнему готовит и загружает человек, сборка его не создаёт.",
     "1.10.13": u"Rezhim Cloudflare WARP Vsegda teper po-nastoyashchemu vsegda: kot bolshe ne soskalkzyvaet na VPN-klyuchi pri avtosinxronizacii, rotacii i proverke zhivogo kanala. Cloudflare ne obyazan otdayat vyhodnoi IP tem servisam, kotorymi my ego meryaem, i ranshe watchdog prinimal eto za smert kanala. Pereklyuchenie na WARP peresobiraet config, esli kanala eshche net, i chestno govorit uzhe na WARP, esli on uzhe vklyuchen. Zadno poyavilis knopka zagruzki configov WARP i relei-tunnel mesh-seti s publikaciej VLESS-profilya v 8-m pole HELLO.",
