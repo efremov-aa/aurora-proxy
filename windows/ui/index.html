@@ -43,6 +43,7 @@
 
       <div class="ngroup" id="g-shop">
         <div class="ngroup-title" data-short="🛒">🛒 <span data-i18n="nav.shop">Магазин</span></div>
+        <button data-t="shop-plans"><span class="ic">💎</span><span class="lb" data-i18n="nav.shop-plans">Тарифы VPN</span></button>
         <button data-t="shop-features"><span class="ic">🧩</span><span class="lb" data-i18n="nav.shop-features">Дополнительные возможности Aurora</span><span class="tag" id="tag-feat">2</span></button>
         <button data-t="shop-billing"><span class="ic">💳</span><span class="lb" data-i18n="nav.shop-billing">Платежи</span></button>
       </div>
@@ -511,6 +512,29 @@
             <table>
               <thead><tr><th>#</th><th data-i18n="th.what">Что</th><th data-i18n="th.via">Куда</th><th data-i18n="th.proto">Протокол</th><th data-i18n="th.status">Статус</th><th></th></tr></thead>
               <tbody id="mesh-routes"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+<!-- ==================================================
+           МАГАЗИН · ТАРИФЫ
+           A-945: витрина строится из catalog.plans, который приходит в
+           подписанной политике мастера. Цифры в коде не зашиты - мастер
+           меняет цены, меняется витрина, обновлять сборку не нужно.
+           ================================================== -->
+      <section class="tab" id="t-shop-plans">
+        <div class="card">
+          <h2><span class="ic">💎</span><span data-i18n="sp.head">Тарифы</span></h2>
+          <p class="hint" data-i18n="sp.hint"></p>
+          <div id="plans-loading"></div>
+          <div class="plans" id="plans-grid"></div>
+        </div>
+        <div class="card pad-0">
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th data-i18n="th.func"></th><th data-i18n="th.val"></th></tr></thead>
+              <tbody id="cmp-rows"></tbody>
             </table>
           </div>
         </div>

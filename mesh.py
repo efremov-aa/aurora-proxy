@@ -3,6 +3,7 @@
 # из invite-ссылок других серверов Aurora (или вручную через UI).
 
 import concurrent.futures
+import base64
 import hashlib
 import hmac
 import ipaddress
@@ -51,6 +52,24 @@ MAX_POLICY_BYTES = 64 * 1024
 MAX_CATALOG_BYTES = 32 * 1024  # A-109: каталог цен и описаний от мастера
 _CATALOG_FIELDS = ("catalog", "buy_url", "master_id")
 _CATALOG_MARK = ""
+_POLICY_ENTITLEMENTS = []   # A-945/M16: UID узлов с правом на меш из подписанной политики
+
+
+def policy_entitlements():
+    """Список UID узлов, которым мастер выдал право на меш (из mesh_entitlements
+    политики, подпись уже проверена в _policy_valid). Пусто — права ни у кого."""
+    return list(_POLICY_ENTITLEMENTS)
+
+
+def has_mesh(uid):
+    """A-945/M18: право узла с данным uid на меш, по подписанной политике мастера.
+
+    М16 уже прочитала mesh_entitlements из политики (подпись Ed25519 проверена
+    в _policy_valid). Здесь только сверка uid — без угадываний, без сетевых
+    вызовов, без состояния вне политики."""
+    if not uid:
+        return False
+    return str(uid) in _POLICY_ENTITLEMENTS
 _POLICY_MAX_NONCES = 256
 _POLICY_NONCES = {}
 _POLICY_NONCES_LOCK = threading.Lock()
@@ -158,7 +177,11 @@ def _policy_master_id():
     try:
         value = str(config.mesh_master_id() or "")
     except Exception:
-        return ""
+        value = ""
+    if not value:
+        # A-945: без env-ключа мастер узнаётся по закреплённому в сборке id.
+        # Это публичное значение, подделать подпись им нельзя.
+        value = str(getattr(config, "MASTER_ID", "") or "")
     if not value or len(value) > 64:
         return ""
     for ch in value:
@@ -194,6 +217,106 @@ def _policy_signature(core, key=None):
     if secret:
         return _hmac_hex(secret, _signed_bytes(core, _POLICY_FIELDS))
     return ""
+
+
+# --- A-945: проверка подписи мастера ключом, закреплённым в сборке ------------
+# Политика и каталог подписаны Ed25519-ключом мастера поверх тех же канонических
+# байт, что и HMAC. HMAC оставлен для совместимости со старым мастером, но узлу
+# с закреплённым ключом он не нужен: общий секрет в публичной сборке означал бы,
+# что поддельную политику составит кто угодно.
+_ED_PUBKEY_BYTES = None
+_ED_PUBKEY_LOCK = threading.Lock()
+
+
+def _ed_pubkey():
+    """Закреплённый открытый ключ мастера (32 байта) или пустой."""
+    global _ED_PUBKEY_BYTES
+    with _ED_PUBKEY_LOCK:
+        if _ED_PUBKEY_BYTES is None:
+            raw = str(getattr(config, "MASTER_ED_PUBKEY", "") or "").strip()
+            try:
+                value = base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4))
+            except Exception:
+                value = b""
+            _ED_PUBKEY_BYTES = value if len(value) == 32 else b""
+        return _ED_PUBKEY_BYTES
+
+
+def _ed_decode(value, size):
+    """base64url без padding -> bytes нужной длины, иначе None."""
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    try:
+        out = base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4))
+    except Exception:
+        return None
+    return out if len(out) == size else None
+
+
+def _ed_signed_core_ok(value, fields, signature):
+    """Подпись мастера над каноническими байтами value[fields]."""
+    pub = _ed_pubkey()
+    if not pub or not isinstance(value, dict):
+        return False
+    try:
+        import release_sign
+    except Exception:
+        return False
+    sig = _ed_decode(signature, 64)
+    if sig is None:
+        return False
+    try:
+        return bool(release_sign.verify(pub, _signed_bytes(value, fields), sig))
+    except Exception:
+        return False
+
+
+def _ed_policy_ok(value):
+    """Подпись политики Ed25519. Ключ из ответа - не доверие: сверяем с закреплённым,
+    иначе подмена ключа и подмена данных шли бы одной подписью."""
+    pub = _ed_pubkey()
+    if not pub:
+        return False
+    claimed = str(value.get("ed_pubkey") or "").strip()
+    pinned = str(getattr(config, "MASTER_ED_PUBKEY", "") or "").strip()
+    if not claimed or not hmac.compare_digest(claimed, pinned):
+        return False
+    return _ed_signed_core_ok(value, _POLICY_FIELDS, value.get("ed25519_signature"))
+
+
+def _ed_catalog_ok(value):
+    """Подпись каталога (цены и описания) тем же ключом мастера."""
+    pub = _ed_pubkey()
+    if not pub or not isinstance(value.get("catalog"), dict):
+        return False
+    claimed = str(value.get("ed_pubkey") or "").strip()
+    pinned = str(getattr(config, "MASTER_ED_PUBKEY", "") or "").strip()
+    if not claimed or not hmac.compare_digest(claimed, pinned):
+        return False
+    core = {"catalog": value.get("catalog"), "buy_url": value.get("buy_url"),
+            "master_id": value.get("master_id")}
+    return _ed_signed_core_ok(core, _CATALOG_FIELDS, value.get("catalog_ed25519"))
+
+
+def _policy_trusted(value):
+    """Политика настоящая, если подпись мастера сошлась.
+
+    Мастер с ключом Ed25519 проверяется ТОЛЬКО им: если подпись есть, но не
+    сходится - отказ, а не откат на HMAC (иначе снятие ed-подписи было бы
+    обходом проверки). HMAC остаётся для старого мастера без ed-подписи.
+    """
+    if not isinstance(value, dict):
+        return False
+    if value.get("ed25519_signature"):
+        return _ed_policy_ok(value)
+    key = _policy_key()
+    if not key:
+        return False
+    signature = value.get("signature")
+    if not _is_hex(signature, 64):
+        return False
+    return hmac.compare_digest(signature, _policy_signature(value, key))
 
 
 def _valid_port(value):
@@ -289,9 +412,8 @@ def _policy_valid(value):
     """Проверяет подпись, срок и одноразовость политики головного сервера."""
     if not isinstance(value, dict):
         return None
-    key = _policy_key()
     master_id = _policy_master_id()
-    if not key or not master_id:
+    if not master_id:
         return None
     version = value.get("policy_version")
     if isinstance(version, bool) or version != 1:
@@ -316,10 +438,7 @@ def _policy_valid(value):
     nonce = value.get("nonce")
     if not _is_hex(nonce, 32):
         return None
-    signature = value.get("signature")
-    if not _is_hex(signature, 64):
-        return None
-    if not hmac.compare_digest(signature, _policy_signature(value, key)):
+    if not _policy_trusted(value):
         return None
     with _POLICY_NONCES_LOCK:
         for known in [k for k, t in _POLICY_NONCES.items() if t <= now]:
@@ -1407,7 +1526,10 @@ def policy():
 
 
 def _policy_port(node):
-    value = node.get("policy_port") or getattr(config, "UI_PORT", 0)
+    # A-945: дефолт - публичный порт политики мастера :8891. Раньше здесь был
+    # config.UI_PORT (8890), то есть ЛАН-панель мастера, которая узлу по ТЗ не
+    # нужна и с улицы недоступна.
+    value = node.get("policy_port") or getattr(config, "MESH_POLICY_PORT", 8891)
     return value if _valid_port(value) else None
 
 
@@ -1456,18 +1578,13 @@ def _catalog_valid(value):
     catalog = value.get("catalog")
     if not isinstance(catalog, dict):
         return None
-    key = _policy_key()
     master_id = _policy_master_id()
-    if not key or not master_id or value.get("master_id") != master_id:
+    if not master_id or value.get("master_id") != master_id:
         return None
     buy_url = value.get("buy_url")
     if not isinstance(buy_url, str) or not buy_url.strip() or len(buy_url) > 200:
         return None
-    signature = value.get("catalog_signature")
-    if not _is_hex(signature, 64):
-        return None
-    if not hmac.compare_digest(signature,
-                               _catalog_signature(catalog, buy_url, master_id, key)):
+    if not _catalog_trusted(value, catalog, buy_url, master_id):
         return None
     plans = catalog.get("plans")
     extras = catalog.get("extras")
@@ -1476,6 +1593,22 @@ def _catalog_valid(value):
     if not isinstance(extras, dict) or not extras or len(extras) > 32:
         return None
     return {"plans": plans, "extras": extras, "buy_url": buy_url.strip()}
+
+
+def _catalog_trusted(value, catalog, buy_url, master_id):
+    """Цены и описания подписаны ключом мастера. Как и политика: если ed-подпись
+    есть, проверяем только её - снятие подписи не должно быть обходом проверки.
+    HMAC оставлен для старого мастера."""
+    if value.get("catalog_ed25519"):
+        return _ed_catalog_ok(value)
+    key = _policy_key()
+    if not key:
+        return False
+    signature = value.get("catalog_signature")
+    if not _is_hex(signature, 64):
+        return False
+    return hmac.compare_digest(signature,
+                               _catalog_signature(catalog, buy_url, master_id, key))
 
 
 def _policy_targets():
@@ -1498,6 +1631,20 @@ def _policy_targets():
             value = str(config.get("mesh_policy_addr", "") or "").strip()
         except Exception:
             value = ""
+    # A-945: публичный адрес мастера - всегда в целях, иначе свежий узел без
+    # записи hub вообще не знает, у кого спросить политику, и молчит.
+    try:
+        pinned = str(getattr(config, "MASTER_POLICY_URL", "") or "").strip()
+    except Exception:
+        pinned = ""
+    if pinned:
+        host, _, port_text = pinned.rpartition(":")
+        host = host.split("://", 1)[-1].strip()
+        port = int(port_text) if port_text.strip().isdigit() else 0
+        if host and _valid_peer_host(host) and _valid_port(port):
+            entry = (host, port)
+            if entry not in targets:
+                targets.append(entry)
     if value and "://" not in value:
         host, _, port_text = value.partition(":")
         host = host.strip()
@@ -1550,6 +1697,13 @@ def apply_policy_raw(raw, source=""):
                                    catalog.get("buy_url")):
                 config.log("mesh: каталог мастера принят (тарифов %d, позиций %d)" % (
                     len(catalog["plans"]), len(catalog["extras"])))
+    ents = raw.get("mesh_entitlements")
+    if isinstance(ents, list):
+        clean = [str(e) for e in ents if isinstance(e, str) and e.strip()]
+        if clean != _POLICY_ENTITLEMENTS:
+            _POLICY_ENTITLEMENTS[:] = clean
+            config.log("mesh: права на меш мастера (%d узлов): %s" % (
+                len(clean), ", ".join(clean[:8])))
     return True
 
 
@@ -1650,16 +1804,10 @@ def apply_cached_policy():
     # свой — 30 суток с момента получения.
     policy = cached["policy"]
     master_id = _policy_master_id()
-    key = _policy_key()
-    if not key or not master_id or policy.get("master_id") != master_id:
+    if not master_id or policy.get("master_id") != master_id:
         config.log("mesh: кэш подписи от чужого мастера — игнорирую")
         return False
-    signature = policy.get("signature")
-    if not isinstance(signature, str) or not re.fullmatch(r"[0-9a-f]{64}", signature):
-        config.log("mesh: в кэше нет корректной подписи — игнорирую")
-        return False
-    core = {field: policy.get(field) for field in _POLICY_FIELDS}
-    if not hmac.compare_digest(signature, _policy_signature(core)):
+    if not _policy_trusted(policy):
         config.log("mesh: подпись в кэше не сходится — игнорирую")
         return False
     changed = False

@@ -499,6 +499,19 @@ _MESH_LIVE = {"ts": 0.0, "ok": False}
 MESH_LIVE_TTL = 60.0
 
 
+def _custom_routes():
+    """A-945: свои правила маршрутизации (купленная позиция whitelist).
+
+    Человек описал свой маршрут - он идёт первым, до штатных правил. Семантику
+    не выдумываем: у каждого правила действие выбирает сам человек
+    (proxy/direct/block). Ошибки здесь не должны ронять сборку конфига."""
+    try:
+        import effects
+        return effects.xray_rules()
+    except Exception:
+        return []
+
+
 def build_xray_config(final_tag):
     """Полный xray-конфиг. outbounds: [пул vless..., direct, block]."""
     if final_tag == "direct":
@@ -601,7 +614,7 @@ def build_xray_config(final_tag):
              "protocol": "dokodemo-door", "settings": {"address": "127.0.0.1"}},
         ],
         "outbounds": outbounds,
-        "routing": {"domainStrategy": "IPIfNonMatch", "rules": rules},
+        "routing": {"domainStrategy": "IPIfNonMatch", "rules": _custom_routes() + rules},
     }
     # Внешний VLESS-Reality inbound для подключения к прокси ИЗВНЕ.
     # При замке master_only сервер не раскрывает наружу входящий VLESS:
@@ -815,10 +828,27 @@ def _authoritative_config(cfg, target):
         target = "direct"
     result = copy.deepcopy(cfg)
     result["outbounds"] = outbounds
+    # A-948: dokodemo-door-инбаунд (api-in) САМ является целью маршрута:
+    # outboundTag "api-in" указывает на inbound, а outbound'а с таким тегом
+    # не существует, поэтому он никогда не попадал в `used` и правило
+    # aurora-xray-api молча превращалось в "direct" при КАЖДОМ синке.
+    # Последствие - бесконечная петля соединений (xray дозванивается сам
+    # к 127.0.0.1:XRAY_API_PORT через direct, api-in принимает, и снова
+    # в direct). Замерено 17.10.2026 на ba38-ai-server: 56364 ESTAB,
+    # все 127.0.0.1<->127.0.0.1, хост вставал из-за bind() EADDRINUSE.
+    # Чинить только dokodemo-door: теги обычных inbound'ов (http-in/vless-in)
+    # как outboundTag остаются невалидными и должны схлопываться в direct.
+    loopback_inbound_tags = set()
+    for _ib in result.get("inbounds") or []:
+        if isinstance(_ib, dict) and _ib.get("protocol") == "dokodemo-door":
+            _tag = _ib.get("tag")
+            if isinstance(_tag, str) and _tag:
+                loopback_inbound_tags.add(_tag)
     for rule in result.get("routing", {}).get("rules", []) or []:
         outbound = rule.get("outboundTag")
-        if outbound not in used:
-            rule["outboundTag"] = "direct"
+        if outbound in used or outbound in loopback_inbound_tags:
+            continue
+        rule["outboundTag"] = "direct"
     # A-279: build_xray_config() помечает http-правило как ["http-in","vless-in"]
     # (строка выше), а прежняя проверка ждала ровно ["http-in"] — условие не
     # выполнялось НИКОГДА, и catch-all вставлялся в позицию 0, перекрывая

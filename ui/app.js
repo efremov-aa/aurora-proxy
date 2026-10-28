@@ -1318,16 +1318,37 @@
     var body = data ? JSON.stringify(data) : '';
     return fetch(url, { method: 'POST', headers: authHdr(), body: body })
       .then(function (r) {
-        return r.json().catch(function () { return {}; }).then(function (j) {
-          if (!r.ok) {
-            j = j && typeof j === 'object' ? j : {};
-            j.ok = false;
-            j.error = j.error || ('HTTP ' + r.status);
+        var ct = (r.headers.get('content-type') || '').toLowerCase();
+        return r.text().then(function (txt) {
+          var j = null;
+          if (txt && txt.length) {
+            try {
+              j = JSON.parse(txt);
+            } catch (e) {
+              j = null;
+            }
           }
-          return j;
+          if (j && typeof j === 'object') {
+            if (!r.ok) {
+              if (j.ok === undefined) j.ok = false;
+              if (!j.error && !j.msg) j.error = 'HTTP ' + r.status;
+            }
+            return j;
+          }
+          // Сервер вернул не JSON — считаем это ошибкой, но не сетевой
+          var err = {};
+          err.ok = false;
+          if (r.ok) {
+            err.error = 'invalid response';
+          } else {
+            err.error = 'HTTP ' + r.status;
+          }
+          return err;
         });
       })
-      .catch(function () { return { ok: false, error: 'network error' }; });
+      .catch(function () {
+        return { ok: false, error: 'network error' };
+      });
   }
 
   /* ================= STATE ================= */

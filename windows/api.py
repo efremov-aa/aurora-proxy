@@ -16,6 +16,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import config
 import crypt
 import extgate
+import effects
 import core
 import mesh
 import meshsignal
@@ -1217,6 +1218,24 @@ class Handler(BaseHTTPRequestHandler):
             # A-827: игровой контур — сценарий, сервер группы, права узлов.
             self._send(*_json({"ok": True, "game": _game_status()}))
             return
+        if path == "/api/addons":
+            # A-945: что куплено и что из этого узел включил. Применять эффекты
+            # из панели нельзя - узел исполняет ровно то, что прислал мастер.
+            _lic = extgate.state()
+            self._send(*_json({
+                "ok": True,
+                "addons": _lic.get("addons") or [],
+                "addons_detail": _lic.get("addons_detail") or [],
+                "addon_effects": _lic.get("addon_effects") or {},
+                "addon_effects_legend": _lic.get("addon_effects_legend") or {},
+                "unknown": _lic.get("addon_unknown") or [],
+                "effects": effects.status(),
+                "routes": effects.custom_routes(),
+                "route_actions": list(effects.ROUTE_ACTIONS),
+                "cap": pool._cap(),
+                "mesh_entitlements": _lic.get("mesh_entitlements") or [],
+            }))
+            return
         self._send(*_json({"error": "unknown endpoint"}, 404))
         return
 
@@ -1243,9 +1262,6 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/policy/accept":
             self._policy_accept_raw()
-            return
-        if path == "/api/mesh/register":
-            self._mesh_register_raw()
             return
         if path == "/api/setup/complete":
             setup_data, body_error = _read_json_body(self)
@@ -1345,9 +1361,12 @@ class Handler(BaseHTTPRequestHandler):
             "/api/game/server": self._game_server_post,
             "/api/mesh/invite": self._mesh_invite,
             "/api/mesh/regenerate": self._mesh_regenerate,
-            "/api/mesh/node/add": self._mesh_node_add,
             "/api/mesh/node/remove": self._mesh_node_remove,
             "/api/mesh/join": self._mesh_join,
+            # A-945: свои правила маршрутизации (купленная позиция whitelist).
+            # Правила хранятся всегда, применяются только при купленной whitelist:
+            # включать можно только купленное.
+            "/api/routes/custom/save": self._routes_custom_save_raw,
         }.get(path)
         if handler:
             handler(data)
@@ -1473,46 +1492,6 @@ class Handler(BaseHTTPRequestHandler):
         config.save_settings()
         _public_succeeded("policy_accept", ip)
         self._send(*_json({"ok": True, "rev": rev}))
-
-    def _mesh_register_raw(self):
-        # публичная регистрация узла у головного сервера: только по master_token
-        ip = self.client_address[0]
-        if not _public_allowed("mesh_register", ip, max_hits=5, window=60, backoff=2):
-            self._send(*_json({"ok": False, "error": "too many requests"}, 429))
-            return
-        expected = str(config.get("master_token") or "").strip()
-        if not expected:
-            self._send(*_json({"ok": False, "error": "registration closed"}, 403))
-            return
-        data, body_error = _read_json_body(self)
-        if body_error:
-            self._send(*_json({"ok": False, "error": body_error}, 400))
-            return
-        token = str(data.get("token") or "")
-        if not _token_matches(token, expected):
-            _public_failed("mesh_register", ip)
-            self._send(*_json({"ok": False, "error": "bad master token"}, 403))
-            return
-        host = str(data.get("host") or "").strip()
-        port = data.get("port")
-        if (not _valid_peer_host(host) or host.lower() in ("localhost", "localhost.localdomain")
-                or type(port) is not int or not 1 <= port <= 65535):
-            _public_failed("mesh_register", ip)
-            self._send(*_json({"ok": False, "error": "invalid host or port"}, 400))
-            return
-        if len(mesh.all_nodes()) >= 256:
-            _public_failed("mesh_register", ip)
-            self._send(*_json({"ok": False, "error": "node limit reached"}, 429))
-            return
-        node, err = mesh.add(data.get("name"), data.get("region") or "RU",
-                             host, port, role="node")
-        if err:
-            _public_failed("mesh_register", ip)
-            self._send(*_json({"ok": False, "error": err}, 400))
-            return
-        _public_succeeded("mesh_register", ip)
-        config.log("mesh: узел зарегистрирован через /api/mesh/register (%s)" % node["name"])
-        self._send(*_json({"ok": True, "id": node["id"], "node": node}))
 
     def _rusegment_region(self, data):
         raw = data.get("regions") or []
@@ -2090,46 +2069,38 @@ class Handler(BaseHTTPRequestHandler):
             return
         self._send(*_json({"ok": True}))
 
-    def _mesh_node_add(self, data):
-        host = str(data.get("host") or "").strip()
-        try:
-            port = int(data.get("port") or 0)
-        except (TypeError, ValueError):
-            self._send(*_json({"ok": False, "error": "неверный порт"}, 400))
+    def _routes_custom_save_raw(self, data):
+        """A-945: сохранить свои правила маршрутизации и применить их на xray.
+
+        Правила пишутся всегда, но применяются только при купленной whitelist:
+        включать можно лишь то, что куплено."""
+        rows = data.get("routes")
+        if not isinstance(rows, list):
+            self._send(*_json({"ok": False, "error": "routes must be a list"}, 400))
             return
-        if not host or port <= 0 or port > 65535:
-            self._send(*_json({"ok": False, "error": "неверный host/port"}, 400))
+        if len(rows) > 400:
+            self._send(*_json({"ok": False, "error": "too many routes"}, 400))
             return
-        if not _token_matches(self.headers.get("X-Auth"), config.get("master_token")):
-            self._send(*_json({"ok": False, "error": "master token required"}, 403))
+        if not effects.set_custom_routes(rows):
+            self._send(*_json({"ok": False, "error": "save failed"}, 500))
             return
-        role = str(data.get("role") or "node").strip().lower()
-        if role not in ("node", "test"):
-            self._send(*_json({"ok": False, "error": "неверная роль узла"}, 400))
-            return
-        policy_port = data.get("policy_port")
-        if policy_port is not None:
+        lic = extgate.state() or {}
+        active = set()
+        effects_map = lic.get("addon_effects") or {}
+        for name in lic.get("addons") or []:
+            for code in effects_map.get(name) or []:
+                active.add(code)
+        applied = "custom_routes" in active
+        if applied:
             try:
-                policy_port = int(policy_port)
-            except (TypeError, ValueError):
-                policy_port = 0
-            if policy_port <= 0 or policy_port > 65535:
-                self._send(*_json({"ok": False, "error": "неверный policy_port"}, 400))
-                return
-        else:
-            policy_port = None
-        node, err = mesh.add(data.get("name"), data.get("region"),
-                             host, port, role,
-                             auto_name=_as_bool(data.get("auto_name")),
-                             policy_port=policy_port)
-        if err:
-            self._send(*_json({"ok": False, "error": err}, 400))
-            return
-        secret = node.pop("secret", None)
-        resp = {"ok": True, "node": node}
-        if secret:
-            resp["secret"] = secret
-        self._send(*_json(resp))
+                core.sync()
+            except Exception as e:
+                config.log("routes: custom rules saved, xray sync failed: %s" % e)
+        config.log("routes: свои правила сохранены (%d), применены: %s"
+                   % (len(effects.custom_routes()), applied))
+        self._send(*_json({"ok": True, "routes": effects.custom_routes(),
+                           "applied": applied}))
+
 
     def _mesh_node_remove(self, data):
         nid = str(data.get("id") or "").strip()

@@ -18,10 +18,12 @@
 
 import json
 import os
+import re
 import threading
 import time
 
 import config
+import mesh
 
 LICENSE_FILE = os.path.join(config.DATA_DIR, "ext_license.json")
 
@@ -30,6 +32,96 @@ ATTEMPTS = 3                  # попытки при сети/мастере
 BACKOFF_S = 0.7               # пауза между попытками, растёт
 STATE_LOCK = threading.RLock()
 FEATURES = ("whitelist", "unlimited", "adblock", "extension")
+
+# A-945: коды эффектов, которые мастер кладёт в addon_effects. Узел исполняет
+# ровно то, что прислал мастер, и не решает сам. Код, которого нет в легенде,
+# показывается человеку как «неизвестная возможность» и молча не включается.
+EFFECT_CODES = ("external_vless", "mesh_tunnel", "no_profile_cap",
+                "custom_routes", "ext_config", "display_only")
+MAX_ADDONS = 32
+ADDON_ID_RE = re.compile(r"^[a-z0-9_-]{1,40}$")
+
+
+def _valid_addon_id(value):
+    return isinstance(value, str) and bool(ADDON_ID_RE.fullmatch(value))
+
+
+def _parse_addons(value):
+    """Что куплено: id действующих позиций + подробности.
+
+    Просроченные и отменённые мастер не присылает. Поле может отсутствовать
+    (старый мастер) - это «ничего не куплено», а не ошибка.
+    """
+    ids, detail = [], []
+    raw = value.get("addons")
+    if isinstance(raw, list):
+        for item in raw:
+            if _valid_addon_id(item) and item not in ids:
+                ids.append(item)
+            if len(ids) >= MAX_ADDONS:
+                break
+    rows = value.get("addons_detail")
+    if isinstance(rows, list):
+        for row in rows:
+            if not isinstance(row, dict) or not _valid_addon_id(row.get("id")):
+                continue
+            period = str(row.get("period") or "").strip().lower()
+            detail.append({
+                "id": str(row.get("id")),
+                "name": str(row.get("name") or "")[:120],
+                "price": _int(row.get("price"), 0),
+                "period": period if period in ("once", "month") else "",
+                "until": _int(row.get("until"), 0),
+                "forever": bool(row.get("forever")),
+            })
+            if len(detail) >= MAX_ADDONS:
+                break
+    return ids[:MAX_ADDONS], detail
+
+
+def _parse_effects(value, ids):
+    """Карта «позиция -> что включить» от мастера. Решать за мастера нельзя."""
+    effects, legend, unknown = {}, {}, []
+    raw = value.get("addon_effects")
+    if isinstance(raw, dict):
+        # Неизвестные коды собираем ВСЕГДА, даже под невалидным id позиции:
+        # человек должен увидеть, что мастер прислал то, чего узел не умеет.
+        for codes in raw.values():
+            if not isinstance(codes, list):
+                continue
+            for code in codes:
+                code = str(code or "").strip().lower()
+                if code and code not in EFFECT_CODES and code not in unknown:
+                    unknown.append(code)
+        for key, codes in raw.items():
+            if not _valid_addon_id(key) or not isinstance(codes, list):
+                continue
+            out = []
+            for code in codes:
+                code = str(code or "").strip().lower()
+                if code in EFFECT_CODES and code not in out:
+                    out.append(code)
+            if out:
+                effects[key] = out
+    rows = value.get("addon_effects_legend")
+    if isinstance(rows, dict):
+        for key, text in rows.items():
+            legend[str(key)[:40]] = str(text or "")[:200]
+    return effects, legend, unknown
+
+
+def _effects_known(snapshot):
+    """Коды, которые мастер разрешил исполнить прямо сейчас.
+
+    display_only - не действие: такую позицию показываем, но включать нечего.
+    Позиция без известного кода НЕ считается включённой.
+    """
+    active = set()
+    for name in snapshot.get("addons") or []:
+        for code in (snapshot.get("addon_effects") or {}).get(name) or []:
+            if code in EFFECT_CODES and code != "display_only":
+                active.add(code)
+    return active
 
 _CACHE = {}          # последний успешный ответ мастера (сырой)
 _SNAPSHOT = {}       # что отдаём наружу
@@ -172,6 +264,13 @@ def _apply(value, code):
                  "410": "expired", "429": "slow_down"}.get(str(code), "blocked")
     else:
         state = status or "unknown"
+    # A-945: покупки видны только в успешном ответе. При отказе (код >= 400)
+    # мастер не присылает ни addons, ни эффекты - это «ничего не куплено».
+    ids, detail = ([], [])
+    effects, legend, unknown = ({}, {}, [])
+    if code == 200 and value.get("ok"):
+        ids, detail = _parse_addons(value)
+        effects, legend, unknown = _parse_effects(value, ids)
     return {
         "state": state,
         "plan": plan,
@@ -184,6 +283,11 @@ def _apply(value, code):
         "limit_devices": _int(value.get("limit_devices"), 0),
         "rules_version": value.get("rules_version"),
         "buy_url": str(value.get("buy_url") or getattr(config, "BUY_URL", "") or "").strip(),
+        "addons": ids,
+        "addons_detail": detail,
+        "addon_effects": effects,
+        "addon_effects_legend": legend,
+        "addon_unknown": unknown,
         "checked_at": int(time.time()),
         "code": code,
     }
@@ -237,6 +341,14 @@ def check(force=False, timeout=None):
                 "limit_bytes": result["limit_bytes"],
                 "device_count": result["device_count"],
                 "limit_devices": result["limit_devices"],
+                # A-945: покупки переживают офлайн вместе с тарифом, иначе при
+                # недоступном мастере панель показывала бы «ничего не куплено»
+                # у человека, который всё купил.
+                "addons": result["addons"],
+                "addons_detail": result["addons_detail"],
+                "addon_effects": result["addon_effects"],
+                "addon_effects_legend": result["addon_effects_legend"],
+                "addon_unknown": result["addon_unknown"],
             })
             _save_cache()
             previous = (_SNAPSHOT or {}).get("plan")
@@ -246,7 +358,24 @@ def check(force=False, timeout=None):
         else:
             config.log("ext-gate: мастер не ответил (%s) — работаем на кэше" % reason)
         _rebuild(offline_reason=reason if result is None else None)
+        _apply_effects()
         return dict(_SNAPSHOT)
+
+
+def _apply_effects():
+    """A-945: после проверки лицензии - привести узел к тому, что куплено.
+
+    Импорт ленивый: effects ходит в extgate.state(), обратный импорт на
+    уровне модуля дал бы цикл. Ошибка применения не должна ронять проверку."""
+    try:
+        import effects
+        return effects.apply()
+    except Exception as e:
+        try:
+            config.log("addon: применение эффектов не удалось: %s" % e)
+        except Exception:
+            pass
+        return {}
 
 
 def _rebuild(offline_reason=None):
@@ -272,9 +401,12 @@ def _rebuild(offline_reason=None):
             state = "free"
         _SNAPSHOT = {
             "ok": state == "ok" and is_pro(plan),
-            # A-277: "active" - подписка жива (в т.ч. триал free), независимо от PRO.
-            # Раньше trial_ok() требовал "ok", а "ok" по определению false без PRO,
-            # поэтому триал не получал extension/adblock (конъюнкция была невыполнима).
+            # A-277: "active" - подписка жива (в т.ч. бесплатный уровень close),
+            # независимо от PRO. Раньше trial_ok() требовал "ok", а "ok" по
+            # определению false без PRO, поэтому бесплатный уровень не получал
+            # extension/adblock (конъюнкция была невыполнима).
+            # A-945: триала больше нет - бесплатный уровень это close (0 ₽,
+            # бессрочно), а не пробный период.
             "active": state in ("ok", "free"),
             "state": state,
             "plan": plan,
@@ -293,7 +425,17 @@ def _rebuild(offline_reason=None):
             "offline": offline,
             "offline_reason": offline_reason or "",
             "last_error": "" if (checked and not expired_cache) else (offline_reason or "no-data"),
+            # A-945: купленные позиции и что каждая включает. Поля могут быть
+            # пустыми - это честное «ничего не куплено».
+            "addons": list(cache.get("addons") or [])[:MAX_ADDONS],
+            "addons_detail": list(cache.get("addons_detail") or [])[:MAX_ADDONS],
+            "addon_effects": dict(cache.get("addon_effects") or {}),
+            "addon_effects_legend": dict(cache.get("addon_effects_legend") or {}),
+            "addon_unknown": list(cache.get("addon_unknown") or [])[:MAX_ADDONS],
+            # A-945/M16: узлы с правом на меш из подписанной политики мастера.
+            "mesh_entitlements": mesh.policy_entitlements(),
         }
+        _SNAPSHOT["effects"] = sorted(_effects_known(_SNAPSHOT))
         return dict(_SNAPSHOT)
 
 
@@ -330,7 +472,8 @@ def trial_ok():
     with STATE_LOCK:
         snap = dict(_SNAPSHOT) if _SNAPSHOT else _rebuild()
     # A-277: брать признак "подписка жива" из снимка, а не из "ok"
-    # (ok == state=="ok" and is_pro(plan), то есть для триала всегда False).
+    # (ok == state=="ok" and is_pro(plan), то есть для бесплатного уровня
+    # всегда False). A-945: триала нет, бесплатный уровень - это close.
     if "active" in snap:
         return bool(snap.get("active")) and not is_pro(str(snap.get("plan") or ""))
     st = str(snap.get("state") or "")

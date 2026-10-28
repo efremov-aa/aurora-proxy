@@ -203,7 +203,10 @@ def refresh_from_github():
         total_revived += revived
         # дальше — только те, кто сейчас не в блоке (метки свежие оставляем)
         candidates = [k for k in candidates if not pool.blocked(k.get("uri", ""))]
-        room = max(0, int(config.MAX_USER_KEYS) - len(pool.get_keys()))
+        # A-945: потолок ключей берём из pool (купленная nolimit снимает его),
+        # room=0 означает «без ограничения» - тогда берём весь остаток.
+        cap = pool._cap()
+        room = len(candidates) if not cap else max(0, int(cap) - len(pool.get_keys()))
         if candidates and room:
             # TCP-отсев с запасом x3: сначала живая часть, доберём следующей пачкой
             picked = _tcp_alive_keys(candidates[:room * 3])

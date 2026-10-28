@@ -404,6 +404,21 @@ def _save_dead():
 
 
 # --- public API ---
+def _cap():
+    """Потолок ключей. A-945: он больше не константа - купленная позиция
+    nolimit снимает его на ходу, поэтому спрашиваем effects, а не config.
+    0 = без ограничения."""
+    try:
+        import effects
+        return effects.key_cap()
+    except Exception:
+        pass
+    try:
+        return int(config.MAX_USER_KEYS)
+    except Exception:
+        return 0
+
+
 def get_keys():
     with _LOCK:
         return [dict(k) for k in _KEYS]
@@ -445,10 +460,10 @@ def add_key(key, force=False):
         if dead_key in _DEAD and not force:
             if not _dead_stale_locked(dead_key):
                 return "blocked"
-            if len(_KEYS) >= config.MAX_USER_KEYS:
+            if _cap() and len(_KEYS) >= _cap():
                 return "limit"
             revived = True
-        elif len(_KEYS) >= config.MAX_USER_KEYS:
+        elif _cap() and len(_KEYS) >= _cap():
             return "limit"
         keys_local = list(_KEYS)
         status_local = dict(_STATUS)

@@ -411,14 +411,54 @@ def _node_id():
         value = "mesh-aurora-home"
     with _LOCK:
         _STATE["node_id"] = value
+    return value
+
+
+_NODE_PREFIX_RE = re.compile(r"^node-([A-Za-z0-9_.:-]{1,64})$")
+
+
+def _uid_from_node_id(node_id):
+    """A-945/M17: iz node_id «node-<uid>» vydelyaet UID."""
+    m = _NODE_PREFIX_RE.match(str(node_id or "").strip())
+    return m.group(1) if m else None
+
+
+def _mesh_token_for(uid):
+    """A-945/M17: lichnyy sekret tunaela: base64url(hmac_sha256(semya_makera,
+    "aurora-mesh:"+uid)). Tochnyy analog nodereg.mesh_token_for (master).
+    Semya - data/node_registry.key (0600). Na klienta fayla mozhnet net —
+    vozvrashaet "", rukaospitanie padayet na obshchiy AURORA_MESH_SECRET
+    (bez regressii legacy). De-terministno, bez setevykh vyзовov."""
+    text = str(uid or "").strip()
+    if not text or not _ID_RE.match(text):
+        return ""
+    key_file = os.path.join(config.DATA_DIR, "node_registry.key")
+    try:
+        with open(key_file, "rb") as fh:
+            raw = fh.read(64)
+    except OSError:
+        return ""
+    seed = raw.strip()
+    if len(seed) < 32:
+        return ""
+    digest = hmac.new(seed[:32], ("aurora-mesh:" + text).encode("utf-8"),
+                      hashlib.sha256).digest()
+    return base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
 
 
 def _peer_secret(node_id):
-    """Lichnyy sekret pira: svoy uzla ili iz mesh-registry."""
+    """Lichnyy sekret pira: svoy uzla, mesh_token_for(uid) ili mesh-registry."""
     if node_id == _node_id():
         value = _STATE.get("secret") or ""
         if value:
             return value
+    # M17: lichnyy sekret pira vyvodyetsia de-terministno iz semeni makera + UID,
+    # bez setevykh vyзовov i bez novoy schemey /node/register.
+    uid = _uid_from_node_id(node_id)
+    if uid:
+        token = _mesh_token_for(uid)
+        if token:
+            return token
     try:
         import mesh
         return str(mesh.node_secret(node_id) or "")
@@ -482,6 +522,15 @@ def _known(node_id, proof, nonce):
         _diag("bad-id", node_id, "proof=%s nonce=%s" % (bool(proof), bool(nonce)))
         return False
     node = str(node_id).strip()
+    # M18: blok tunaela bez prava na mesh (fail-closed). Proverka vedetsia
+    # tolko kogda master opublikoval mesh_entitlements (inache - bez regressii
+    # legacy, kuda mestnoe _peer_secret/obshchiy sekret rabotayut kak ranee).
+    import mesh
+    entitlements = mesh.policy_entitlements()
+    uid = _uid_from_node_id(node)
+    if entitlements and uid and uid not in entitlements:
+        _diag("no-mesh-entitlement", node, "uid not in mesh_entitlements")
+        return False
     secret = _peer_secret(node)
     if secret:
         ok = hmac.compare_digest(_expected_proof(secret, nonce, node),
