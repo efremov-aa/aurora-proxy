@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Aurora — прокси · меш · магазин</title>
-  <link rel="icon" href="/favicon.ico">
-  <link rel="stylesheet" href="/style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='.9em' font-size='56'%3E%F0%9F%90%B1%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css?v=ux20261030p">
 </head>
 <body class="pre-lang">
 <div class="app">
@@ -13,7 +13,7 @@
   <!-- ============================================================
        SIDEBAR
        ============================================================ -->
-  <aside class="side" id="side">
+  <header class="side app-chrome" id="side">
     <div class="side-brand">
       <span class="cat">🐱</span>
       <div>
@@ -22,44 +22,26 @@
       </div>
     </div>
 
+    <label class="nav-search-wrap" for="nav-search"><span aria-hidden="true">⌕</span><input id="nav-search" type="search" placeholder="⌕" aria-label="Search sections / Поиск разделов" autocomplete="off"><kbd>Ctrl K</kbd></label>
     <nav class="side-nav" id="nav">
-      <div class="ngroup">
-        <div class="ngroup-title" data-short="🏠">🏠 <span data-i18n="nav.group.home">Домашний прокси</span></div>
-        <button data-t="dashboard" class="on"><span class="ic">📊</span><span class="lb" data-i18n="nav.dash">Обзор</span></button>
-        <button data-t="keys"><span class="ic">🔑</span><span class="lb" data-i18n="nav.keys">Ключи</span></button>
-        <button data-t="warp"><span class="ic">🌀</span><span class="lb" data-i18n="nav.warp">WARP</span></button>
-        <button data-t="devices"><span class="ic">📱</span><span class="lb" data-i18n="nav.conn">Устройства</span></button>
-        <button data-t="connect"><span class="ic">🌐</span><span class="lb" data-i18n="nav.connect">Внешний доступ</span></button>
-        <button data-t="rusegment"><span class="ic">🇷🇺</span><span class="lb" data-i18n="nav.rusegment">Ру-сегмент</span></button>
-        <button data-t="tgws"><span class="ic">✈️</span><span class="lb" data-i18n="nav.tgws">TG-WS</span></button>
-      </div>
-
-      <div class="ngroup" id="g-mesh">
-        <div class="ngroup-title" data-short="🕸️">🕸️ <span data-i18n="nav.mesh">Меш-сеть</span></div>
-        <button data-t="mesh-join"><span class="ic">🔗</span><span class="lb" data-i18n="nav.mesh-join">Подключение</span><span class="tag live" id="tag-mesh-join">✓</span></button>
-        <button data-t="mesh-topo"><span class="ic">🌌</span><span class="lb" data-i18n="nav.mesh-topo">Топология</span></button>
-        <button data-t="mesh-routes"><span class="ic">🧭</span><span class="lb" data-i18n="nav.mesh-routes">Маршруты</span></button>
-      </div>
-
-      <div class="ngroup" id="g-shop">
-        <div class="ngroup-title" data-short="🛒">🛒 <span data-i18n="nav.shop">Магазин</span></div>
-        <button data-t="shop-plans"><span class="ic">💎</span><span class="lb" data-i18n="nav.shop-plans">Тарифы VPN</span></button>
-        <button data-t="shop-features"><span class="ic">🧩</span><span class="lb" data-i18n="nav.shop-features">Дополнительные возможности Aurora</span><span class="tag" id="tag-feat">2</span></button>
-        <button data-t="shop-billing"><span class="ic">💳</span><span class="lb" data-i18n="nav.shop-billing">Платежи</span></button>
-      </div>
-
-      <div class="ngroup">
-        <div class="ngroup-title" data-short="🔄">🔄 <span data-i18n="nav.group.upd">Обновления</span></div>
-        <button data-t="update"><span class="ic">⬆️</span><span class="lb" data-i18n="nav.update">Обновление</span><span class="tag hot" id="tag-upd">NEW</span></button>
-        <button data-t="versions"><span class="ic">📚</span><span class="lb" data-i18n="nav.versions">Версии</span></button>
-      </div>
-
-      <div class="ngroup">
-        <div class="ngroup-title" data-short="⚙️">⚙️ <span data-i18n="nav.group.set">Настройки</span></div>
-        <button data-t="settings"><span class="ic">🧩</span><span class="lb" data-i18n="nav.settings">Сервер</span></button>
-        <button data-t="security"><span class="ic">🛡️</span><span class="lb" data-i18n="nav.security">Безопасность</span></button>
-        <button data-t="logs"><span class="ic">📜</span><span class="lb" data-i18n="nav.logs">Логи</span></button>
-      </div>
+      <button data-t="dashboard" class="on"><span class="ic">📊</span><span class="lb" data-i18n="nav.dash">Обзор</span></button>
+      <button data-t="keys"><span class="ic">🔑</span><span class="lb" data-i18n="nav.keys">Ключи</span></button>
+      <button data-t="warp"><span class="ic">🌀</span><span class="lb" data-i18n="nav.warp">WARP</span></button>
+      <button data-t="devices"><span class="ic">📱</span><span class="lb" data-i18n="nav.conn">Устройства</span></button>
+      <button data-t="connect"><span class="ic">🌐</span><span class="lb" data-i18n="nav.connect">Внешний доступ</span></button>
+      <button data-t="rusegment"><span class="ic">🇷🇺</span><span class="lb" data-i18n="nav.rusegment">Ру-сегмент</span></button>
+      <button data-t="tgws"><span class="ic">✈️</span><span class="lb" data-i18n="nav.tgws">TG-WS</span></button>
+      <button data-t="mesh-join"><span class="ic">🔗</span><span class="lb" data-i18n="nav.mesh-join">Подключение</span><span class="tag live" id="tag-mesh-join">✓</span></button>
+      <button data-t="mesh-topo"><span class="ic">🌌</span><span class="lb" data-i18n="nav.mesh-topo">Топология</span></button>
+      <button data-t="mesh-routes"><span class="ic">🧭</span><span class="lb" data-i18n="nav.mesh-routes">Маршруты</span></button>
+      <button data-t="shop-plans"><span class="ic">💎</span><span class="lb" data-i18n="nav.shop-plans">Тарифы VPN</span></button>
+      <button data-t="shop-features"><span class="ic">🧩</span><span class="lb" data-i18n="nav.shop-features">Дополнительные возможности Aurora</span><span class="tag" id="tag-feat">2</span></button>
+      <button data-t="shop-billing"><span class="ic">💳</span><span class="lb" data-i18n="nav.shop-billing">Платежи</span></button>
+      <button data-t="update"><span class="ic">⬆️</span><span class="lb" data-i18n="nav.update">Обновление</span><span class="tag hot" id="tag-upd">NEW</span></button>
+      <button data-t="versions"><span class="ic">📚</span><span class="lb" data-i18n="nav.versions">Версии</span></button>
+      <button data-t="settings"><span class="ic">🧩</span><span class="lb" data-i18n="nav.settings">Сервер</span></button>
+      <button data-t="security"><span class="ic">🛡️</span><span class="lb" data-i18n="nav.security">Безопасность</span></button>
+      <button data-t="logs"><span class="ic">📜</span><span class="lb" data-i18n="nav.logs">Логи</span></button>
     </nav>
 
     <div class="side-foot">
@@ -67,7 +49,7 @@
       <span id="side-version">v—</span>
       <span class="upd" id="side-upd" style="display:none" data-act="nav" data-tab="update">⬆ NEW</span>
     </div>
-  </aside>
+  </header>
 
   <!-- ============================================================
        MAIN
@@ -75,7 +57,7 @@
   <div class="main">
     <header class="topbar">
       <button class="menu-btn" id="menu-btn" aria-label="Меню">☰</button>
-      <div class="tb-title"><span class="ic" id="tb-icon">📊</span><span id="tb-name">Обзор</span></div>
+      <div class="tb-heading"><div class="tb-title"><span class="ic" id="tb-icon">📊</span><span id="tb-name">Обзор</span></div><div class="tb-context" id="tb-context">Домашний прокси</div></div>
       <div class="tb-pills">
         <span class="pill off hide-sm" id="pill-vpn"><span class="dot"></span><span id="pill-vpn-t">VPN</span></span>
         <span class="pill on hide-sm" id="pill-mesh"><span class="dot"></span>mesh</span>
@@ -209,7 +191,20 @@
           </div>
         </div>
 
-        <div class="card">
+
+        <section class="quickstart" aria-labelledby="quickstart-title">
+          <div class="quickstart-head">
+            <div><span class="eyebrow">AURORA QUICK START</span><h2 id="quickstart-title" data-i18n="quick.start">Быстрый запуск</h2></div>
+            <span class="quickstart-count">01 — 04</span>
+          </div>
+          <div class="quickstart-grid">
+            <button class="starter" data-act="nav" data-tab="devices"><span class="starter-no">01</span><span class="starter-icon">📱</span><strong data-i18n="nav.conn">Подключения</strong><span class="starter-go">↗</span></button>
+            <button class="starter" data-act="nav" data-tab="mesh-join"><span class="starter-no">02</span><span class="starter-icon">🕸️</span><strong data-i18n="nav.mesh-join">Подключение</strong><span class="starter-go">↗</span></button>
+            <button class="starter" data-act="nav" data-tab="shop-plans"><span class="starter-no">03</span><span class="starter-icon">💎</span><strong data-i18n="nav.shop-plans">Тарифы VPN</strong><span class="starter-go">↗</span></button>
+            <button class="starter" data-act="nav" data-tab="update"><span class="starter-no">04</span><span class="starter-icon">⬆️</span><strong data-i18n="nav.update">Обновление</strong><span class="starter-go">↗</span></button>
+          </div>
+        </section>
+<div class="card">
           <h2><span class="ic">🛠️</span><span data-i18n="dash.manage">Управление</span></h2>
           <div class="actions" style="margin-top:0">
             <button class="btn" id="btn-refresh" data-i18n="pool.refresh-btn">🔄 Обновить ключи</button>
@@ -857,7 +852,7 @@
   </div>
 </div>
 
-<script src="/qr.js"></script>
-  <script src="/app.js"></script>
+<script src="qr.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
