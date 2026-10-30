@@ -20,7 +20,7 @@
       'nav.mesh': 'Меш-сеть', 'nav.mesh-join': 'Подключение', 'nav.mesh-topo': 'Топология', 'nav.mesh-routes': 'Маршруты',
       'nav.shop': 'Магазин', 'nav.shop-plans': 'Тарифы VPN', 'nav.shop-features': 'Дополнительные возможности Aurora', 'nav.shop-billing': 'Платежи',
       'nav.update': 'Обновление', 'nav.versions': 'Версии', 'nav.settings': 'Сервер', 'nav.security': 'Безопасность', 'nav.logs': 'Логи',
-      'nav.group.home': 'Домашний прокси', 'nav.group.upd': 'Обновления', 'nav.group.set': 'Настройки',
+      'nav.group.home': 'Домашний прокси', 'nav.group.subs': 'Подписки', 'nav.group.upd': 'Обновления', 'nav.group.set': 'Настройки',
       'g.you': 'Вы', 'g.yours': 'ваш', 'status.on': 'онлайн', 'status.off': 'оффлайн', 'status.warn': 'нестабильно',
       'status.online': 'работает', 'status.stopped': 'остановлен', 'status.active': 'активен', 'status.dead': 'мёртв',
       'status.bad': 'плохой', 'status.slow': 'медлен.', 'status.noip': 'noip', 'status.ok': 'ок', 'status.final': 'финал',
@@ -143,7 +143,7 @@
       'nav.mesh': 'Mesh', 'nav.mesh-join': 'Connect', 'nav.mesh-topo': 'Topology', 'nav.mesh-routes': 'Routes',
       'nav.shop': 'Store', 'nav.shop-plans': 'VPN plans', 'nav.shop-features': 'Additional Aurora features', 'nav.shop-billing': 'Billing',
       'nav.update': 'Update', 'nav.versions': 'Versions', 'nav.settings': 'Server', 'nav.security': 'Security', 'nav.logs': 'Logs',
-      'nav.group.home': 'Home proxy', 'nav.group.upd': 'Updates', 'nav.group.set': 'Settings',
+      'nav.group.home': 'Home proxy', 'nav.group.subs': 'Subscriptions', 'nav.group.upd': 'Updates', 'nav.group.set': 'Settings',
       'g.you': 'You', 'g.yours': 'yours', 'status.on': 'online', 'status.off': 'offline', 'status.warn': 'unstable',
       'status.online': 'running', 'status.stopped': 'stopped', 'status.active': 'active', 'status.dead': 'dead',
       'status.bad': 'bad', 'status.slow': 'slow', 'status.noip': 'noip', 'status.ok': 'ok', 'status.final': 'final',
@@ -263,7 +263,7 @@
       'nav.mesh': 'Red mesh', 'nav.mesh-join': 'Conexión', 'nav.mesh-topo': 'Topología', 'nav.mesh-routes': 'Rutas',
       'nav.shop': 'Tienda', 'nav.shop-plans': 'Planes VPN', 'nav.shop-features': 'Funciones adicionales de Aurora', 'nav.shop-billing': 'Pagos',
       'nav.update': 'Actualización', 'nav.versions': 'Versiones', 'nav.settings': 'Servidor', 'nav.security': 'Seguridad', 'nav.logs': 'Registros',
-      'nav.group.home': 'Proxy doméstico', 'nav.group.upd': 'Actualizaciones', 'nav.group.set': 'Ajustes',
+      'nav.group.home': 'Proxy doméstico', 'nav.group.subs': 'Suscripciones', 'nav.group.upd': 'Actualizaciones', 'nav.group.set': 'Ajustes',
       'g.you': 'Usted', 'g.yours': 'suyo', 'status.on': 'en línea', 'status.off': 'desconectado', 'status.warn': 'inestable',
       'status.online': 'activo', 'status.stopped': 'detenido', 'status.active': 'activo', 'status.dead': 'muerto',
       'status.bad': 'malo', 'status.slow': 'lento', 'status.noip': 'noip', 'status.ok': 'ok', 'status.final': 'final',
@@ -383,7 +383,7 @@
       'nav.mesh': 'Mesh', 'nav.mesh-join': 'Verbinden', 'nav.mesh-topo': 'Topologie', 'nav.mesh-routes': 'Routen',
       'nav.shop': 'Shop', 'nav.shop-plans': 'VPN-Tarife', 'nav.shop-features': 'Zusätzliche Aurora-Funktionen', 'nav.shop-billing': 'Zahlungen',
       'nav.update': 'Update', 'nav.versions': 'Versionen', 'nav.settings': 'Server', 'nav.security': 'Sicherheit', 'nav.logs': 'Logs',
-      'nav.group.home': 'Heim-Proxy', 'nav.group.upd': 'Updates', 'nav.group.set': 'Einstellungen',
+      'nav.group.home': 'Heim-Proxy', 'nav.group.subs': 'Abonnements', 'nav.group.upd': 'Updates', 'nav.group.set': 'Einstellungen',
       'g.you': 'Sie', 'g.yours': 'Ihres', 'status.on': 'online', 'status.off': 'offline', 'status.warn': 'instabil',
       'status.online': 'läuft', 'status.stopped': 'gestoppt', 'status.active': 'aktiv', 'status.dead': 'tot',
       'status.bad': 'schlecht', 'status.slow': 'langsam', 'status.noip': 'noip', 'status.ok': 'ok', 'status.final': 'final',
@@ -503,7 +503,7 @@
       'nav.mesh': 'Réseau mesh', 'nav.mesh-join': 'Connexion', 'nav.mesh-topo': 'Topologie', 'nav.mesh-routes': 'Itinéraires',
       'nav.shop': 'Boutique', 'nav.shop-plans': 'Forfaits VPN', 'nav.shop-features': 'Fonctions Aurora supplémentaires', 'nav.shop-billing': 'Paiements',
       'nav.update': 'Mise à jour', 'nav.versions': 'Versions', 'nav.settings': 'Serveur', 'nav.security': 'Sécurité', 'nav.logs': 'Journaux',
-      'nav.group.home': 'Proxy domestique', 'nav.group.upd': 'Mises à jour', 'nav.group.set': 'Réglages',
+      'nav.group.home': 'Proxy domestique', 'nav.group.subs': 'Abonnements', 'nav.group.upd': 'Mises à jour', 'nav.group.set': 'Réglages',
       'g.you': 'Vous', 'g.yours': 'vôtre', 'status.on': 'en ligne', 'status.off': 'hors ligne', 'status.warn': 'instable',
       'status.online': 'actif', 'status.stopped': 'arrêté', 'status.active': 'actif', 'status.dead': 'mort',
       'status.bad': 'mauvais', 'status.slow': 'lent', 'status.noip': 'noip', 'status.ok': 'ok', 'status.final': 'final',
@@ -623,7 +623,7 @@
       'nav.mesh': 'Mesh', 'nav.mesh-join': 'Bağlan', 'nav.mesh-topo': 'Topoloji', 'nav.mesh-routes': 'Rotalar',
       'nav.shop': 'Mağaza', 'nav.shop-plans': 'VPN planları', 'nav.shop-features': 'Aurora ek özellikleri', 'nav.shop-billing': 'Ödemeler',
       'nav.update': 'Güncelleme', 'nav.versions': 'Sürümler', 'nav.settings': 'Sunucu', 'nav.security': 'Güvenlik', 'nav.logs': 'Günlükler',
-      'nav.group.home': 'Ev proxy', 'nav.group.upd': 'Güncellemeler', 'nav.group.set': 'Ayarlar',
+      'nav.group.home': 'Ev proxy', 'nav.group.subs': 'Abonelikler', 'nav.group.upd': 'Güncellemeler', 'nav.group.set': 'Ayarlar',
       'g.you': 'Siz', 'g.yours': 'sizin', 'status.on': 'çevrimiçi', 'status.off': 'çevrimdışı', 'status.warn': 'dengesiz',
       'status.online': 'çalışıyor', 'status.stopped': 'durdu', 'status.active': 'aktif', 'status.dead': 'ölü',
       'status.bad': 'kötü', 'status.slow': 'yavaş', 'status.noip': 'noip', 'status.ok': 'tamam', 'status.final': 'final',
@@ -743,7 +743,7 @@
       'nav.mesh': 'Rede mesh', 'nav.mesh-join': 'Conectar', 'nav.mesh-topo': 'Topologia', 'nav.mesh-routes': 'Rotas',
       'nav.shop': 'Loja', 'nav.shop-plans': 'Planos VPN', 'nav.shop-features': 'Recursos adicionais do Aurora', 'nav.shop-billing': 'Pagamentos',
       'nav.update': 'Atualização', 'nav.versions': 'Versões', 'nav.settings': 'Servidor', 'nav.security': 'Segurança', 'nav.logs': 'Logs',
-      'nav.group.home': 'Proxy doméstico', 'nav.group.upd': 'Atualizações', 'nav.group.set': 'Configurações',
+      'nav.group.home': 'Proxy doméstico', 'nav.group.subs': 'Assinaturas', 'nav.group.upd': 'Atualizações', 'nav.group.set': 'Configurações',
       'g.you': 'Você', 'g.yours': 'seu', 'status.on': 'online', 'status.off': 'offline', 'status.warn': 'instável',
       'status.online': 'ativo', 'status.stopped': 'parado', 'status.active': 'ativo', 'status.dead': 'morto',
       'status.bad': 'ruim', 'status.slow': 'lento', 'status.noip': 'noip', 'status.ok': 'ok', 'status.final': 'final',
@@ -863,7 +863,7 @@
       'nav.mesh': 'Mesh 网络', 'nav.mesh-join': '连接', 'nav.mesh-topo': '拓扑', 'nav.mesh-routes': '路由',
       'nav.shop': '商店', 'nav.shop-plans': 'VPN 套餐', 'nav.shop-features': 'Aurora 附加功能', 'nav.shop-billing': '支付',
       'nav.update': '更新', 'nav.versions': '版本', 'nav.settings': '服务器', 'nav.security': '安全', 'nav.logs': '日志',
-      'nav.group.home': '家用代理', 'nav.group.upd': '更新', 'nav.group.set': '设置',
+      'nav.group.home': '家用代理', 'nav.group.subs': '订阅', 'nav.group.upd': '更新', 'nav.group.set': '设置',
       'g.you': '您', 'g.yours': '您的', 'status.on': '在线', 'status.off': '离线', 'status.warn': '不稳定',
       'status.online': '运行中', 'status.stopped': '已停止', 'status.active': '活动', 'status.dead': '已失效',
       'status.bad': '差', 'status.slow': '慢', 'status.noip': '无IP', 'status.ok': '正常', 'status.final': '最终',
@@ -983,7 +983,7 @@
       'nav.mesh': 'شبكة ميش', 'nav.mesh-join': 'الاتصال', 'nav.mesh-topo': 'الطوبولوجيا', 'nav.mesh-routes': 'المسارات',
       'nav.shop': 'المتجر', 'nav.shop-plans': 'باقات VPN', 'nav.shop-features': 'ميزات Aurora الإضافية', 'nav.shop-billing': 'المدفوعات',
       'nav.update': 'التحديث', 'nav.versions': 'الإصدارات', 'nav.settings': 'الخادم', 'nav.security': 'الأمان', 'nav.logs': 'السجلات',
-      'nav.group.home': 'بروكسي المنزلي', 'nav.group.upd': 'التحديثات', 'nav.group.set': 'الإعدادات',
+      'nav.group.home': 'بروكسي المنزلي', 'nav.group.subs': 'الاشتراكات', 'nav.group.upd': 'التحديثات', 'nav.group.set': 'الإعدادات',
       'g.you': 'أنت', 'g.yours': 'الخاص بك', 'status.on': 'متصل', 'status.off': 'غير متصل', 'status.warn': 'غير مستقر',
       'status.online': 'يعمل', 'status.stopped': 'متوقف', 'status.active': 'نشط', 'status.dead': 'ميت',
       'status.bad': 'سيء', 'status.slow': 'بطيء', 'status.noip': 'noip', 'status.ok': 'موافق', 'status.final': 'نهائي',
@@ -1103,7 +1103,7 @@
       'nav.mesh': 'मेश नेटवर्क', 'nav.mesh-join': 'कनेक्ट', 'nav.mesh-topo': 'टोपोलॉजी', 'nav.mesh-routes': 'रूट',
       'nav.shop': 'दुकान', 'nav.shop-plans': 'VPN योजनाएँ', 'nav.shop-features': 'Aurora अतिरिक्त सुविधाएँ', 'nav.shop-billing': 'भुगतान',
       'nav.update': 'अपडेट', 'nav.versions': 'संस्करण', 'nav.settings': 'सर्वर', 'nav.security': 'सुरक्षा', 'nav.logs': 'लॉग',
-      'nav.group.home': 'घरेलू प्रॉक्सी', 'nav.group.upd': 'अपडेट', 'nav.group.set': 'सेटिंग्स',
+      'nav.group.home': 'घरेलू प्रॉक्सी', 'nav.group.subs': 'सदस्यताएँ', 'nav.group.upd': 'अपडेट', 'nav.group.set': 'सेटिंग्स',
       'g.you': 'आप', 'g.yours': 'आपका', 'status.on': 'ऑनलाइन', 'status.off': 'ऑफ़लाइन', 'status.warn': 'अस्थिर',
       'status.online': 'चालू', 'status.stopped': 'रोका गया', 'status.active': 'सक्रिय', 'status.dead': 'मृत',
       'status.bad': 'खराब', 'status.slow': 'धीमा', 'status.noip': 'noip', 'status.ok': 'ठीक', 'status.final': 'अंतिम',
@@ -2600,6 +2600,9 @@ function loadTG() {
     Array.prototype.forEach.call(document.querySelectorAll('#nav button'), function (b) {
       b.classList.toggle('on', b.getAttribute('data-t') === t);
     });
+    document.querySelectorAll('#nav .ngroup').forEach((group) => {
+      group.classList.toggle('has-active', !!group.querySelector('button[data-t].on'));
+    });
     var meta = TB_META[t] || { ic: '📊', lb: 'Обзор' };
     $('tb-icon').textContent = meta.ic;
     $('tb-name').textContent = meta.lb;
@@ -2612,21 +2615,26 @@ function loadTG() {
   function updateTabContext(t) {
     var button = document.querySelector('#nav button[data-t="' + String(t || '').replace(/["\\]/g, '') + '"]');
     var group = button && button.closest('.ngroup');
-    var label = group && group.querySelector('.ngroup-title');
+    var label = group && (group.querySelector('.ngroup-name') || group.querySelector('.ngroup-title'));
     var context = $('tb-context');
     if (context) context.textContent = label ? label.textContent.replace(/\s+/g, ' ').trim() : '';
   }
 function filterNavigation(query) {
-  const q = String(query || '').trim().toLocaleLowerCase('ru');
-  const buttons = Array.from(document.querySelectorAll('#nav button[data-t]'));
-  buttons.forEach((button) => {
-    const show = !q || (button.textContent || '').toLocaleLowerCase('ru').includes(q);
-    button.hidden = !show;
-  });
-  document.querySelectorAll('#nav .ngroup').forEach((group) => {
-    group.hidden = !Array.from(group.querySelectorAll('button[data-t]')).some((button) => !button.hidden);
-  });
+    const q = String(query || '').trim().toLocaleLowerCase('ru');
+    const buttons = Array.from(document.querySelectorAll('#nav button[data-t]'));
+    buttons.forEach((button) => {
+      const show = !q || (button.textContent || '').toLocaleLowerCase('ru').includes(q);
+      button.hidden = !show;
+    });
+    document.querySelectorAll('#nav .ngroup').forEach((group) => {
+      const hasMatch = Array.from(group.querySelectorAll('button[data-t]')).some((button) => !button.hidden);
+      group.hidden = !hasMatch;
+      group.classList.toggle('open', !!q && hasMatch);
+      const title = group.querySelector('.ngroup-title');
+      if (title) title.setAttribute('aria-expanded', q && hasMatch ? 'true' : 'false');
+    });
   }
+
   function initTabMeta() {
     Array.prototype.forEach.call(document.querySelectorAll('#nav button[data-t]'), function (b) {
       var t = b.getAttribute('data-t');

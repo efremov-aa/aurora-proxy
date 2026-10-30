@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Aurora — прокси · меш · магазин</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='.9em' font-size='56'%3E%F0%9F%90%B1%3C/text%3E%3C/svg%3E">
-  <link rel="stylesheet" href="style.css?v=ux20261030p">
+  <link rel="stylesheet" href="style.css?v=ux20261030q">
 </head>
 <body class="pre-lang">
 <div class="app">
@@ -24,24 +24,10 @@
 
     <label class="nav-search-wrap" for="nav-search"><span aria-hidden="true">⌕</span><input id="nav-search" type="search" placeholder="⌕" aria-label="Search sections / Поиск разделов" autocomplete="off"><kbd>Ctrl K</kbd></label>
     <nav class="side-nav" id="nav">
-      <button data-t="dashboard" class="on"><span class="ic">📊</span><span class="lb" data-i18n="nav.dash">Обзор</span></button>
-      <button data-t="keys"><span class="ic">🔑</span><span class="lb" data-i18n="nav.keys">Ключи</span></button>
-      <button data-t="warp"><span class="ic">🌀</span><span class="lb" data-i18n="nav.warp">WARP</span></button>
-      <button data-t="devices"><span class="ic">📱</span><span class="lb" data-i18n="nav.conn">Устройства</span></button>
-      <button data-t="connect"><span class="ic">🌐</span><span class="lb" data-i18n="nav.connect">Внешний доступ</span></button>
-      <button data-t="rusegment"><span class="ic">🇷🇺</span><span class="lb" data-i18n="nav.rusegment">Ру-сегмент</span></button>
-      <button data-t="tgws"><span class="ic">✈️</span><span class="lb" data-i18n="nav.tgws">TG-WS</span></button>
-      <button data-t="mesh-join"><span class="ic">🔗</span><span class="lb" data-i18n="nav.mesh-join">Подключение</span><span class="tag live" id="tag-mesh-join">✓</span></button>
-      <button data-t="mesh-topo"><span class="ic">🌌</span><span class="lb" data-i18n="nav.mesh-topo">Топология</span></button>
-      <button data-t="mesh-routes"><span class="ic">🧭</span><span class="lb" data-i18n="nav.mesh-routes">Маршруты</span></button>
-      <button data-t="shop-plans"><span class="ic">💎</span><span class="lb" data-i18n="nav.shop-plans">Тарифы VPN</span></button>
-      <button data-t="shop-features"><span class="ic">🧩</span><span class="lb" data-i18n="nav.shop-features">Дополнительные возможности Aurora</span><span class="tag" id="tag-feat">2</span></button>
-      <button data-t="shop-billing"><span class="ic">💳</span><span class="lb" data-i18n="nav.shop-billing">Платежи</span></button>
-      <button data-t="update"><span class="ic">⬆️</span><span class="lb" data-i18n="nav.update">Обновление</span><span class="tag hot" id="tag-upd">NEW</span></button>
-      <button data-t="versions"><span class="ic">📚</span><span class="lb" data-i18n="nav.versions">Версии</span></button>
-      <button data-t="settings"><span class="ic">🧩</span><span class="lb" data-i18n="nav.settings">Сервер</span></button>
-      <button data-t="security"><span class="ic">🛡️</span><span class="lb" data-i18n="nav.security">Безопасность</span></button>
-      <button data-t="logs"><span class="ic">📜</span><span class="lb" data-i18n="nav.logs">Логи</span></button>
+      <div class="ngroup" id="g-home"><button type="button" class="ngroup-title" data-short="🏠" aria-expanded="false" aria-haspopup="true"><span class="ngroup-icon" aria-hidden="true">🏠</span><span class="ngroup-name" data-i18n="nav.group.home">Домашний прокси</span><span class="ngroup-caret" aria-hidden="true">⌄</span></button><div class="ngroup-menu"><button data-t="dashboard" class="on"><span class="ic">📊</span><span class="lb" data-i18n="nav.dash">Обзор</span></button><button data-t="keys"><span class="ic">🔑</span><span class="lb" data-i18n="nav.keys">Ключи</span></button><button data-t="warp"><span class="ic">🌀</span><span class="lb" data-i18n="nav.warp">WARP</span></button><button data-t="devices"><span class="ic">📱</span><span class="lb" data-i18n="nav.conn">Устройства</span></button><button data-t="connect"><span class="ic">🌐</span><span class="lb" data-i18n="nav.connect">Внешний доступ</span></button><button data-t="rusegment"><span class="ic">🇷🇺</span><span class="lb" data-i18n="nav.rusegment">Ру-сегмент</span></button><button data-t="tgws"><span class="ic">✈️</span><span class="lb" data-i18n="nav.tgws">TG-WS</span></button></div></div>
+      <div class="ngroup" id="g-mesh"><button type="button" class="ngroup-title" data-short="🕸️" aria-expanded="false" aria-haspopup="true"><span class="ngroup-icon" aria-hidden="true">🕸️</span><span class="ngroup-name" data-i18n="nav.mesh">Меш-сеть</span><span class="ngroup-caret" aria-hidden="true">⌄</span></button><div class="ngroup-menu"><button data-t="mesh-join"><span class="ic">🔗</span><span class="lb" data-i18n="nav.mesh-join">Подключение</span><span class="tag live" id="tag-mesh-join">✓</span></button><button data-t="mesh-topo"><span class="ic">🌌</span><span class="lb" data-i18n="nav.mesh-topo">Топология</span></button><button data-t="mesh-routes"><span class="ic">🧭</span><span class="lb" data-i18n="nav.mesh-routes">Маршруты</span></button></div></div>
+      <div class="ngroup" id="g-subs"><button type="button" class="ngroup-title" data-short="👥" aria-expanded="false" aria-haspopup="true"><span class="ngroup-icon" aria-hidden="true">👥</span><span class="ngroup-name" data-i18n="nav.group.subs">Подписки</span><span class="ngroup-caret" aria-hidden="true">⌄</span></button><div class="ngroup-menu"><button data-t="shop-plans"><span class="ic">💎</span><span class="lb" data-i18n="nav.shop-plans">Тарифы VPN</span></button><button data-t="shop-features"><span class="ic">🧩</span><span class="lb" data-i18n="nav.shop-features">Дополнительные возможности Aurora</span><span class="tag" id="tag-feat">2</span></button><button data-t="shop-billing"><span class="ic">💳</span><span class="lb" data-i18n="nav.shop-billing">Платежи</span></button></div></div>
+      <div class="ngroup" id="g-settings"><button type="button" class="ngroup-title" data-short="⚙️" aria-expanded="false" aria-haspopup="true"><span class="ngroup-icon" aria-hidden="true">⚙️</span><span class="ngroup-name" data-i18n="nav.group.set">Настройки</span><span class="ngroup-caret" aria-hidden="true">⌄</span></button><div class="ngroup-menu"><button data-t="update"><span class="ic">⬆️</span><span class="lb" data-i18n="nav.update">Обновление</span><span class="tag hot" id="tag-upd">NEW</span></button><button data-t="versions"><span class="ic">📚</span><span class="lb" data-i18n="nav.versions">Версии</span></button><button data-t="settings"><span class="ic">🧩</span><span class="lb" data-i18n="nav.settings">Сервер</span></button><button data-t="security"><span class="ic">🛡️</span><span class="lb" data-i18n="nav.security">Безопасность</span></button><button data-t="logs"><span class="ic">📜</span><span class="lb" data-i18n="nav.logs">Логи</span></button></div></div>
     </nav>
 
     <div class="side-foot">
