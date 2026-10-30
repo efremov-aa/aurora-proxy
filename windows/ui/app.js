@@ -1318,6 +1318,7 @@
     var body = data ? JSON.stringify(data) : '';
     return fetch(url, { method: 'POST', headers: authHdr(), body: body })
       .then(function (r) {
+        var ct = (r.headers.get('content-type') || '').toLowerCase();
         return r.text().then(function (txt) {
           var j = null;
           if (txt && txt.length) {
@@ -1334,6 +1335,7 @@
             }
             return j;
           }
+          // Сервер вернул не JSON — считаем это ошибкой, но не сетевой
           var err = {};
           err.ok = false;
           if (r.ok) {

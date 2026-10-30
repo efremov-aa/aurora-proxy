@@ -375,7 +375,7 @@ class _CfWorkerPool:
         return domains
 
     def report_failure(self, worker_domain: str, exc: Exception) -> None:
-        return  # TODO: check status code after daily limit reached
+
         if not isinstance(exc, WsHandshakeError) or exc.status_code != 429:
             return
 

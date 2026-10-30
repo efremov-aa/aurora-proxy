@@ -16,6 +16,7 @@
 * в лог не пишем токены — только план и флаг PRO.
 """
 
+import base64
 import json
 import os
 import re
@@ -255,6 +256,10 @@ def _apply(value, code):
     A-112: пустой/битый ответ мастера не должен ронять панель - чиним в dict."""
     if not isinstance(value, dict):
         value = {}
+    if code == 200 and value.get("ok") and not _license_signature_ok(value):
+        config.log("ext-gate: отклонён неподписанный ответ мастера")
+        code = 502
+        value = {"status": "unknown"}
     plan = str(value.get("plan") or "").strip().lower()
     status = str(value.get("status") or "").strip().lower()
     if code == 200 and value.get("ok"):
@@ -291,6 +296,26 @@ def _apply(value, code):
         "checked_at": int(time.time()),
         "code": code,
     }
+
+
+def _license_signature_ok(value):
+    """Проверяет подпись успешного ответа лицензии закреплённым ключом мастера."""
+    if not isinstance(value, dict) or not value.get("signature"):
+        return False
+    try:
+        encoded = str(getattr(config, "MASTER_ED_PUBKEY", "") or "").strip()
+        pub = base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4))
+        signature = base64.urlsafe_b64decode(
+            str(value["signature"]) + "=" * (-len(str(value["signature"])) % 4))
+        if len(pub) != 32 or len(signature) != 64:
+            return False
+        body = {key: item for key, item in value.items() if key != "signature"}
+        raw = json.dumps(body, ensure_ascii=False, sort_keys=True,
+                         separators=(",", ":")).encode("utf-8")
+        import release_sign
+        return bool(release_sign.verify(pub, raw, signature))
+    except Exception:
+        return False
 
 
 # ------------------------------------------------------------------- цикл

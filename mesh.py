@@ -285,6 +285,34 @@ def _ed_policy_ok(value):
     return _ed_signed_core_ok(value, _POLICY_FIELDS, value.get("ed25519_signature"))
 
 
+def _ed_entitlements_ok(value):
+    """Проверяет подпись списка прав на mesh от закреплённого мастера."""
+    pub = _ed_pubkey()
+    if not pub or not isinstance(value, dict):
+        return False
+    pinned = str(getattr(config, "MASTER_ED_PUBKEY", "") or "").strip()
+    claimed = str(value.get("ed_pubkey") or "").strip()
+    if not claimed or not hmac.compare_digest(claimed, pinned):
+        return False
+    ents = value.get("mesh_entitlements")
+    if not isinstance(ents, list) or len(ents) > 4096:
+        return False
+    if any(not isinstance(uid, str) or not uid.strip() for uid in ents):
+        return False
+    signed = {"policy": {field: value.get(field) for field in _POLICY_FIELDS},
+              "mesh_entitlements": sorted(set(ents))}
+    sig = _ed_decode(value.get("mesh_entitlements_signature"), 64)
+    if sig is None:
+        return False
+    try:
+        import release_sign
+        payload = json.dumps(signed, sort_keys=True, separators=(",", ":"),
+                             ensure_ascii=True).encode("utf-8")
+        return bool(release_sign.verify(pub, payload, sig))
+    except Exception:
+        return False
+
+
 def _ed_catalog_ok(value):
     """Подпись каталога (цены и описания) тем же ключом мастера."""
     pub = _ed_pubkey()
@@ -1698,12 +1726,10 @@ def apply_policy_raw(raw, source=""):
                 config.log("mesh: каталог мастера принят (тарифов %d, позиций %d)" % (
                     len(catalog["plans"]), len(catalog["extras"])))
     ents = raw.get("mesh_entitlements")
-    if isinstance(ents, list):
-        clean = [str(e) for e in ents if isinstance(e, str) and e.strip()]
-        if clean != _POLICY_ENTITLEMENTS:
-            _POLICY_ENTITLEMENTS[:] = clean
-            config.log("mesh: права на меш мастера (%d узлов): %s" % (
-                len(clean), ", ".join(clean[:8])))
+    clean = sorted(set(ents)) if _ed_entitlements_ok(raw) else []
+    if clean != _POLICY_ENTITLEMENTS:
+        _POLICY_ENTITLEMENTS[:] = clean
+        config.log("mesh: mesh-entitlements verified (%d nodes)" % len(clean))
     return True
 
 
