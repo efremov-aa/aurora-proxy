@@ -1216,6 +1216,14 @@
     },
   
   };
+  var WORKSPACE_I18N = {
+    ru: 'Быстрый запуск', en: 'Quick launch', es: 'Inicio rápido', de: 'Schnellstart',
+    fr: 'Démarrage rapide', tr: 'Hızlı başlangıç', pt: 'Início rápido', zh: '快速开始',
+    ar: 'بدء سريع', hi: 'त्वरित शुरुआत'
+  };
+  Object.keys(WORKSPACE_I18N).forEach(function (lang) {
+    if (I18N[lang]) I18N[lang]['quick.start'] = WORKSPACE_I18N[lang];
+  });
   function langNow() {
     var l = 'ru';
     try { l = localStorage.getItem(LS.lang) || 'ru'; } catch (e) { }
@@ -1238,6 +1246,8 @@
       n.placeholder = _t(n.getAttribute('data-i18n-placeholder'));
     });
     initTabMeta();
+    filterNavigation(($('nav-search') || {}).value || '');
+    updateTabContext(CFG.tab);
     renderAll(V.S || {});
     var theme = document.documentElement.getAttribute('data-theme');
     $('theme-btn').textContent = (theme === 'dark' ? _t('theme.sun') : _t('theme.moon'));
@@ -2593,9 +2603,29 @@ function loadTG() {
     var meta = TB_META[t] || { ic: '📊', lb: 'Обзор' };
     $('tb-icon').textContent = meta.ic;
     $('tb-name').textContent = meta.lb;
+    updateTabContext(t);
     var side = $('side');
     if (side && side.classList.contains('open')) side.classList.remove('open');
+    if (side && side.classList.contains('search-open')) side.classList.remove('search-open');
     loadTab(t);
+  }
+  function updateTabContext(t) {
+    var button = document.querySelector('#nav button[data-t="' + String(t || '').replace(/["\\]/g, '') + '"]');
+    var group = button && button.closest('.ngroup');
+    var label = group && group.querySelector('.ngroup-title');
+    var context = $('tb-context');
+    if (context) context.textContent = label ? label.textContent.replace(/\s+/g, ' ').trim() : '';
+  }
+function filterNavigation(query) {
+  const q = String(query || '').trim().toLocaleLowerCase('ru');
+  const buttons = Array.from(document.querySelectorAll('#nav button[data-t]'));
+  buttons.forEach((button) => {
+    const show = !q || (button.textContent || '').toLocaleLowerCase('ru').includes(q);
+    button.hidden = !show;
+  });
+  document.querySelectorAll('#nav .ngroup').forEach((group) => {
+    group.hidden = !Array.from(group.querySelectorAll('button[data-t]')).some((button) => !button.hidden);
+  });
   }
   function initTabMeta() {
     Array.prototype.forEach.call(document.querySelectorAll('#nav button[data-t]'), function (b) {
@@ -3170,6 +3200,37 @@ function loadTG() {
     });
   };
 
+  function initWorkspaceMenus() {
+    function closeMenus() {
+      Array.prototype.forEach.call(document.querySelectorAll('#nav .ngroup'), function (group) {
+        group.classList.remove('open');
+        var title = group.querySelector('.ngroup-title');
+        if (title) title.setAttribute('aria-expanded', 'false');
+      });
+    }
+    Array.prototype.forEach.call(document.querySelectorAll('#nav .ngroup-title'), function (title) {
+      title.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        var group = title.closest('.ngroup');
+        var wasOpen = group.classList.contains('open');
+        closeMenus();
+        if (!wasOpen) {
+          group.classList.add('open');
+          title.setAttribute('aria-expanded', 'true');
+        }
+      });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('#nav button[data-t]'), function (button) {
+      button.addEventListener('click', closeMenus);
+    });
+    document.addEventListener('click', function (event) {
+      if (!event.target.closest('#nav')) closeMenus();
+    });
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') closeMenus();
+    });
+  }
   function init() {
     try {
       var th = localStorage.getItem(LS.theme) || 'dark';
@@ -3181,7 +3242,26 @@ function loadTG() {
     /* Заголовок вкладки рисуем сами: после F5 активна первая .tab.show из HTML,
        а #tb-name оставался сырым текстом до перевода — название «проскакивало» */
     navTo(CFG.tab || 'status', true);
+    var navSearch = $('nav-search');
+    if (navSearch) navSearch.addEventListener('input', function () { filterNavigation(navSearch.value); });
+    document.addEventListener('keydown', function (event) {
+      if ((event.ctrlKey || event.metaKey) && String(event.key).toLowerCase() === 'k') {
+        event.preventDefault();
+        if (navSearch && window.innerWidth <= 1024 && window.innerWidth > 768 && !navSearch.getClientRects().length) {
+          $('side').classList.add('search-open');
+        }
+        if (navSearch) navSearch.focus();
+      } else if (event.key === 'Escape' && navSearch && document.activeElement === navSearch) {
+        navSearch.value = '';
+        filterNavigation('');
+        navSearch.blur();
+      }
+    });
+    if (navSearch) navSearch.addEventListener('blur', function () {
+      if (!navSearch.value && window.innerWidth > 768 && window.innerWidth <= 1024) $('side').classList.remove('search-open');
+    });
     bindActions();
+    initWorkspaceMenus();
     loadState();
     var subsTask = loadSubs();
     if (subsTask && typeof subsTask.then === 'function') {
