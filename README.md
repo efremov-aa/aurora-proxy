@@ -6,7 +6,7 @@
 
 ![Version](https://img.shields.io/badge/version-1.10.18-blue)
 ![Release](https://img.shields.io/badge/release-v1.10.18%20%22%D0%9A%D0%BE%D1%82-%D0%B4%D0%B8%D0%B0%D0%B3%D0%BD%D0%BE%D1%81%D1%82%22-pink)
-![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 ![Platform](https://img.shields.io/badge/platform-linux%20%7C%20windows-lightgrey)
 ![Python](https://img.shields.io/badge/Python-3.12%20stdlib-3776AB?logo=python)
 ![Xray](https://img.shields.io/badge/xray-v26.9.9-blue)
