@@ -5,7 +5,7 @@
 **Свой прокси, своя панель, до 5 игровых mesh-клиентов, чат и голос — бесплатно и без квот.**
 
 ![Version](https://img.shields.io/badge/version-1.10.18-blue)
-![Release](https://img.shields.io/badge/version-1.10.18-blue)
+![Release](https://img.shields.io/badge/release-1.10.18-blue)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 ![Platform](https://img.shields.io/badge/platform-linux%20%7C%20windows-lightgrey)
 ![Python](https://img.shields.io/badge/Python-3.12%20stdlib-3776AB?logo=python)
