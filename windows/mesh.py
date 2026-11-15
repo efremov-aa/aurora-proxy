@@ -1637,7 +1637,18 @@ def _policy_targets():
     нет записи hub, вообще не знает адреса головного и молча ждёт флагов."""
     targets = []
     try:
-        for node in all_nodes():
+        # A-945: all_nodes() всегда подставляет hub() = САМ УЗЕЛ (config.VM_HOST),
+        # а _policy_port() по умолчанию берёт MESH_POLICY_PORT (8891) - публичный
+        # порт политики МАСТЕРА. На клиенте это адрес самого себя, где 8891 никто
+        # не слушает: каждые 15 секунд "mesh: политика (http <self>:8891)
+        # отброшена: не объект" (на ba38-ai-server это дало 27+ тыс. строк за 2
+        # недели). Хаб как источник политики нужен только сборке-мастеру.
+        nodes = []
+        with _LOCK:
+            nodes.extend(_NODES)
+        if _is_master_build():
+            nodes.insert(0, hub())
+        for node in nodes:
             if node.get("id") != "hub" and node.get("role") != "hub":
                 continue
             port = _policy_port(node)
