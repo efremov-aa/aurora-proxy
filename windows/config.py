@@ -21,12 +21,13 @@ from collections import deque
 # (xray run/keytest/statsquery/netstat/netsh/taskkill/tg-ws-proxy и т.п.).
 HIDE_FLAG = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
 
-VERSION = "1.10.18"
-VERSION_NAME = "Кот-диагност"
+VERSION = "1.10.19"
+VERSION_NAME = "Кот-коммутатор"
 APP_NAME = "Aurora"
 
 # История версий для вкладки «Версии» (v, имя, дата).
 VERSION_HISTORY = (
+    ("1.10.19", "Кот-коммутатор", "16.11.2026"),
     ("1.10.18", "Кот-диагност", "30.10.2026"),
     ("1.10.17", "Кот-диагност", "28.10.2026"),
     ("1.10.15", "Кот-диагност", "28.10.2026"),
@@ -59,6 +60,7 @@ VERSION_HISTORY = (
 )
 
 VERSION_NOTES = {
+    "1.10.19": "Кот-коммутатор: выбор другого WARP-конфига теперь реально переключает канал. Раньше у WARP-выхода был постоянный тег, поэтому xray.json оставался со старым адресом, а кнопка отвечала «уже на WARP» — список менялся, трафик нет. Теперь конфиг пересобирается и применяется сразу.",
     "1.10.15": "Кот-диагност: исправлена обработка ответа «Канал на WARP». При сетевом сбое UI больше не показывает ложное «сервер не ответил», если ответ уже получен, и чётче сообщает причину отказа.",
     "1.10.14": "Кот-диагност перестал отвечать одной фразой на разные поломки. Кнопка «Канал на WARP» теперь говорит причину: конфиг WARP не загружен (Aurora его не генерирует — его загружает владелец), не найден xray.exe или xray не принял конфиг. Сервер проверяет бинарь и конфиг ДО записи xray.json и откатывает файл, если xray не поднялся, поэтому следующий синк больше не считает канал переключённым. Причина отказа пишется в журнал, ошибка видна 8 секунд. В Windows-сборке download_xray.ps1 теперь кладёт xray в bin рядом с run.py — раньше он попадал на уровень выше, и переключение падало уже после записи конфига. Честно: WARP-конфиг по-прежнему готовит и загружает человек, сборка его не создаёт.",
     "1.10.13": u"Rezhim Cloudflare WARP Vsegda teper po-nastoyashchemu vsegda: kot bolshe ne soskalkzyvaet na VPN-klyuchi pri avtosinxronizacii, rotacii i proverke zhivogo kanala. Cloudflare ne obyazan otdayat vyhodnoi IP tem servisam, kotorymi my ego meryaem, i ranshe watchdog prinimal eto za smert kanala. Pereklyuchenie na WARP peresobiraet config, esli kanala eshche net, i chestno govorit uzhe na WARP, esli on uzhe vklyuchen. Zadno poyavilis knopka zagruzki configov WARP i relei-tunnel mesh-seti s publikaciej VLESS-profilya v 8-m pole HELLO.",
