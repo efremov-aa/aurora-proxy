@@ -799,10 +799,18 @@ def _authoritative_config(cfg, target):
     if _warp_obs_auth:
         for _wob in _warp_obs_auth:
             allowed.add(_wob["tag"])
+        # A-WARP-M: teg WARP postoyannyi ('warp'/'warp-noise'), poetomu prosto
+        # "dobavit esli net" ne pomogaet: odin i tot zhe teg mozhet nosit
+        # STAR endpoint. Zamenyaem warp-outbound'y na tekushchie - vybrannyj
+        # konfig dolzhen rezhimosya v kanal, a ne tol'ko v spiske paneli.
+        _cur_warp_tags = set()
         for _wob in _warp_obs_auth:
-            if not any(isinstance(o, dict) and o.get("tag") == _wob["tag"]
-                       for o in (cfg.get("outbounds") or [])):
-                cfg.setdefault("outbounds", []).append(copy.deepcopy(_wob))
+            _cur_warp_tags.add(_wob["tag"])
+        _obs_list = cfg.setdefault("outbounds", [])
+        _obs_list[:] = [o for o in _obs_list
+                        if not (isinstance(o, dict) and o.get("tag") in _cur_warp_tags)]
+        for _wob in _warp_obs_auth:
+            _obs_list.append(copy.deepcopy(_wob))
     allowed.update(("direct", "block"))
     outbounds = []
     used = set()
@@ -1491,7 +1499,12 @@ def _set_active_tag_impl(tag):
         # dlya otkata, esli xray ne prinyat novyy konfig.
         disk_before = json.loads(json.dumps(cfg))
         tags = [o.get("tag") for o in cfg.get("outbounds", [])]
-        if tag not in tags:
+        # A-WARP-M: u WARP постоянный тег ('warp'/'warp-noise'), поэтому выбор
+        # другого конфига через /api/warp/select не обновлял endpoint: старый
+        # outbound оставался в xray.json, канал шёл по прежнему адресу, а кнопка
+        # отвечала "already active". Перебираем конфиг авторитативно, иначе
+        # выбранный канал не применяется.
+        if tag not in tags or tag == warp.WARP_TAG:
             # A-857: outbound-y WARP est' tol'ko v konfige, sobRannom s final=warp.
             # Poka kanal na klyuchakh - tega net, i ruchoy vybor otkazyvalsya
             # ("tag not in outbounds"). Pere sobiraem config s etim tegom
@@ -1507,7 +1520,7 @@ def _set_active_tag_impl(tag):
             config.update_state(comm={"state": "idle", "msg": ""})
             return False, "tag not in outbounds"
         prev = get_vless_now()
-        if prev == tag:
+        if prev == tag and tag != warp.WARP_TAG:
             config.update_state(comm={"state": "idle", "msg": ""})
             return True, "already active"
         for rule in cfg.get("routing", {}).get("rules", []):

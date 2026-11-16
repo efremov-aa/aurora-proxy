@@ -1521,6 +1521,18 @@ class Handler(BaseHTTPRequestHandler):
         res = warp.select(name)
         config.log("api: A-WARP-M vybor konfiga name=%s ok=%s"
                    % (name[:40], bool(res.get("ok"))))
+        # A-WARP-M: spisok i kanal - odno. Esli kanal UZHE na WARP, prosto
+        # smenit active v store nelzya: xray.json ostalsya so STARYM outbound
+        # (teg 'warp' tot zhe), i kanal ne pereklyuchalsya. Pereprimenyaem.
+        if res.get("ok"):
+            try:
+                if core.get_vless_now() == warp.WARP_TAG:
+                    ok2, msg2 = core.set_active_tag(warp.WARP_TAG)
+                    config.log("api: A-WARP-M vybor: kanal na WARP, pereprimenenie"
+                               " ok=%s msg=%s" % (ok2, msg2))
+            except Exception as exc:
+                config.log("api: A-WARP-M vybor: pereprimenenie ne udalos: %s"
+                           % type(exc).__name__)
         st = warp.status()
         st["ok"] = bool(res.get("ok"))
         if not res.get("ok"):
