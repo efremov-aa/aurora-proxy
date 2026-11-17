@@ -1459,7 +1459,7 @@
   postJSON('/api/warp/select', { name: String(name) }).then(function (j) {
     toast(j && j.ok ? ('Активный конфиг: ' + (j.name || name)) : ('WARP: не удалось выбрать (' + ((j && (j.error || j.msg)) || 'нет ответа') + ')'), !!(j && j.ok));
     if (j && j.configs) warpRender(j);
-    refresh();
+    loadState(true);
   }).catch(function () { toast('WARP: конфиг не выбран', false); });
 }
 function warpUse() {
@@ -1481,7 +1481,7 @@ function warpUse() {
         var m = String(j.msg || '');
         if (m.indexOf('already') >= 0) toast('Уже на WARP 🐾', true);
         else toast('Канал на WARP' + (m ? ' · ' + m : ''), true);
-        refresh();
+        loadState(true);
         return;
       }
       var why = String((j && (j.msg || j.error)) || 'нет ответа');
@@ -1499,10 +1499,10 @@ function warpUse() {
       } else {
         toast('WARP: канал не переключён — ' + (human[why] || why), false, 8000);
       }
-      refresh();
+      loadState(true);
     } catch (e) {
       toast('WARP: канал не переключён — ошибка обработки ответа', false, 8000);
-      refresh();
+      loadState(true);
     }
   }).catch(function (e) {
     WARP_USE_BUSY = false;
@@ -1512,7 +1512,7 @@ function warpUse() {
     } else {
       toast('WARP: канал не переключён — сервер не ответил', false, 8000);
     }
-    refresh();
+    loadState(true);
   });
 }
 function warpProbeOne(name) {
@@ -1528,7 +1528,7 @@ function warpProbeOne(name) {
         var ok = cfg && cfg.egress && cfg.egress !== '-';
         toast(ok ? ('Проверено · ' + name + ' · выход ' + cfg.egress) : ('Проверка не дала выхода · ' + name), !!ok);
         WARP_PROBE_BUSY = false;
-        refresh();
+        loadState(true);
       }).catch(function () { WARP_PROBE_BUSY = false; });
     }, 18000);
   }).catch(function () { WARP_PROBE_BUSY = false; });
@@ -1539,7 +1539,7 @@ function warpRemoveOne(name) {
   postJSON('/api/warp/remove', { name: String(name) }).then(function (j) {
     toast(j && j.ok ? ('Конфиг удалён: ' + name) : ('WARP: не удалось удалить (' + ((j && (j.error || j.msg)) || 'нет ответа') + ')'), !!(j && j.ok));
     if (j && j.configs) warpRender(j);
-    refresh();
+    loadState(true);
   }).catch(function () { toast('WARP: конфиг не удалён', false); });
 }
   function warpUpload() {
