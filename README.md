@@ -4,8 +4,8 @@
 
 **Свой прокси, своя панель, до 5 игровых mesh-клиентов, чат и голос — бесплатно и без квот.**
 
-![Version](https://img.shields.io/badge/version-1.10.20-blue)
-![Release](https://img.shields.io/badge/release-1.10.20%20%22%D0%9A%D0%BE%D1%82-%D0%B4%D0%B8%D0%B7%D0%B0%D0%B9%D0%BD%D0%B5%D1%80%22-blue)
+![Version](https://img.shields.io/badge/version-1.10.21-blue)
+![Release](https://img.shields.io/badge/release-1.10.21%20%22%D0%9A%D0%BE%D1%82-%D0%B4%D0%B5%D0%B1%D0%B0%D0%B3%22-blue)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 ![Platform](https://img.shields.io/badge/platform-linux%20%7C%20windows-lightgrey)
 ![Python](https://img.shields.io/badge/Python-3.12%20stdlib-3776AB?logo=python)
@@ -47,7 +47,7 @@
 - 🐾 **общая меш-сеть** — я умею ждать друзей, играть с ними в общей группе, переписываться и
   разговаривать.
 
-**Версия:** `VERSION=1.10.20`, `VERSION_NAME=Кот-дизайнер`
+**Версия:** `VERSION=1.10.21`, `VERSION_NAME=Кот-дебаг`
 **Политика:** ревизия 2 (принимается при первом запуске)
 
 ### 🐾 Честно сразу
@@ -66,16 +66,16 @@ Aurora — **не VPN-сервис**, **не анонимайзер** и **не 
 
 ## 📦 Загрузка
 
-Мяу! Всё лежит в [Release v1.10.20 «Кот-дизайнер»](https://github.com/efremov-aa/aurora-proxy/releases).
+Мяу! Всё лежит в [Release v1.10.21 «Кот-дебаг»](https://github.com/efremov-aa/aurora-proxy/releases).
 
 <details>
 <summary>📋 Ассеты релиза</summary>
 
 | Ассет | Что внутри |
 |---|---|
-| `Aurora-v1.10.20-linux.zip` | Linux-версия: модули, `ui/`, `proxy/`, `Dockerfile`, `docker-compose.yml`, systemd-юниты |
-| `Aurora-v1.10.20-windows.zip` | Windows-версия (папка `windows/`): те же модули + `bin/`, `nssm/`, `installer/`, `download_xray.ps1` |
-| `Aurora-Setup-1.10.20.exe` 🪟 | **Установщик для Windows**: ставит Aurora как службу **NSSM «Aurora»**, xray и TG-WS внутри, авто-обновление |
+| `Aurora-v1.10.21-linux.zip` | Linux-версия: модули, `ui/`, `proxy/`, `Dockerfile`, `docker-compose.yml`, systemd-юниты |
+| `Aurora-v1.10.21-windows.zip` | Windows-версия (папка `windows/`): те же модули + `bin/`, `nssm/`, `installer/`, `download_xray.ps1` |
+| `Aurora-Setup-1.10.21.exe` 🪟 | **Установщик для Windows**: ставит Aurora как службу **NSSM «Aurora»**, xray и TG-WS внутри, авто-обновление |
 | `*.sig` | Подпись Ed25519 каждого ассета: авто-обновление не примет неподписанный файл 🐾 |
 
 Подпись релизов проверена: Ed25519, fingerprint `ca4f87c9999e0282…`. Скачанный архив побайтно
@@ -266,7 +266,7 @@ docker compose up -d --build
 <details>
 <summary>🪟 Вариант 3 — Windows</summary>
 
-Скачайте `Aurora-Setup-1.10.20.exe` и запустите: ставится служба **NSSM «Aurora»**.
+Скачайте `Aurora-Setup-1.10.21.exe` и запустите: ставится служба **NSSM «Aurora»**.
 Данные — в `%LOCALAPPDATA%\Aurora`. Альтернатива — ручная установка из [`windows/README-windows.md`](windows/README-windows.md).
 
 </details>
