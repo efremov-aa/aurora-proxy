@@ -14,13 +14,14 @@ import urllib.request
 import uuid
 from collections import deque
 
-VERSION = "1.10.24"
-VERSION_NAME = "Кот-выключатель"
+VERSION = "1.10.25"
+VERSION_NAME = "Кот-кран"
 APP_NAME = "Aurora"
 
 # История версий для вкладки «Версии» (v, имя, дата).
 # ВАЖНО: без дублей — иначе вкладка показывает одну версию несколько раз.
 VERSION_HISTORY = (
+    ("1.10.25", "Кот-кран", "18.11.2026"),
     ("1.10.24", "Кот-выключатель", "18.11.2026"),
     ("1.10.23", "Кот-обновщик", "18.11.2026"),
     ("1.10.22", "Кот-маскировщик", "18.11.2026"),
@@ -60,6 +61,7 @@ VERSION_HISTORY = (
 
 # Описания версий для вкладки «Версии» (v -> текст). Показываются в панели.
 VERSION_NOTES = {
+    "1.10.25": "Кот-кран добавил выключатель внешнего VLESS-Reality :8443 на вкладку «Внешний доступ»: выключенный inbound исчезает из xray и порт закрывается, включённый — возвращается. Настройки по-прежнему берутся из env AURORA_VLESS_*, кнопка только гасит/поднимает сам inbound.",
     "1.10.24": "Кот-выключатель добавил в панель выключатели внешнего резервного канала (MASQUE/mihomo) и Telegram WS-прокси. На серверах, где внешний выход и TG не нужны, их теперь можно погасить одной кнопкой: выключенный канал останавливает mihomo, выключенный TG-WS останавливает прокси и не поднимает его. Заодно в Windows-сборку дотянуты обработчики MASQUE (вкладка там раньше отвечала ошибкой).",
     "1.10.23": "Кот-обновщик починил доставку новых модулей при автообновлении: в список доставляемых файлов добавлен masque.py, а логика новых модулей теперь понимает файлы в корне архива (раньше такие молча пропускались, и узел падал на ModuleNotFoundError после обновления). Уже обновившиеся узлы с прошлым релизом починим доставкой masque.py.",
     "1.10.22": "Кот-маскировщик добавил транспорт MASQUE для резерва Cloudflare WARP: в части сетей чистый WireGuard блокируется (нет ответов на handshake), а MASQUE (mihomo) проходит. В мастере настройки появился шаг «Резервный канал (WARP)» с выбором WireGuard/MASQUE и проверкой выходного IP, в панели — вкладка MASQUE для загрузки и смены конфигов. Старый WARP-раздел на мастере убран, чтобы не путаться.",
@@ -660,11 +662,15 @@ def vless_public(raw=None):
     if raw is None:
         raw = VLESS_PUBLIC
     if not isinstance(raw, dict):
-        return {"enabled": False}
-    enabled = raw.get("enabled") is True
+        return {"enabled": False, "configured": False}
+    # A-118: выключатель внешнего VLESS из панели (env только задаёт настройки).
+    toggle_on = _settings.get("vless_enabled", True) is True
+    enabled = raw.get("enabled") is True and toggle_on
     port = _parse_port(raw.get("port", 8443))
+    configured = bool(raw.get("enabled") is True and canonical_uuid(raw.get("uuid")))
     out = {
         "enabled": enabled,
+        "configured": configured,
         "port": port if port is not None else 0,
         "host": external_link_host(raw),
         "uuid": canonical_uuid(raw.get("uuid")),
@@ -713,6 +719,8 @@ _SETTINGS_DEFAULTS = {
     # Включаются/выключаются из панели; выключенный канал не поднимается.
     "masque_enabled": True,
     "tgws_enabled": True,
+    # A-118: внешний VLESS-Reality inbound :8443 (тоже выключатель из панели).
+    "vless_enabled": True,
 
     "game_tun": False,         # A-816: TUN-подсеть игровых узлов (требует root/CAP_NET_ADMIN)
     # A-827 (Ш4): три сценария на старте. Пусто = ещё не выбран.
@@ -1068,7 +1076,7 @@ def _validate_settings(raw):
         "vpn_mode", "auto_recovery", "auto_refresh", "lan_only",
         "block_scanners", "rate_limit", "twofa", "show_mesh", "show_subs",
         "mesh_master", "auto_join", "master_only", "setup_complete",
-        "masque_enabled", "tgws_enabled",
+        "masque_enabled", "tgws_enabled", "vless_enabled",
     )
     string_keys = (
         "continue_text", "ui_token", "server_name", "mesh_id", "mesh_token",

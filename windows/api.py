@@ -473,11 +473,27 @@ def _auth_ok(self):
 
 
 def _vless_ext():
-    """Внешняя vless-ссылка для подключения к домашнему прокси ИЗВНЕ."""
+    """Внешняя vless-ссылка для подключения к домашнему прокси ИЗВНЕ.
+
+    A-118: отдаём словарь всегда (даже выключен/не настроен), чтобы панель
+    могла показать выключатель. configured — есть ли настройки вообще.
+    """
     v = config.vless_public()
     host = config._format_link_host(v.get("host", ""))
-    if not v.get("enabled") or not v.get("uuid") or not host:
-        return {}
+    out = {
+        "enabled": bool(v.get("enabled")),
+        "configured": bool(v.get("configured")),
+        "port": v.get("port") or 0,
+        "host": v.get("host") or "",
+        "uuid": v.get("uuid") or "",
+        "sni": v.get("sni") or "",
+        "pbk": v.get("public_key") or "",
+        "sid": v.get("short_id") or "",
+        "fp": "chrome",
+        "link": "",
+    }
+    if not out["enabled"] or not out["uuid"] or not host:
+        return out
     q = urllib.parse.urlencode({
         "encryption": "none",
         "security": "reality",
@@ -489,19 +505,9 @@ def _vless_ext():
         "type": "tcp",
         "headerType": "none",
     })
-    link = "vless://%s@%s:%d?%s#Aurora-Out" % (
+    out["link"] = "vless://%s@%s:%d?%s#Aurora-Out" % (
         v["uuid"], host, v["port"], q)
-    return {
-        "link": link,
-        "host": v["host"],
-        "port": v["port"],
-        "uuid": v["uuid"],
-        "sni": v["sni"],
-        "pbk": v["public_key"],
-        "sid": v["short_id"],
-        "fp": "chrome",
-        "enabled": True,
-    }
+    return out
 
 
 def _key_handle(uid, key_id):
@@ -822,6 +828,11 @@ def build_state(local=True):
     st["egress_ip"] = core.egress_ip()
     st["comm"] = st.pop("comm", {"state": "idle", "msg": ""})
     st["vless_ext"] = _vless_ext()
+    # A-118: выключатель внешнего VLESS-«Входящего» :8443.
+    try:
+        st["vless_enabled"] = bool(config.vless_public().get("enabled"))
+    except Exception:
+        st["vless_enabled"] = False
     st["mesh_tunnel"] = _tunnel_status()
     st["game_tun"] = _game_tun_status()
     st["game"] = _game_status()
@@ -1368,6 +1379,7 @@ class Handler(BaseHTTPRequestHandler):
             "/api/recovery/conn": self._rc_conn,
             "/api/tgws/restart": self._tgws_restart,
             "/api/tgws/enable": self._tgws_enable,
+            "/api/vless/enable": self._vless_enable,
             "/api/rusegment/check": self._rusegment_check,
             "/api/rusegment/region": self._rusegment_region,
             "/api/security/rotate": self._security_rotate,
@@ -1609,6 +1621,25 @@ class Handler(BaseHTTPRequestHandler):
             return
         config.log("tgws: enabled=%s" % value)
         self._send(*_json(st))
+
+    # A-118: vyklyuchatel vneshnego VLESS-Reality inbound :8443.
+    def _vless_enable(self, data):
+        value = data.get("enabled")
+        if type(value) is not bool:
+            self._send(*_json({"ok": False, "error": "enabled must be boolean"}, 400))
+            return
+        if not config.vless_public().get("configured"):
+            self._send(*_json({"ok": False, "error": "внешний VLESS не настроен"}, 400))
+            return
+        if not config.set("vless_enabled", value):
+            self._send(*_json({"ok": False, "error": "settings save failed"}, 500))
+            return
+        config.save_settings()
+        config.log("vless: external inbound enabled=%s" % value)
+        # xray пересоберётся в фоне: inbound vless-in появится/исчезнет.
+        threading.Thread(target=core.sync, daemon=True).start()
+        self._send(*_json({"ok": True, "enabled": value,
+                           "msg": "внешний VLESS переключается, xray пересобирается"}))
 
     def _rusegment_check(self, data):
         started = rusegment.check_all()

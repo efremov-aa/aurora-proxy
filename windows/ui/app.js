@@ -1870,6 +1870,29 @@ function warpRemoveOne(name) {
     } else {
       q.innerHTML = '<div class="qr-ph">' + _t('c.secret-hint') + '</div>';
     }
+    // A-118: выключатель внешнего VLESS (только если он настроен).
+    var cxTog = $('cx-toggle');
+    if (cxTog) {
+      if (x.configured) {
+        cxTog.style.display = '';
+        cxTog.textContent = link ? '⏹ Выключить внешний VLESS' : '▶ Включить внешний VLESS';
+      } else {
+        cxTog.style.display = 'none';
+      }
+    }
+  }
+
+  // A-118: включить/выключить внешний VLESS-Reality inbound :8443.
+  function vlessToggle() {
+    var x = (V.S && V.S.vless_ext) || {};
+    var next = !x.enabled;
+    postJSON('/api/vless/enable', { enabled: next }).then(function (j) {
+      if (j && j.ok) { V.S = V.S || {}; V.S.vless_enabled = j.enabled; }
+      loadState(true);
+      toast((j && j.ok)
+        ? (next ? 'Внешний VLESS включён' : 'Внешний VLESS выключен')
+        : ('Ошибка: ' + ((j && j.error) || 'нет ответа')), !!(j && j.ok));
+    });
   }
 
   /* ================= RU SEGMENT ================= */
@@ -3201,6 +3224,7 @@ function loadTG() {
     'masque-apply': function () { masqueApply(); },
     'masque-clear': function () { masqueClear(); },
     'masque-toggle': function () { masqueToggle(); },
+    'cx-toggle': function () { vlessToggle(); },
   };
   function actTarget(ev) {
     var node = ev && ev.target;
