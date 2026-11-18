@@ -27,6 +27,7 @@ import security
 import source
 import subs
 import warp  # A-WARP-PUB: rezervnyy kanal WARP
+import masque  # A-MASQUE-PUB: rezerv WARP cherez mihomo
 import telemetry
 import tgws
 import ui
@@ -47,6 +48,7 @@ def _load_ui_token():
 # A-WARP-PUB-3: proba WARP idet v fonovom potoke (kak /api/keys/check),
 # otvet mgnovennyi, rezultat cherez /api/warp.
 _WARP_PROBE = {"running": False}
+_MASQUE_PROBE = {"running": False}
 def _json(data, status=200):
     body = json.dumps(data, ensure_ascii=False).encode("utf-8")
     return (status, "application/json; charset=utf-8", body)
@@ -874,6 +876,11 @@ def build_state(local=True):
         st["warp"] = warp.status()
     except Exception:
         st["warp"] = {"loaded": False, "mode": "off", "active": False}
+    try:
+        st["masque"] = masque.status()
+    except Exception:
+        st["masque"] = {"loaded": False, "count": 0, "name": "",
+                        "endpoint": "", "egress": "-"}
     if not local:
         v = dict(st["vless_ext"])
         for sec in ("link", "uuid", "pbk", "sid", "host", "port", "sni", "fp"):
@@ -1055,6 +1062,12 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(*_json({"error": "unauthorized"}, 401))
                 return
             self._send(*_json(warp.status()))
+            return
+        if path == "/api/masque":
+            if not _trusted_read(self):
+                self._send(*_json({"error": "unauthorized"}, 401))
+                return
+            self._send(*_json(masque.status()))
             return
         if path == "/api/mesh/policy":
             self._send(*_json(mesh.policy()))
@@ -1292,6 +1305,13 @@ class Handler(BaseHTTPRequestHandler):
                 return
             self._setup_complete(setup_data or {})
             return
+        if path == "/api/setup/warp_test":
+            test_data, body_error = _read_json_body(self)
+            if body_error:
+                self._send(*_json({"error": body_error}, 400))
+                return
+            self._setup_warp_test(test_data or {})
+            return
         if not _admin_ok(self):
             self._send(*_json({"error": "unauthorized"}, 401))
             return
@@ -1350,6 +1370,13 @@ class Handler(BaseHTTPRequestHandler):
             "/api/warp/select": self._warp_select,
             "/api/warp/remove": self._warp_remove,
             "/api/warp/clear": self._warp_clear,
+            # A-MASQUE-PUB: rezerv WARP cherez mihomo (MASQUE)
+            "/api/masque/upload": self._masque_upload,
+            "/api/masque/select": self._masque_select,
+            "/api/masque/remove": self._masque_remove,
+            "/api/masque/clear": self._masque_clear,
+            "/api/masque/apply": self._masque_apply,
+            "/api/masque/probe": self._masque_probe,
             "/api/recovery/limit": self._rc_limit,
             "/api/recovery/region": self._rc_region,
             "/api/recovery/conn": self._rc_conn,
@@ -1565,6 +1592,80 @@ class Handler(BaseHTTPRequestHandler):
         st["ok"] = True
         self._send(*_json(st))
 
+
+    # --- A-MASQUE-PUB: rezerv WARP cherez mihomo (MASQUE) ---
+    def _masque_upload(self, data):
+        raw = data.get("config") or data.get("raw") or ""
+        if not isinstance(raw, str) or not raw.strip():
+            self._send(*_json({"ok": False, "error": "no config"}, 400))
+            return
+        if len(raw.encode("utf-8", "ignore")) > masque.MAX_CONFIG_BYTES:
+            self._send(*_json({"ok": False, "error": "config too large"}, 400))
+            return
+        name = data.get("name") if isinstance(data.get("name"), str) else ""
+        r = masque.install(raw, name)
+        config.log("masque: A-MASQUE konfig zagruzhen ok=%s name=%s"
+                   % (bool(r.get("ok")), str(r.get("name", ""))[:40]))
+        if not r.get("ok"):
+            self._send(*_json(r, 400))
+            return
+        st = masque.status()
+        st["ok"] = True
+        self._send(*_json(st))
+
+    def _masque_select(self, data):
+        name = data.get("name") if isinstance(data.get("name"), str) else ""
+        res = masque.select(name)
+        config.log("masque: vybor name=%s ok=%s" % (name[:40], bool(res.get("ok"))))
+        if not res.get("ok"):
+            self._send(*_json(res, 400))
+            return
+        st = masque.status()
+        st["ok"] = True
+        self._send(*_json(st))
+
+    def _masque_remove(self, data):
+        name = data.get("name") if isinstance(data.get("name"), str) else ""
+        res = masque.remove(name)
+        if not res.get("ok"):
+            self._send(*_json(res, 400))
+            return
+        st = masque.status()
+        st["ok"] = True
+        self._send(*_json(st))
+
+    def _masque_clear(self, data):
+        r = masque.clear()
+        st = masque.status()
+        st["ok"] = bool(r.get("ok"))
+        self._send(*_json(st))
+
+    def _masque_apply(self, data):
+        res = masque.apply()
+        st = masque.status()
+        st.update(res)
+        self._send(*_json(st))
+
+    def _masque_probe(self, data):
+        if _MASQUE_PROBE["running"]:
+            self._send(*_json({"ok": True, "started": True,
+                               "msg": "proba MASQUE uzhe idet"}))
+            return
+        pname = data.get("name") if isinstance(data.get("name"), str) else ""
+        _MASQUE_PROBE["running"] = True
+
+        def _run():
+            try:
+                r = masque.probe(30, pname)
+                config.log("masque: proba: %s" % (r.get("egress") or r.get("error")))
+            except Exception as exc:
+                config.log("masque: proba ne udalas: %s" % str(exc)[:120])
+            finally:
+                _MASQUE_PROBE["running"] = False
+        threading.Thread(target=_run, daemon=True).start()
+        self._send(*_json({"ok": True, "started": True,
+                           "msg": "proba MASQUE zapuschena, rezultat cherez ~20 s"}))
+
     def _keys_cleanup(self, data):
         removed = pool.cleanup()
         if removed:
@@ -1651,6 +1752,43 @@ class Handler(BaseHTTPRequestHandler):
         token = security.rotate()
         self._send(*_json({"ok": bool(token), "token": token}))
 
+    def _setup_warp_test(self, data):
+        """A-MASQUE-PUB: proverit' vybrannyj transport WARP pri ustanovke."""
+        local = _is_local(self)
+        if not local and not _host_in_lan(self.client_address[0]):
+            _setup_reject(self, "setup requires localhost", 403)
+            return
+        if config.get("setup_complete", False):
+            _setup_reject(self, "setup already complete", 409)
+            return
+        tr = str(data.get("transport") or "").strip().lower()
+        if tr not in ("wireguard", "masque"):
+            self._send(*_json({"ok": False, "error": "bad transport"}, 400))
+            return
+        if tr == "masque":
+            r = masque.fetch_default()
+            if not r.get("ok"):
+                self._send(*_json({"ok": False, "transport": tr,
+                                   "error": r.get("error", "masque fetch failed")}, 200))
+                return
+            res = masque.probe(30, r.get("name"))
+            out = {"ok": bool(res.get("ok")), "transport": tr,
+                   "egress": res.get("egress", "-")}
+            if not res.get("ok"):
+                out["error"] = res.get("error", "no egress")
+            self._send(*_json(out))
+            return
+        if not warp.load():
+            self._send(*_json({"ok": False, "transport": tr,
+                               "error": "нет WARP-конфига (загрузите на вкладке WARP)"}, 200))
+            return
+        res = warp.probe()
+        out = {"ok": bool(res.get("ok")), "transport": tr,
+               "egress": res.get("egress", "-")}
+        if not res.get("ok"):
+            out["error"] = res.get("error", "no egress")
+        self._send(*_json(out))
+
     def _setup_complete(self, data):
         if not isinstance(data, dict):
             data = {}
@@ -1710,6 +1848,11 @@ class Handler(BaseHTTPRequestHandler):
                 mesh_joined = True
             else:
                 config.log("api: setup mesh invite skipped: %s" % (join_err or "unknown"))
+        transport = data.get("warp_transport")
+        if transport not in (None, "", "off", "wireguard", "masque"):
+            _setup_reject(self, "invalid warp transport", 400)
+            return
+        transport = transport or "off"
         values = {
             "server_name": name.strip(),
             "ui_token": password,
@@ -1717,6 +1860,7 @@ class Handler(BaseHTTPRequestHandler):
             "ui_pin": pin,
             "policy_rev_accepted": policy_rev,
             "setup_complete": True,
+            "warp_transport": transport,
         }
         values.update(ports)
         for key in ("lan_only", "block_scanners", "rate_limit"):
@@ -1728,6 +1872,14 @@ class Handler(BaseHTTPRequestHandler):
             _setup_reject(self, "settings save failed", 500)
             return
         _load_ui_token()
+        # A-MASQUE-PUB: razvernut' vybrannyj transport rezerva.
+        try:
+            if transport == "masque":
+                masque.apply()
+            elif transport == "wireguard":
+                config.set("warp_mode", "on")
+        except Exception as exc:
+            config.log("api: setup warp deploy failed: %s" % type(exc).__name__)
         self._send(*_json({"ok": True, "mesh_joined": mesh_joined,
                            "restart_required": restart_required,
                            "settings": _settings()["settings"]}))

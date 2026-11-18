@@ -1365,6 +1365,91 @@
   // A-949: posledniy status WARP (dlya podskazki do zaprosa) i odin zapros za raz.
   var WARP_STATE = null;
   var WARP_USE_BUSY = false;
+
+  /* ---- A-MASQUE-PUB: rezerv WARP cherez mihomo ---- */
+  function masqueRender(m) {
+    if (!m) return;
+    function put(id, val) { var el = $(id); if (el) el.textContent = String(val); }
+    var cfgs = (m.configs && m.configs.length) ? m.configs : [];
+    var cur = String(m.name || '');
+    put('masque-state', !m.loaded ? 'конфигов нет'
+      : (cfgs.length + ' конфиг(ов)' + (cur ? ' · выбран ' + cur : '')));
+    put('masque-ep', cur || (m.loaded ? 'без имени' : '—'));
+    put('masque-ip', (m.egress && m.egress !== '-') ? m.egress : 'не проверен');
+    put('masque-active', m.loaded ? 'готов' : '—');
+    var box = $('masque-configs');
+    if (box) {
+      if (!cfgs.length) {
+        box.innerHTML = '<tr><td colspan="4" class="empty">Конфигов пока нет — загрузи первый</td></tr>';
+      } else {
+        box.innerHTML = cfgs.map(function (c) {
+          var n = c.name || '?';
+          var eg = (c.egress && c.egress !== '-') ? c.egress : 'не проверен';
+          return '<tr class="' + (c.active ? 'tr-active' : '') + '">' +
+            '<td><b>' + esc(n) + '</b>' + (c.active ? ' 🐈' : '') + '</td>' +
+            '<td class="mono">' + esc(c.endpoint || '—') + '</td>' +
+            '<td class="mono">' + esc(eg) + '</td>' +
+            '<td>' + (c.active ? '' :
+              '<button class="btn small primary" title="Сделать активным" data-act="masque-select" data-name2="' + esc(n) + '">📌 Активный</button> ') +
+            '<button class="btn small" title="Проверить" data-act="masque-probe-one" data-name2="' + esc(n) + '">🧪</button> ' +
+            '<button class="btn small" title="Удалить" data-act="masque-remove-one" data-name2="' + esc(n) + '">🗑</button>' +
+            '</td></tr>';
+        }).join('');
+      }
+    }
+  }
+  function masqueUpload() {
+    var inp = $('masque-file');
+    if (!inp) return;
+    inp.value = '';
+    inp.click();
+  }
+  function masqueOnFile() {
+    var f = document.getElementById('masque-file') && document.getElementById('masque-file').files[0];
+    if (!f) return;
+    if (f.size > 262144) return toast('файл больше 256 КБ', false);
+    var rd = new FileReader();
+    rd.onload = function () {
+      var nm = ($('masque-name') && $('masque-name').value || '').trim();
+      postJSON('/api/masque/upload', { config: String(rd.result || ''), name: nm }).then(function (j) {
+        if (j && j.configs) masqueRender(j);
+        else toast('MASQUE: конфиг не принят (' + ((j && j.error) || 'нет ответа') + ')', false);
+      });
+    };
+    rd.readAsText(f);
+  }
+  function masqueSelect(name) {
+    postJSON('/api/masque/select', { name: String(name) }).then(function (j) {
+      if (j && j.configs) masqueRender(j);
+      if (j && j.ok) toast('MASQUE выбран', true);
+    });
+  }
+  function masqueApply() {
+    postJSON('/api/masque/apply', {}).then(function (j) {
+      if (j && j.configs) masqueRender(j);
+      toast((j && j.ok) ? 'MASQUE применён' : 'MASQUE: не применён', !!(j && j.ok));
+    });
+  }
+  function masqueProbeOne(name) {
+    postJSON('/api/masque/probe', { name: String(name) }).then(function () {
+      getJSON('/api/masque').then(function (m) {
+        if (m && m.configs) masqueRender(m);
+        toast((m && m.egress && m.egress !== '-') ? ('MASQUE выход ' + m.egress) : 'MASQUE: выхода нет',
+          !!(m && m.egress && m.egress !== '-'));
+      });
+    });
+  }
+  function masqueRemoveOne(name) {
+    postJSON('/api/masque/remove', { name: String(name) }).then(function (j) {
+      if (j && j.configs) masqueRender(j);
+    });
+  }
+  function masqueClear() {
+    postJSON('/api/masque/clear', {}).then(function (j) {
+      if (j && j.configs) masqueRender(j);
+    });
+  }
+
   function warpRender(w) {
     w = (w && typeof w === 'object') ? w : {};
     WARP_STATE = w;
@@ -1554,7 +1639,8 @@ function warpRemoveOne(name) {
   // proveden u vladeltsa na mastere.
   document.addEventListener('change', function (ev) {
     var t = ev.target;
-    if (!t || t.id !== 'warp-file') return;
+    if (!t || (t.id !== 'warp-file' && t.id !== 'masque-file')) return;
+    if (t.id === 'masque-file') { masqueOnFile(); return; }
     warpOnFile(ev);
   }, true);
   function warpOnFile(ev) {
@@ -1621,6 +1707,7 @@ function warpRemoveOne(name) {
     renderKeys(S);
     renderCheckProgress(S);
     warpRender(S.warp);
+    if (S.masque) masqueRender(S.masque);
     renderDevices(S);
     renderConnect(S);
     renderRu(S);
@@ -2877,7 +2964,8 @@ function loadTG() {
       xray_api_port: $('setup-xray-api-port') ? $('setup-xray-api-port').value.trim() : '',
       tgws_port: $('setup-tgws-port') ? $('setup-tgws-port').value.trim() : '',
       mesh_invite: $('setup-mesh') ? $('setup-mesh').value.trim() : '',
-      setup_token: $('setup-token') ? $('setup-token').value.trim() : ''
+      setup_token: $('setup-token') ? $('setup-token').value.trim() : '',
+      warp_transport: (document.querySelector('input[name="setup-warp"]:checked') || {}).value || 'off'
     };
   }
 
@@ -2914,12 +3002,12 @@ function loadTG() {
   function setupRender() {
     var step = SETUP.step;
     var pr = $('setup-progress');
-    if (pr) pr.textContent = (step + 1) + '/7';
+    if (pr) pr.textContent = (step + 1) + '/8';
     Array.prototype.forEach.call(document.querySelectorAll('[data-setup-step]'), function (n) {
       n.style.display = Number(n.getAttribute('data-setup-step')) === step ? '' : 'none';
     });
     $('setup-back').style.display = step === 0 ? 'none' : '';
-    var last = step === 6;
+    var last = step === 7;
     $('setup-next').style.display = last ? 'none' : '';
     $('setup-finish').style.display = last ? '' : 'none';
   }
@@ -2971,7 +3059,8 @@ function loadTG() {
       block_scanners: d.block_scanners,
       rate_limit: d.rate_limit,
       mesh_invite: d.mesh_invite,
-      setup_token: d.setup_token
+      setup_token: d.setup_token,
+      warp_transport: d.warp_transport
     }).then(function (r) {
       if (!r || r.ok !== true) throw new Error((r && r.error) || 'Ошибка');
       try {
@@ -3000,7 +3089,7 @@ function loadTG() {
         if (!r || r.ok !== true) throw new Error((r && r.error) || 'Ошибка');
         V.S.policy_accepted_rev = V.S.policy_rev;
         V.S.policy_required = false;
-        SETUP.step = Math.min(6, SETUP.step + 1);
+        SETUP.step = Math.min(7, SETUP.step + 1);
         setupRender();
       }).catch(function (e) {
         $('setup-error').textContent = (e && e.message) || 'Ошибка';
@@ -3009,11 +3098,35 @@ function loadTG() {
       });
       return;
     }
-    SETUP.step = Math.min(6, SETUP.step + 1);
+    SETUP.step = Math.min(7, SETUP.step + 1);
     setupRender();
   }
 
   function setupBack() { setupError(''); SETUP.step = Math.max(0, SETUP.step - 1); setupRender(); }
+
+  // A-MASQUE-PUB: проверка выбранного транспорта WARP прямо в мастере настройки.
+  function setupWarpTest() {
+    var tr = (document.querySelector('input[name="setup-warp"]:checked') || {}).value || 'off';
+    var res = $('setup-warp-result');
+    var note = $('setup-warp-note');
+    if (tr === 'off') {
+      if (res) res.textContent = 'не выбран';
+      if (note) note.textContent = 'Выберите WireGuard или MASQUE и проверьте.';
+      return;
+    }
+    if (res) res.textContent = 'проверяю…';
+    if (note) note.textContent = 'Поднимаю туннель, это займёт ~20 секунд…';
+    postJSON('/api/setup/warp_test', { transport: tr }).then(function (r) {
+      var ok = r && r.ok && r.egress && r.egress !== '-';
+      if (res) res.textContent = ok ? ('выход ' + r.egress) : ('не работает: ' + ((r && (r.error || r.msg)) || '?'));
+      if (note) note.textContent = ok
+        ? 'Транспорт работает. Он будет развёрнут на этом сервере.'
+        : 'Транспорт не прошёл проверку — выберите другой.';
+    }).catch(function (e) {
+      if (res) res.textContent = 'ошибка';
+      if (note) note.textContent = (e && e.message) || 'Ошибка';
+    });
+  }
 
   var ACTS = {
     nav: function (t) { navTo(t.getAttribute('data-tab')); },
@@ -3068,6 +3181,13 @@ function loadTG() {
     // otkryvaet dialog nativno. Label (A-837) u menya dialog ne
     // otkryval, vozvrayom button + inp.click().
     'warp-upload': function () { warpUpload(); },
+    // A-MASQUE-PUB: rezerv WARP cherez mihomo
+    'masque-upload': function () { masqueUpload(); },
+    'masque-select': function (t) { masqueSelect(t.getAttribute('data-name2') || ''); },
+    'masque-probe-one': function (t) { masqueProbeOne(t.getAttribute('data-name2') || ''); },
+    'masque-remove-one': function (t) { masqueRemoveOne(t.getAttribute('data-name2') || ''); },
+    'masque-apply': function () { masqueApply(); },
+    'masque-clear': function () { masqueClear(); },
   };
   function actTarget(ev) {
     var node = ev && ev.target;
@@ -3128,6 +3248,7 @@ function loadTG() {
     $('setup-back') && ($('setup-back').onclick = setupBack);
     $('setup-next') && ($('setup-next').onclick = setupNext);
     $('setup-finish') && ($('setup-finish').onclick = setupFinish);
+    $('setup-warp-test') && ($('setup-warp-test').onclick = setupWarpTest);
     Array.prototype.forEach.call(document.querySelectorAll('#nav button[data-t]'), function (b) {
       b.onclick = function () { navTo(b.getAttribute('data-t')); };
     });

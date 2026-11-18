@@ -26,6 +26,7 @@ import rusegment
 import security
 import source
 import warp  # A-WARP-PUB: rezervnyy kanal WARP
+import masque  # A-MASQUE-PUB
 import subs
 import telemetry
 import tgws
@@ -865,6 +866,11 @@ def build_state(local=True):
         if "white_ip" in st:
             st["white_ip"] = ""
     st["warp"] = warp.status()  # A-WARP-PUB-4: status rezerva WARP
+    try:
+        st["masque"] = masque.status()
+    except Exception:
+        st["masque"] = {"loaded": False, "count": 0, "name": "",
+                        "endpoint": "", "egress": "-"}
     # ключи в пуле
     keys = pool.get_keys()
     vless_now = st["vless_now"]
@@ -939,6 +945,7 @@ SUBS_ADMIN_POSTS = frozenset({
 # A-WARP-PUB-3: proba WARP idet v fonovom potoke (kak /api/keys/check),
 # chtoby parallelnye zaprosy ne nachali provbu povtorno.
 _WARP_PROBE = {"running": False}
+_MASQUE_PROBE = {"running": False}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -1035,6 +1042,12 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(*_json({"error": "unauthorized"}, 401))
                 return
             self._send(*_json(warp.status()))
+            return
+        if path == "/api/masque":
+            if not _trusted_read(self):
+                self._send(*_json({"error": "unauthorized"}, 401))
+                return
+            self._send(*_json(masque.status()))
             return
         if path == "/api/mesh/policy":
             self._send(*_json(mesh.policy()))
@@ -1270,6 +1283,13 @@ class Handler(BaseHTTPRequestHandler):
                 return
             self._setup_complete(setup_data or {})
             return
+        if path == "/api/setup/warp_test":
+            test_data, body_error = _read_json_body(self)
+            if body_error:
+                self._send(*_json({"error": body_error}, 400))
+                return
+            self._setup_warp_test(test_data or {})
+            return
         if not _admin_ok(self):
             self._send(*_json({"error": "unauthorized"}, 401))
             return
@@ -1321,6 +1341,12 @@ class Handler(BaseHTTPRequestHandler):
             "/api/warp/select": self._warp_select,
             "/api/warp/remove": self._warp_remove,
             "/api/warp/clear": self._warp_clear,
+            "/api/masque/upload": self._masque_upload,
+            "/api/masque/select": self._masque_select,
+            "/api/masque/remove": self._masque_remove,
+            "/api/masque/clear": self._masque_clear,
+            "/api/masque/apply": self._masque_apply,
+            "/api/masque/probe": self._masque_probe,
             "/api/keys/add": self._keys_add,
             "/api/keys/refresh": self._keys_refresh,
             "/api/keys/check": self._keys_check,
@@ -1516,6 +1542,42 @@ class Handler(BaseHTTPRequestHandler):
         token = security.rotate()
         self._send(*_json({"ok": bool(token), "token": token}))
 
+    def _setup_warp_test(self, data):
+        local = _is_local(self)
+        if not local and not _host_in_lan(self.client_address[0]):
+            _setup_reject(self, "setup requires localhost", 403)
+            return
+        if config.get("setup_complete", False):
+            _setup_reject(self, "setup already complete", 409)
+            return
+        tr = str(data.get("transport") or "").strip().lower()
+        if tr not in ("wireguard", "masque"):
+            self._send(*_json({"ok": False, "error": "bad transport"}, 400))
+            return
+        if tr == "masque":
+            r = masque.fetch_default()
+            if not r.get("ok"):
+                self._send(*_json({"ok": False, "transport": tr,
+                                   "error": r.get("error", "masque fetch failed")}, 200))
+                return
+            res = masque.probe(30, r.get("name"))
+            out = {"ok": bool(res.get("ok")), "transport": tr,
+                   "egress": res.get("egress", "-")}
+            if not res.get("ok"):
+                out["error"] = res.get("error", "no egress")
+            self._send(*_json(out))
+            return
+        if not warp.load():
+            self._send(*_json({"ok": False, "transport": tr,
+                               "error": "нет WARP-конфига"}, 200))
+            return
+        res = warp.probe()
+        out = {"ok": bool(res.get("ok")), "transport": tr,
+               "egress": res.get("egress", "-")}
+        if not res.get("ok"):
+            out["error"] = res.get("error", "no egress")
+        self._send(*_json(out))
+
     def _setup_complete(self, data):
         if not isinstance(data, dict):
             data = {}
@@ -1575,6 +1637,11 @@ class Handler(BaseHTTPRequestHandler):
                 mesh_joined = True
             else:
                 config.log("api: setup mesh invite skipped: %s" % (join_err or "unknown"))
+        transport = data.get("warp_transport")
+        if transport not in (None, "", "off", "wireguard", "masque"):
+            _setup_reject(self, "invalid warp transport", 400)
+            return
+        transport = transport or "off"
         values = {
             "server_name": name.strip(),
             "ui_token": password,
@@ -1582,6 +1649,7 @@ class Handler(BaseHTTPRequestHandler):
             "ui_pin": pin,
             "policy_rev_accepted": policy_rev,
             "setup_complete": True,
+            "warp_transport": transport,
         }
         values.update(ports)
         for key in ("lan_only", "block_scanners", "rate_limit"):
@@ -1593,6 +1661,13 @@ class Handler(BaseHTTPRequestHandler):
             _setup_reject(self, "settings save failed", 500)
             return
         _load_ui_token()
+        try:
+            if transport == "masque":
+                masque.apply()
+            elif transport == "wireguard":
+                config.set("warp_mode", "on")
+        except Exception as exc:
+            config.log("api: setup warp deploy failed: %s" % type(exc).__name__)
         self._send(*_json({"ok": True, "mesh_joined": mesh_joined,
                            "restart_required": restart_required,
                            "settings": _settings()["settings"]}))

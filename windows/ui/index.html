@@ -28,6 +28,7 @@
         <button data-t="dashboard" class="on"><span class="ic">📊</span><span class="lb" data-i18n="nav.dash">Обзор</span></button>
         <button data-t="keys"><span class="ic">🔑</span><span class="lb" data-i18n="nav.keys">Ключи</span></button>
         <button data-t="warp"><span class="ic">🌀</span><span class="lb" data-i18n="nav.warp">WARP</span></button>
+        <button data-t="masque"><span class="ic">🛡️</span><span class="lb">MASQUE</span></button>
         <button data-t="devices"><span class="ic">📱</span><span class="lb" data-i18n="nav.conn">Устройства</span></button>
         <button data-t="connect"><span class="ic">🌐</span><span class="lb" data-i18n="nav.connect">Внешний доступ</span></button>
         <button data-t="rusegment"><span class="ic">🇷🇺</span><span class="lb" data-i18n="nav.rusegment">Ру-сегмент</span></button>
@@ -287,6 +288,36 @@
               <button class="btn small" data-act="warp-clear">🗑 Удалить всё</button>
             </div>
             <div class="hint" id="warp-note">Каждый конфиг — отдельный сервер WARP. Выбери рядом, каким каналом питать трафик.</div>
+          </div>
+        </div>
+      </section>
+      <section class="tab" id="t-masque">
+        <div class="card">
+          <h3><span class="ic">🛡️</span>Резервный канал Cloudflare WARP (MASQUE)</h3>
+          <div class="kchk" id="masque-box">
+            <div class="kchk-head">
+              <span class="kchk-t">🛡️ MASQUE WARP (mihomo)</span>
+              <span class="badge mono" id="masque-state">–</span>
+            </div>
+            <div class="metrics chk">
+              <div class="stat"><div class="k">🔐 Выбранный конфиг</div><div class="v" id="masque-ep">–</div></div>
+              <div class="stat"><div class="k">📤 Выход IP</div><div class="v" id="masque-ip">–</div></div>
+              <div class="stat"><div class="k">🚧 mihomo</div><div class="v" id="masque-active">–</div></div>
+            </div>
+            <div class="tbl-wrap" style="margin-top:8px">
+              <table>
+                <thead><tr><th>Конфиг</th><th>Сервер</th><th>Выход IP</th><th></th></tr></thead>
+                <tbody id="masque-configs"><tr><td colspan="4" class="empty">Конфигов пока нет — загрузи первый</td></tr></tbody>
+              </table>
+            </div>
+            <div class="kchk-foot">
+              <input type="file" id="masque-file" accept=".json,.yaml,.yml,application/json,text/yaml" hidden>
+              <input type="text" id="masque-name" class="inp" placeholder="Имя конфига" maxlength="40" style="width:150px">
+              <button class="btn small" data-act="masque-upload">⬇ Загрузить конфиг</button>
+              <button class="btn small" data-act="masque-apply">▶ Применить</button>
+              <button class="btn small" data-act="masque-clear">🗑 Удалить всё</button>
+            </div>
+            <div class="hint" id="masque-note">Конфиг с https://warp-generation.github.io/ (кнопка MASQUE) — JSON или Clash-YAML.</div>
           </div>
         </div>
       </section>
@@ -845,6 +876,18 @@
           <p class="hint">Необязательно. Вставьте invite головного сервера, если он уже выдан.</p>
           <label class="setup-field"><span>Invite</span><input id="setup-mesh" type="text" autocomplete="off" placeholder="aurora://invite?..."></label>
           <p class="hint">VLESS и TG-WS настраиваются автоматически. Порты можно изменить на этом шаге. Секреты мастера в этот мастер не вводятся.</p>
+        </section>
+<section class="setup-step" data-setup-step="7" style="display:none">
+          <h3>Резервный канал (WARP)</h3>
+          <p class="hint">Cloudflare WARP — резерв на случай пустого пула ключей. В части сетей работает только MASQUE, поэтому выберите транспорт и проверьте его.</p>
+          <label class="setup-check"><input id="setup-warp-off" type="radio" name="setup-warp" value="off" checked><span>Не использовать</span></label>
+          <label class="setup-check"><input id="setup-warp-wg" type="radio" name="setup-warp" value="wireguard"><span>WireGuard (xray)</span></label>
+          <label class="setup-check"><input id="setup-warp-msq" type="radio" name="setup-warp" value="masque"><span>MASQUE (mihomo)</span></label>
+          <div class="setup-warp-test">
+            <button class="btn small" id="setup-warp-test" type="button">Проверить выбранный</button>
+            <span class="badge mono" id="setup-warp-result">—</span>
+          </div>
+          <p class="hint" id="setup-warp-note">Проверка поднимает туннель и показывает выходной IP. Нужно ~20 секунд.</p>
         </section>
         <div id="setup-error" class="setup-error" style="display:none"></div>
       </div>
