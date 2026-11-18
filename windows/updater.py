@@ -31,7 +31,7 @@ _MODULES = [
     "config.py", "pool.py", "source.py", "core.py", "telemetry.py", "tgws.py", "recovery.py", 
     "rusegment.py", "api.py", "ui.py", "run.py", "updater.py", "security.py", "subs.py", 
     "mesh.py", "crypt.py", "release_sign.py", "extgate.py", "warp.py", "meshtunnel.py", 
-    "meshtun.py", "meshsignal.py", "effects.py", "proxy/__init__.py", "proxy/_aes.py", "proxy/balancer.py",
+    "meshtun.py", "meshsignal.py", "effects.py", "masque.py", "proxy/__init__.py", "proxy/_aes.py", "proxy/balancer.py",
     "proxy/bridge.py", "proxy/config.py", "proxy/fake_tls.py", "proxy/pool.py", 
     "proxy/raw_websocket.py", "proxy/stats.py", "proxy/tg_ws_proxy.py", "proxy/utils.py",
 ]
@@ -208,10 +208,13 @@ def _new_module_rel(name):
     """
     name = str(name or "").replace("\\", "/")
     parts = [p for p in name.split("/") if p not in ("", ".")]
-    if len(parts) < 2 or any(p == ".." for p in parts):
+    if not parts or any(p == ".." for p in parts):
         return None
-    parts = parts[1:]
-    if not parts or any(p.lower() in ("linux", "windows") for p in parts):
+    if any(p.lower() in ("linux", "windows") for p in parts):
+        return None
+    if len(parts) > 1:
+        parts = parts[1:]
+    if not parts:
         return None
     rel = "/".join(parts)
     if not rel.endswith(".py") or rel.count("/") > 1:
