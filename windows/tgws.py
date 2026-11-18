@@ -172,6 +172,67 @@ def restart():
         return False
 
 
+def enabled():
+    """TG-WS-прокси включён? (A-118: выключатель из панели)."""
+    return bool(config.get("tgws_enabled", True))
+
+
+def _kill_windows():
+    """Убить процесс, держащий порт TG-WS (только Windows)."""
+    try:
+        out = subprocess.run(["netstat", "-ano"], capture_output=True, text=True,
+                             timeout=10, creationflags=config.HIDE_FLAG).stdout
+        pids = []
+        for ln in out.splitlines():
+            if ":%d" % config.TGWS_PORT in ln and "LISTENING" in ln:
+                parts = ln.split()
+                if parts and parts[-1].isdigit() and parts[-1] not in pids:
+                    pids.append(parts[-1])
+        for pid in pids:
+            subprocess.run(["taskkill", "/F", "/PID", pid],
+                           capture_output=True, timeout=10,
+                           creationflags=config.HIDE_FLAG)
+        return True
+    except Exception:
+        return False
+
+
+def stop():
+    """Остановить TG-WS прокси (A-118)."""
+    if os.name == "nt":
+        return _kill_windows()
+    try:
+        subprocess.run(["systemctl", "--user", "stop", "tg-ws-proxy"],
+                       capture_output=True, text=True, timeout=20)
+    except Exception:
+        pass
+    try:
+        subprocess.run(["pkill", "-f", "proxy.tg_ws_proxy"],
+                       capture_output=True, text=True, timeout=10)
+    except Exception:
+        pass
+    return True
+
+
+def set_enabled(value):
+    """Включить/выключить TG-WS (A-118). Возвращает новый status()."""
+    value = bool(value)
+    config.set("tgws_enabled", value)
+    try:
+        config.save_settings()
+    except Exception:
+        pass
+    if value:
+        restart()
+    else:
+        stop()
+    refresh_status()
+    st = status()
+    st["ok"] = True
+    st["enabled"] = enabled()
+    return st
+
+
 def tgws_link():
     """Ссылка tg://proxy?... для QR."""
     import urllib.parse
@@ -193,6 +254,7 @@ def status(include_secret=False):
         "port": config.TGWS_PORT,
         "secret_ok": bool(_get_secret()),
         "link": tgws_link(),
+        "enabled": enabled(),
     }
     # Секрет отдаём только доверенному клиенту (панель владельца из LAN/loopback).
     if include_secret:

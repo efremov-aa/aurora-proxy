@@ -881,6 +881,15 @@ def build_state(local=True):
     except Exception:
         st["masque"] = {"loaded": False, "count": 0, "name": "",
                         "endpoint": "", "egress": "-"}
+    # A-118: выключатели внешнего канала и TG-WS — в состоянии панели.
+    try:
+        st["masque_enabled"] = masque.enabled()
+    except Exception:
+        st["masque_enabled"] = bool(config.get("masque_enabled", True))
+    try:
+        st["tgws_enabled"] = tgws.enabled()
+    except Exception:
+        st["tgws_enabled"] = bool(config.get("tgws_enabled", True))
     if not local:
         v = dict(st["vless_ext"])
         for sec in ("link", "uuid", "pbk", "sid", "host", "port", "sni", "fp"):
@@ -1377,10 +1386,12 @@ class Handler(BaseHTTPRequestHandler):
             "/api/masque/clear": self._masque_clear,
             "/api/masque/apply": self._masque_apply,
             "/api/masque/probe": self._masque_probe,
+            "/api/masque/enable": self._masque_enable,
             "/api/recovery/limit": self._rc_limit,
             "/api/recovery/region": self._rc_region,
             "/api/recovery/conn": self._rc_conn,
             "/api/tgws/restart": self._tgws_restart,
+            "/api/tgws/enable": self._tgws_enable,
             "/api/rusegment/check": self._rusegment_check,
             "/api/rusegment/region": self._rusegment_region,
             "/api/security/rotate": self._security_rotate,
@@ -1666,6 +1677,21 @@ class Handler(BaseHTTPRequestHandler):
         self._send(*_json({"ok": True, "started": True,
                            "msg": "proba MASQUE zapuschena, rezultat cherez ~20 s"}))
 
+    # A-118: vyklyuchatel vneshnego kanala (MASQUE/mihomo) iz paneli.
+    def _masque_enable(self, data):
+        value = data.get("enabled")
+        if type(value) is not bool:
+            self._send(*_json({"ok": False, "error": "enabled must be boolean"}, 400))
+            return
+        try:
+            st = masque.set_enabled(value)
+        except Exception as exc:
+            config.log("masque: enable failed: %s" % type(exc).__name__)
+            self._send(*_json({"ok": False, "error": "toggle failed"}, 500))
+            return
+        config.log("masque: external channel enabled=%s" % value)
+        self._send(*_json(st))
+
     def _keys_cleanup(self, data):
         removed = pool.cleanup()
         if removed:
@@ -1705,6 +1731,21 @@ class Handler(BaseHTTPRequestHandler):
         ok = tgws.restart()
         tgws.refresh_status()
         self._send(*_json({"ok": ok}))
+
+    # A-118: vyklyuchatel TG-WS-proksi iz paneli.
+    def _tgws_enable(self, data):
+        value = data.get("enabled")
+        if type(value) is not bool:
+            self._send(*_json({"ok": False, "error": "enabled must be boolean"}, 400))
+            return
+        try:
+            st = tgws.set_enabled(value)
+        except Exception as exc:
+            config.log("tgws: enable failed: %s" % type(exc).__name__)
+            self._send(*_json({"ok": False, "error": "toggle failed"}, 500))
+            return
+        config.log("tgws: enabled=%s" % value)
+        self._send(*_json(st))
 
     def _rusegment_check(self, data):
         started = rusegment.check_all()

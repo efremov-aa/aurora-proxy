@@ -1377,6 +1377,10 @@
     put('masque-ep', cur || (m.loaded ? 'без имени' : '—'));
     put('masque-ip', (m.egress && m.egress !== '-') ? m.egress : 'не проверен');
     put('masque-active', m.loaded ? 'готов' : '—');
+    // A-118: подпись выключателя внешнего канала.
+    var mtog = $('masque-toggle');
+    if (mtog) mtog.textContent = (m.enabled === false)
+      ? '▶ Включить внешний канал' : '⏹ Выключить внешний канал';
     var box = $('masque-configs');
     if (box) {
       if (!cfgs.length) {
@@ -1447,6 +1451,16 @@
   function masqueClear() {
     postJSON('/api/masque/clear', {}).then(function (j) {
       if (j && j.configs) masqueRender(j);
+    });
+  }
+  // A-118: выключатель внешнего резервного канала (MASQUE/mihomo).
+  function masqueToggle() {
+    var next = !(V.S && V.S.masque && V.S.masque.enabled);
+    postJSON('/api/masque/enable', { enabled: next }).then(function (j) {
+      if (j && j.configs) masqueRender(j);
+      if (j && j.ok) { V.S = V.S || {}; V.S.masque = j; }
+      toast((j && j.ok) ? (next ? 'Внешний канал включён' : 'Внешний канал выключен')
+        : 'MASQUE: ошибка', !!(j && j.ok));
     });
   }
 
@@ -2545,6 +2559,9 @@ function loadTG() {
       $('tg-on').className = 'badge ' + (j.running ? 'ok' : 'off');
       $('tg-port').textContent = j.port != null ? j.port : '–';
       $('tg-sec').textContent = j.secret_ok ? '✓' : '–';
+      // A-118: подпись выключателя TG-WS.
+      var tgb = $('tg-toggle');
+      if (tgb) tgb.textContent = (j.enabled === false) ? '▶ Включить TG-WS' : '⏹ Выключить TG-WS';
       /* Ссылка и секрет показываем текстом: QR один, а добавить клиента проще копированием */
       var lb = $('tg-link');
       if (lb) lb.value = j.link || '';
@@ -2580,6 +2597,17 @@ function loadTG() {
     document.body.removeChild(ta);
   }
   window.tgCopy = tgCopy;
+
+  // A-118: выключатель TG-WS-прокси.
+  function tgToggle() {
+    var next = !(V.TG && V.TG.enabled === false);
+    postJSON('/api/tgws/enable', { enabled: next }).then(function (j) {
+      if (j && j.ok) { V.S = V.S || {}; V.S.tgws_enabled = j.enabled; }
+      loadTG();
+      toast((j && j.ok) ? (next ? 'TG-WS включён' : 'TG-WS выключен')
+        : 'TG-WS: ошибка', !!(j && j.ok));
+    });
+  }
 
   /* ================= SETTINGS ================= */
   function loadSettings() {
@@ -3146,6 +3174,7 @@ function loadTG() {
     'ru-check': function () { window.ruCheck(); },
     'ru-toggle-fail': function () { window.ruToggleFail(); },
     'tgws-restart': function () { window.tgRestart(); },
+    'tg-toggle': function () { tgToggle(); },
     'mesh-join': function () { window.meshJoin(); },
     'mesh-leave': function () { window.meshLeave(); },
     'mesh-regen': function () { window.meshRegen(); },
@@ -3188,6 +3217,7 @@ function loadTG() {
     'masque-remove-one': function (t) { masqueRemoveOne(t.getAttribute('data-name2') || ''); },
     'masque-apply': function () { masqueApply(); },
     'masque-clear': function () { masqueClear(); },
+    'masque-toggle': function () { masqueToggle(); },
   };
   function actTarget(ev) {
     var node = ev && ev.target;

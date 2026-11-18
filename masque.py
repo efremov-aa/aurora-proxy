@@ -302,6 +302,41 @@ def apply(name=""):
     return {"ok": True, "name": key, "endpoint": "%s:%d" % (m["server"], m["port"])}
 
 
+def enabled():
+    """Внешний резервный канал включён? (A-118: выключатель из панели)."""
+    return bool(config.get("masque_enabled", True))
+
+
+def stop():
+    """Погасить mihomo: внешний канал выключен (A-118)."""
+    _run(_service_cmd("stop"))
+    # Публичная сборка может не иметь юнита — гасим процесс mihomo напрямую.
+    if sys.platform.startswith("win"):
+        _run(["taskkill", "/F", "/IM", "mihomo.exe"])
+    else:
+        _run(["pkill", "-f", "mihomo"])
+    return True
+
+
+def set_enabled(value):
+    """Включить/выключить внешний канал (A-118). Возвращает новый status()."""
+    value = bool(value)
+    config.set("masque_enabled", value)
+    try:
+        config.save_settings()
+    except Exception:
+        pass
+    if value:
+        if active_name():
+            apply()
+    else:
+        stop()
+    st = status()
+    st["ok"] = True
+    st["enabled"] = enabled()
+    return st
+
+
 def probe(timeout=20, name=""):
     """Поднять временный mihomo с выбранным конфигом и узнать выходной IP."""
     store = _read_store()
@@ -493,4 +528,5 @@ def status():
         "egress": last_ip,
         "egress_ts": int(last_ts),
         "reason": reason,
+        "enabled": enabled(),
     }

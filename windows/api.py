@@ -871,6 +871,15 @@ def build_state(local=True):
     except Exception:
         st["masque"] = {"loaded": False, "count": 0, "name": "",
                         "endpoint": "", "egress": "-"}
+    # A-118: выключатели внешнего канала и TG-WS — в состоянии панели.
+    try:
+        st["masque_enabled"] = masque.enabled()
+    except Exception:
+        st["masque_enabled"] = bool(config.get("masque_enabled", True))
+    try:
+        st["tgws_enabled"] = tgws.enabled()
+    except Exception:
+        st["tgws_enabled"] = bool(config.get("tgws_enabled", True))
     # ключи в пуле
     keys = pool.get_keys()
     vless_now = st["vless_now"]
@@ -1347,6 +1356,7 @@ class Handler(BaseHTTPRequestHandler):
             "/api/masque/clear": self._masque_clear,
             "/api/masque/apply": self._masque_apply,
             "/api/masque/probe": self._masque_probe,
+            "/api/masque/enable": self._masque_enable,
             "/api/keys/add": self._keys_add,
             "/api/keys/refresh": self._keys_refresh,
             "/api/keys/check": self._keys_check,
@@ -1357,6 +1367,7 @@ class Handler(BaseHTTPRequestHandler):
             "/api/recovery/region": self._rc_region,
             "/api/recovery/conn": self._rc_conn,
             "/api/tgws/restart": self._tgws_restart,
+            "/api/tgws/enable": self._tgws_enable,
             "/api/rusegment/check": self._rusegment_check,
             "/api/rusegment/region": self._rusegment_region,
             "/api/security/rotate": self._security_rotate,
@@ -1456,6 +1467,94 @@ class Handler(BaseHTTPRequestHandler):
             return
         self._send(*_json(r))
 
+    # --- A-MASQUE-PUB: rezerv WARP cherez mihomo (MASQUE) ---
+    def _masque_upload(self, data):
+        raw = data.get("config") or data.get("raw") or ""
+        if not isinstance(raw, str) or not raw.strip():
+            self._send(*_json({"ok": False, "error": "no config"}, 400))
+            return
+        if len(raw.encode("utf-8", "ignore")) > masque.MAX_CONFIG_BYTES:
+            self._send(*_json({"ok": False, "error": "config too large"}, 400))
+            return
+        name = data.get("name") if isinstance(data.get("name"), str) else ""
+        r = masque.install(raw, name)
+        config.log("masque: A-MASQUE konfig zagruzhen ok=%s name=%s"
+                   % (bool(r.get("ok")), str(r.get("name", ""))[:40]))
+        if not r.get("ok"):
+            self._send(*_json(r, 400))
+            return
+        st = masque.status()
+        st["ok"] = True
+        self._send(*_json(st))
+
+    def _masque_select(self, data):
+        name = data.get("name") if isinstance(data.get("name"), str) else ""
+        res = masque.select(name)
+        config.log("masque: vybor name=%s ok=%s" % (name[:40], bool(res.get("ok"))))
+        if not res.get("ok"):
+            self._send(*_json(res, 400))
+            return
+        st = masque.status()
+        st["ok"] = True
+        self._send(*_json(st))
+
+    def _masque_remove(self, data):
+        name = data.get("name") if isinstance(data.get("name"), str) else ""
+        res = masque.remove(name)
+        if not res.get("ok"):
+            self._send(*_json(res, 400))
+            return
+        st = masque.status()
+        st["ok"] = True
+        self._send(*_json(st))
+
+    def _masque_clear(self, data):
+        r = masque.clear()
+        st = masque.status()
+        st["ok"] = bool(r.get("ok"))
+        self._send(*_json(st))
+
+    def _masque_apply(self, data):
+        res = masque.apply()
+        st = masque.status()
+        st.update(res)
+        self._send(*_json(st))
+
+    def _masque_probe(self, data):
+        if _MASQUE_PROBE["running"]:
+            self._send(*_json({"ok": True, "started": True,
+                               "msg": "proba MASQUE uzhe idet"}))
+            return
+        pname = data.get("name") if isinstance(data.get("name"), str) else ""
+        _MASQUE_PROBE["running"] = True
+
+        def _run():
+            try:
+                r = masque.probe(30, pname)
+                config.log("masque: proba: %s" % (r.get("egress") or r.get("error")))
+            except Exception as exc:
+                config.log("masque: proba ne udalas: %s" % str(exc)[:120])
+            finally:
+                _MASQUE_PROBE["running"] = False
+        threading.Thread(target=_run, daemon=True).start()
+        self._send(*_json({"ok": True, "started": True,
+                           "msg": "proba MASQUE zapuschena, rezultat cherez ~20 s"}))
+
+    # A-118: vyklyuchatel vneshnego kanala (MASQUE/mihomo) iz paneli.
+    def _masque_enable(self, data):
+        value = data.get("enabled")
+        if type(value) is not bool:
+            self._send(*_json({"ok": False, "error": "enabled must be boolean"}, 400))
+            return
+        try:
+            st = masque.set_enabled(value)
+        except Exception as exc:
+            config.log("masque: enable failed: %s" % type(exc).__name__)
+            self._send(*_json({"ok": False, "error": "toggle failed"}, 500))
+            return
+        config.log("masque: external channel enabled=%s" % value)
+        self._send(*_json(st))
+
     def _keys_cleanup(self, data):
         removed = pool.cleanup()
         if removed:
@@ -1495,6 +1594,21 @@ class Handler(BaseHTTPRequestHandler):
         ok = tgws.restart()
         tgws.refresh_status()
         self._send(*_json({"ok": ok}))
+
+    # A-118: vyklyuchatel TG-WS-proksi iz paneli.
+    def _tgws_enable(self, data):
+        value = data.get("enabled")
+        if type(value) is not bool:
+            self._send(*_json({"ok": False, "error": "enabled must be boolean"}, 400))
+            return
+        try:
+            st = tgws.set_enabled(value)
+        except Exception as exc:
+            config.log("tgws: enable failed: %s" % type(exc).__name__)
+            self._send(*_json({"ok": False, "error": "toggle failed"}, 500))
+            return
+        config.log("tgws: enabled=%s" % value)
+        self._send(*_json(st))
 
     def _rusegment_check(self, data):
         started = rusegment.check_all()

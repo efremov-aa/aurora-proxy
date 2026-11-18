@@ -21,12 +21,13 @@ from collections import deque
 # (xray run/keytest/statsquery/netstat/netsh/taskkill/tg-ws-proxy и т.п.).
 HIDE_FLAG = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
 
-VERSION = "1.10.23"
-VERSION_NAME = "Кот-обновщик"
+VERSION = "1.10.24"
+VERSION_NAME = "Кот-выключатель"
 APP_NAME = "Aurora"
 
 # История версий для вкладки «Версии» (v, имя, дата).
 VERSION_HISTORY = (
+    ("1.10.24", "Кот-выключатель", "18.11.2026"),
     ("1.10.23", "Кот-обновщик", "18.11.2026"),
     ("1.10.22", "Кот-маскировщик", "18.11.2026"),
     ("1.10.21", "Кот-дебаг", "17.11.2026"),
@@ -64,6 +65,7 @@ VERSION_HISTORY = (
 )
 
 VERSION_NOTES = {
+    "1.10.24": "Кот-выключатель добавил в панель выключатели внешнего резервного канала (MASQUE/mihomo) и Telegram WS-прокси. На серверах, где внешний выход и TG не нужны, их теперь можно погасить одной кнопкой: выключенный канал останавливает mihomo, выключенный TG-WS останавливает прокси и не поднимает его. Заодно в Windows-сборку дотянуты обработчики MASQUE (вкладка там раньше отвечала ошибкой).",
     "1.10.23": "Кот-обновщик починил доставку новых модулей при автообновлении: в список доставляемых файлов добавлен masque.py, а логика новых модулей теперь понимает файлы в корне архива (раньше такие молча пропускались, и узел падал на ModuleNotFoundError после обновления). Уже обновившиеся узлы с прошлым релизом починим доставкой masque.py.",
     "1.10.22": "Кот-маскировщик добавил транспорт MASQUE для резерва Cloudflare WARP: в части сетей чистый WireGuard блокируется (нет ответов на handshake), а MASQUE (mihomo) проходит. В мастере настройки появился шаг «Резервный канал (WARP)» с выбором WireGuard/MASQUE и проверкой выходного IP, в панели — вкладка MASQUE для загрузки и смены конфигов. Старый WARP-раздел на мастере убран, чтобы не путаться.",
     "1.10.21": "Кот-дебаг починил UI после WARP-действий: в обработчиках висел неопределённый refresh(), из-за чего в консоли ReferenceError, а пользователь видел ложный «сервер не ответил». Теперь вызов loadState(true).",
@@ -942,6 +944,10 @@ _SETTINGS_DEFAULTS = {
     # off = ne vklyuchaetsya, auto = tolko pri pustom pule,
     # on = vsegda, kogda konfig zagruzhen.
     "warp_mode": "off",
+    # A-118: внешний резервный канал (MASQUE/mihomo) и TG-WS-прокси.
+    # Включаются/выключаются из панели; выключенный канал не поднимается.
+    "masque_enabled": True,
+    "tgws_enabled": True,
     "vpn_mode": True,        # True = VPN активен (final = лучший ключ), False = прямой
     "auto_recovery": True,   # авто-восстановление канала через агента
     "continue_text": "",     # текст при отправке continue
@@ -1303,6 +1309,7 @@ def _validate_settings(raw):
         "vpn_mode", "auto_recovery", "auto_refresh", "lan_only",
         "block_scanners", "rate_limit", "twofa", "show_mesh", "show_subs",
         "mesh_master", "auto_join", "master_only", "setup_complete",
+        "masque_enabled", "tgws_enabled",
     )
     string_keys = (
         "continue_text", "ui_token", "server_name", "mesh_id", "mesh_token",
