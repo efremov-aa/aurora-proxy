@@ -39,6 +39,7 @@ IFF_NO_PI = 0x1000
 IF_NAME = str(os.environ.get("AURORA_MESH_IF", "aurora") or "aurora")[:15]
 GROUP_MASK = 24
 READ_MAX = 65535
+WINTUN_RING_CAPACITY = 0x400000
 POLL_S = 0.01
 # A-473: skolko paketov chitaem iz TNA za odin prohod petli
 TUN_BATCH_MAX = 64
@@ -297,20 +298,22 @@ def _load_wintun():
     has_old = (hasattr(dll, "WintunReceiveEvent")
                and hasattr(dll, "WintunReleaseBuffer"))
     if has_new:
-        dll.WintunStartSession.argtypes = [ctypes.c_void_p]
+        dll.WintunStartSession.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
         dll.WintunStartSession.restype = ctypes.c_void_p      # SESSION*
         dll.WintunGetReadWaitEvent.argtypes = [ctypes.c_void_p]
         dll.WintunGetReadWaitEvent.restype = ctypes.c_void_p  # HANDLE sobitiya
         dll.WintunReceivePacket.argtypes = [ctypes.c_void_p,
-                                            ctypes.POINTER(ctypes.c_size_t)]
+                                            ctypes.POINTER(ctypes.c_uint32)]
         dll.WintunReceivePacket.restype = ctypes.c_void_p
         dll.WintunReleaseReceivePacket.argtypes = [ctypes.c_void_p,
                                                    ctypes.c_void_p]
         dll.WintunReleaseReceivePacket.restype = None
         if hasattr(dll, "WintunAllocateSendPacket"):
             dll.WintunAllocateSendPacket.argtypes = [ctypes.c_void_p,
-                                                     ctypes.c_size_t]
+                                                     ctypes.c_uint32]
             dll.WintunAllocateSendPacket.restype = ctypes.c_void_p
+        dll.WintunSendPacket.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        dll.WintunSendPacket.restype = None
         _W32["api"] = "1.x"
     elif has_old:
         dll.WintunStartSession.argtypes = [ctypes.c_void_p]
@@ -362,7 +365,7 @@ def _open_windows(name):
         raise OSError("net adaptera %s - sozdat ego ustanovshchik Aurora "
                       "(trebuetsya prava administratora)" % name)
     try:
-        session = dll.WintunStartSession(adapter)
+        session = dll.WintunStartSession(adapter, WINTUN_RING_CAPACITY)
         # A-818: 1.x vozvrashchaet SESSION* (0 = oshibka), 0.x - HANDLE,
         # gde 0xFFFFFFFF tozhe oshibka. Odin universalnyy prover ne podhodil.
         if _W32.get("api") == "1.x":
@@ -407,11 +410,7 @@ def _win_send(pkt):
                 _stat("alloc_failed")
                 return False
             ctypes.memmove(buf, payload, len(payload))
-            rc = dll.WintunSendPacket(adapter, buf)
-            if rc != 0:
-                _stat("send_failed")
-                _log("WintunSendPacket rc=%d" % int(rc))
-                return False
+            dll.WintunSendPacket(session, buf)
             _stat("sent")
             return True
         rc = dll.WintunSendPacket(session, ctypes.create_string_buffer(payload),
@@ -574,7 +573,7 @@ def _pump_windows(dll, adapter, session):
                 continue
             if rc != WAIT_OBJECT_0:
                 break
-            size = ctypes.c_size_t(READ_MAX)
+            size = ctypes.c_uint32(0)
             buf = dll.WintunReceivePacket(session, ctypes.byref(size))
             if not buf:
                 if ctypes.get_last_error() in (1223, 995):
@@ -582,7 +581,11 @@ def _pump_windows(dll, adapter, session):
                 time.sleep(POLL_S)
                 continue
             try:
-                pkt = ctypes.string_at(buf, int(size.value))
+                packet_size = int(size.value)
+                if packet_size <= 0 or packet_size > READ_MAX:
+                    _stat("bad_len")
+                    continue
+                pkt = ctypes.string_at(buf, packet_size)
                 if pkt:
                     _stat("read")
                     _outbound(pkt)
