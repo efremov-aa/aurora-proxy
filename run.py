@@ -3,6 +3,7 @@
 import os
 import threading
 
+import autocheck
 import config
 import core
 import extgate
@@ -101,6 +102,21 @@ def _boot():
     threading.Thread(target=tgws_loop, daemon=True).start()
     # обновление имён устройств
     threading.Thread(target=telemetry.resolve_names, daemon=True).start()
+    # A-1040 «Кот-смотритель»: автопроверка пула ключей по расписанию
+    autocheck.start()
+    # A-MASQUE-AUTO: автопроверка MASQUE-канала. Конфиги живут недолго и
+    # умирают молча (эндпоинт перестаёт отвечать по UDP) - без этого цикла
+    # панель месяцами показывала "no egress", а канал стоял. Каждые N минут:
+    # проба -> смена эндпоинта на тех же ключах -> свежий конфиг с генератора.
+    try:
+        import masque
+        if masque.start_autocheck():
+            config.log("boot: MASQUE autocheck started (every %ds)"
+                       % masque.AUTO_INTERVAL)
+    except Exception:
+        import traceback
+        config.log("boot: MASQUE autocheck did not start:\n%s"
+                   % traceback.format_exc())
     # стартовая проверка ру-сегмента (фон, результаты — в /api/state)
     rusegment.start()
     # обязательное авто-обновление (без обхода; сервера на ручном — вне этой сборки)

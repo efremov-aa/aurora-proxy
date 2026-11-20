@@ -13,8 +13,11 @@ import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+import autocheck
+import backup
 import config
 import crypt
+import diag
 import extgate
 import effects
 import core
@@ -1097,7 +1100,9 @@ class Handler(BaseHTTPRequestHandler):
             self._send(*_json({"error": "outside lan"}, 403))
             return
         trusted = _trusted_read(self)
-        if not trusted and path in ("/api/log", "/api/logs", "/api/recovery/log", "/api/routes"):
+        if not trusted and path in ("/api/log", "/api/logs", "/api/recovery/log",
+                                    "/api/routes", "/api/diag", "/api/speed",
+                                    "/api/autocheck"):
             self._send(*_json({"error": "management authentication required"}, 403))
             return
         # гейт видимости: меш-разделы и подписки закрыты, пока головной сервер
@@ -1122,6 +1127,16 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/recovery/log":
             self._send(*_json(recovery.status()))
+            return
+        # A-1040 «Кот-смотритель»: диагностика, замер скорости, автопроверка.
+        if path == "/api/diag":
+            self._send(*_json(diag.status()))
+            return
+        if path == "/api/speed":
+            self._send(*_json(diag.speed_status()))
+            return
+        if path == "/api/autocheck":
+            self._send(*_json(autocheck.status()))
             return
         if path == "/api/ext/download":
             # A-161: архив браузерного расширения - по подписке (триал или PRO).
@@ -1321,7 +1336,12 @@ class Handler(BaseHTTPRequestHandler):
             return
         path = self.path.split("?", 1)[0]
 
-        data, body_error = _read_json_body(self)
+        # A-1040: импорт архива — тело больше обычного (base64 ZIP до 8 МБ).
+        if path == "/api/backup/import":
+            data, body_error = _read_json_body(
+                self, max_bytes=backup.MAX_ARCHIVE_BYTES * 2 + 65536)
+        else:
+            data, body_error = _read_json_body(self)
         if body_error:
             self._send(*_json({"ok": False, "error": body_error}, 400))
             return
@@ -1329,6 +1349,10 @@ class Handler(BaseHTTPRequestHandler):
         # блокирока управления, пока политика не принята (кроме самого приёма)
         if config.policy_required() and path != "/api/policy/accept":
             self._send(*_json({"error": "policy required"}, 403))
+            return
+
+        if path == "/api/backup/import":
+            self._backup_import(data or {})
             return
 
         # гейт видимости: POST-изменения меша/подписок закрыты, пока мастер
@@ -1367,6 +1391,7 @@ class Handler(BaseHTTPRequestHandler):
             "/api/masque/clear": self._masque_clear,
             "/api/masque/apply": self._masque_apply,
             "/api/masque/probe": self._masque_probe,
+            "/api/masque/fetch": self._masque_fetch,
             "/api/masque/enable": self._masque_enable,
             "/api/keys/add": self._keys_add,
             "/api/keys/refresh": self._keys_refresh,
@@ -1374,6 +1399,12 @@ class Handler(BaseHTTPRequestHandler):
             "/api/keys/cleanup": self._keys_cleanup,
             "/api/keys/remove": self._keys_remove,
             "/api/keys/active": self._keys_active,
+            # A-1040 «Кот-смотритель»: обслуживание канала и данных.
+            "/api/diag/run": self._diag_run,
+            "/api/speed/run": self._speed_run,
+            "/api/autocheck/save": self._autocheck_save,
+            "/api/autocheck/run": self._autocheck_run,
+            "/api/backup/export": self._backup_export,
             "/api/recovery/limit": self._rc_limit,
             "/api/recovery/region": self._rc_region,
             "/api/recovery/conn": self._rc_conn,
@@ -1479,6 +1510,63 @@ class Handler(BaseHTTPRequestHandler):
             return
         self._send(*_json(r))
 
+    # --- A-1040 «Кот-смотритель»: обслуживание ------------------------------
+    def _diag_run(self, data):
+        self._send(*_json(diag.start()))
+
+    def _speed_run(self, data):
+        self._send(*_json(diag.speed_start()))
+
+    def _autocheck_save(self, data):
+        values = {}
+        enabled = data.get("enabled")
+        if type(enabled) is not bool:
+            self._send(*_json({"ok": False, "error": "enabled must be boolean"}, 400))
+            return
+        values["keycheck_enabled"] = enabled
+        interval = data.get("interval_min", config.get("keycheck_interval_min", 60))
+        # меньше 15 минут не пускаем: частая проверка — это шум и нагрузка
+        if type(interval) is not int or interval < 15 or interval > 10080:
+            self._send(*_json({"ok": False, "error": "interval is out of range"}, 400))
+            return
+        values["keycheck_interval_min"] = interval
+        if not config.set_many(values):
+            self._send(*_json({"ok": False, "error": "settings save failed"}, 500))
+            return
+        self._send(*_json({"ok": True, "autocheck": autocheck.status()}))
+
+    def _autocheck_run(self, data):
+        self._send(*_json(autocheck.run_now()))
+
+    def _backup_export(self, data):
+        password = data.get("password")
+        try:
+            blob, name = backup.export(password)
+        except (backup.BackupError, crypt.BackupPasswordError, ValueError) as e:
+            self._send(*_json({"ok": False, "error": str(e)[:200]}, 400))
+            return
+        config.log("backup: архив создан (%d байт)" % len(blob))
+        self._send_binary(200, "application/zip", blob, name)
+
+    def _backup_import(self, data):
+        password = data.get("password")
+        encoded = data.get("data")
+        if not isinstance(encoded, str) or not encoded:
+            self._send(*_json({"ok": False, "error": "нет файла архива"}, 400))
+            return
+        import base64
+        try:
+            raw = base64.b64decode(encoded, validate=True)
+        except (ValueError, TypeError):
+            self._send(*_json({"ok": False, "error": "файл архива не читается"}, 400))
+            return
+        try:
+            report = backup.restore(raw, password)
+        except backup.BackupError as e:
+            self._send(*_json({"ok": False, "error": str(e)[:200]}, 400))
+            return
+        self._send(*_json(report))
+
     # --- A-MASQUE-PUB: rezerv WARP cherez mihomo (MASQUE) ---
     def _masque_upload(self, data):
         raw = data.get("config") or data.get("raw") or ""
@@ -1551,6 +1639,15 @@ class Handler(BaseHTTPRequestHandler):
         threading.Thread(target=_run, daemon=True).start()
         self._send(*_json({"ok": True, "started": True,
                            "msg": "proba MASQUE zapuschena, rezultat cherez ~20 s"}))
+
+    def _masque_fetch(self, data):
+        """A-MASQUE-FIX: sam sozdat konfig na sayte i primenit k mihomo."""
+        res = masque.fetch_apply()
+        config.log("api: A-MASQUE avto-sozdanie ok=%s %s"
+                   % (res.get("ok"), res.get("name") or res.get("error")))
+        out = masque.status()
+        out.update(res)
+        self._send(*_json(out))
 
     # A-118: vyklyuchatel vneshnego kanala (MASQUE/mihomo) iz paneli.
     def _masque_enable(self, data):
@@ -1688,6 +1785,14 @@ class Handler(BaseHTTPRequestHandler):
         self._send(*_json({"ok": bool(token), "token": token}))
 
     def _setup_warp_test(self, data):
+        """A-MASQUE-PUB: proverit' vybrannyj transport WARP pri ustanovke.
+
+        A-MASQUE-FIX: ran'she proveryalsya TOL'KO aktivnyy konfig odnoy
+        probey - esli on mertv, master vsegda pisal "no egress" i ne
+        perekllyuchal konfigy. Teper': WireGuard - probe VSEH konfigov
+        (pobeditel' stanovitsya aktivnym), MASQUE - probe + pereklyuchenie
+        endpontoov na teh zhe klyuchah.
+        """
         local = _is_local(self)
         if not local and not _host_in_lan(self.client_address[0]):
             _setup_reject(self, "setup requires localhost", 403)
@@ -1705,23 +1810,73 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(*_json({"ok": False, "transport": tr,
                                    "error": r.get("error", "masque fetch failed")}, 200))
                 return
-            res = masque.probe(30, r.get("name"))
+            key = str(r.get("name") or "")
+            res = masque.probe(30, key)
+            # A-MASQUE-EP: konfig s generatora mog popast' na mertvyj
+            # endponto - probe vremennyy, mihomo-service ne trogaem.
+            if not res.get("ok") and not res.get("busy"):
+                m = (masque._read_store()["items"].get(key) or {}).get("masque") or {}
+                cur = str(m.get("server") or "")
+                for ip, port in masque.MASQUE_ENDPOINTS:
+                    if ip == cur:
+                        continue
+                    if not masque.set_endpoint(key, ip, port):
+                        break
+                    res = masque.probe(30, key)
+                    if res.get("ok"):
+                        break
             out = {"ok": bool(res.get("ok")), "transport": tr,
-                   "egress": res.get("egress", "-")}
+                   "name": key, "egress": res.get("egress", "-")}
             if not res.get("ok"):
                 out["error"] = res.get("error", "no egress")
             self._send(*_json(out))
             return
-        if not warp.load():
+        st = warp.status()
+        names = [str(c.get("name") or "") for c in (st.get("configs") or [])]
+        names = [n for n in names if n]
+        if not names and not warp.load():
             self._send(*_json({"ok": False, "transport": tr,
-                               "error": "нет WARP-конфига"}, 200))
+                               "error": "нет WARP-конфига (загрузите на вкладке WARP)"}, 200))
             return
-        res = warp.probe()
-        out = {"ok": bool(res.get("ok")), "transport": tr,
-               "egress": res.get("egress", "-")}
-        if not res.get("ok"):
-            out["error"] = res.get("error", "no egress")
-        self._send(*_json(out))
+        if _WARP_PROBE["running"]:
+            self._send(*_json({"ok": False, "transport": tr,
+                               "error": "проба WARP уже идёт — повторите через минуту"}, 200))
+            return
+        _WARP_PROBE["running"] = True
+        try:
+            # aktivnyy - pervym, ostal'nye - po poryadku spiska
+            # (ne bolee 5: proverka kazhdogo - do 12 s, browser zhdet)
+            active = str(st.get("name") or "")
+            order = ([active] if active in names else []) + \
+                [n for n in names if n != active]
+            order = order[:5]
+            if not order:
+                order = [""]
+            res = {"ok": False, "error": "no egress"}
+            picked = ""
+            for name in order:
+                res = warp.probe(name=name)
+                if res.get("ok"):
+                    picked = name
+                    break
+                if str(res.get("error") or "") == "port-busy":
+                    break
+            # A-MASQUE-FIX: rabochiy konfig delaem aktivnym, chtoby
+            # zavershennyy master razvernul imenno ego.
+            if picked and active and picked != active and not config.get(
+                    "setup_complete", False):
+                warp.select(picked)
+                config.log("api: setup warp test: vybran rabochiy konfig %s"
+                           % picked[:40])
+            out = {"ok": bool(res.get("ok")), "transport": tr,
+                   "egress": res.get("egress", "-")}
+            if picked:
+                out["name"] = picked
+            if not res.get("ok"):
+                out["error"] = res.get("error", "no egress")
+            self._send(*_json(out))
+        finally:
+            _WARP_PROBE["running"] = False
 
     def _setup_complete(self, data):
         if not isinstance(data, dict):

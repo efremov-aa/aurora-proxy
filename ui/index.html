@@ -57,6 +57,7 @@
 
       <div class="ngroup">
         <div class="ngroup-title" data-short="⚙️">⚙️ <span data-i18n="nav.group.set">Настройки</span></div>
+        <button data-t="service"><span class="ic">🧰</span><span class="lb" data-i18n="nav.service">Сервис</span></button>
         <button data-t="settings"><span class="ic">🧩</span><span class="lb" data-i18n="nav.settings">Сервер</span></button>
         <button data-t="security"><span class="ic">🛡️</span><span class="lb" data-i18n="nav.security">Безопасность</span></button>
         <button data-t="logs"><span class="ic">📜</span><span class="lb" data-i18n="nav.logs">Логи</span></button>
@@ -303,6 +304,7 @@
               <div class="stat"><div class="k">🔐 Выбранный конфиг</div><div class="v" id="masque-ep">–</div></div>
               <div class="stat"><div class="k">📤 Выход IP</div><div class="v" id="masque-ip">–</div></div>
               <div class="stat"><div class="k">🚧 mihomo</div><div class="v" id="masque-active">–</div></div>
+              <div class="stat"><div class="k">⏱ Автопроверка</div><div class="v" id="masque-auto">–</div></div>
             </div>
             <div class="tbl-wrap" style="margin-top:8px">
               <table>
@@ -313,12 +315,13 @@
             <div class="kchk-foot">
               <input type="file" id="masque-file" accept=".json,.yaml,.yml,application/json,text/yaml" hidden>
               <input type="text" id="masque-name" class="inp" placeholder="Имя конфига" maxlength="40" style="width:150px">
+              <button class="btn small primary" data-act="masque-fetch" title="Выпустить свежий MASQUE-конфиг и сразу поднять канал">✨ Получить конфиг с сайта</button>
               <button class="btn small" data-act="masque-upload">⬇ Загрузить конфиг</button>
               <button class="btn small" data-act="masque-apply">▶ Применить</button>
               <button class="btn small" data-act="masque-clear">🗑 Удалить всё</button>
               <button class="btn small" id="masque-toggle" data-act="masque-toggle">⏹ Выключить внешний канал</button>
             </div>
-            <div class="hint" id="masque-note">Конфиг с https://warp-generation.github.io/ (кнопка MASQUE) — JSON или Clash-YAML.</div>
+            <div class="hint" id="masque-note">«Получить конфиг с сайта» — свежие ключи с генератора, эндпоинт и проверка выхода автоматически. Конфиг вручную: https://warp-generation.github.io/ — JSON или Clash-YAML.</div>
           </div>
         </div>
       </section>
@@ -790,6 +793,87 @@
         </div>
       </section>
 
+      <!-- ==================================================
+           СЕРВИС: диагностика · скорость · автопроверка · бэкап
+           A-1040 «Кот-смотритель»
+           ================================================== -->
+      <section class="tab" id="t-service">
+        <div class="card">
+          <h2><span class="ic">🩺</span><span data-i18n="svc.diag.head">Диагностика</span><span class="count"><span class="badge" id="diag-state">—</span></span></h2>
+          <p class="hint" data-i18n="svc.diag.hint">Одна кнопка проверяет канал целиком: порт xray, прямой выход, выход через прокси, выходной IP, DNS, TG-WS и резервные каналы. Запускается в фоне.</p>
+          <div class="actions" style="margin-top:0">
+            <button class="btn primary" id="svc-diag-run" data-act="svc-diag-run">🧪 <span data-i18n="svc.diag.run">Проверить всё</span></button>
+            <span class="spacer"></span>
+            <span class="badge mono" id="diag-ts">—</span>
+          </div>
+          <div class="tbl-wrap" style="margin-top:12px">
+            <table>
+              <thead><tr><th data-i18n="svc.diag.c1">Проверка</th><th data-i18n="svc.diag.c2">Статус</th><th data-i18n="svc.diag.c3">Время</th><th data-i18n="svc.diag.c4">Подробность</th></tr></thead>
+              <tbody id="svc-diag-rows"><tr><td colspan="4" class="empty" data-i18n="svc.diag.empty">проверка ещё не запускалась</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2><span class="ic">📶</span><span data-i18n="svc.speed.head">Замер скорости</span><span class="count"><span class="badge mono" id="speed-state">—</span></span></h2>
+          <p class="hint" data-i18n="svc.speed.hint">Замер идёт через тот же mixed-порт, что используете вы. Скачивается 5 МБ и отправляется 1 МБ — при дорогом канале жмите по необходимости.</p>
+          <div class="metrics" style="margin:0 0 12px">
+            <div class="stat"><div class="k">⏱️ <span data-i18n="svc.speed.ping">Пинг</span></div><div class="v mono" id="speed-ping">–</div></div>
+            <div class="stat"><div class="k">⬇️ <span data-i18n="svc.speed.down">Загрузка</span></div><div class="v mono" id="speed-down">–</div></div>
+            <div class="stat"><div class="k">⬆️ <span data-i18n="svc.speed.up">Отдача</span></div><div class="v mono" id="speed-up">–</div></div>
+            <div class="stat"><div class="k">🎯 <span data-i18n="svc.speed.target">Сервер</span></div><div class="v mono" id="speed-target" style="font-size:13px">–</div></div>
+          </div>
+          <div class="actions" style="margin-top:0">
+            <button class="btn primary" id="svc-speed-run" data-act="svc-speed-run">▶ <span data-i18n="svc.speed.run">Замерить</span></button>
+            <span class="spacer"></span>
+            <span class="badge mono" id="speed-ts">—</span>
+          </div>
+          <div class="tbl-wrap" style="margin-top:12px">
+            <table>
+              <thead><tr><th data-i18n="th.date">Дата</th><th data-i18n="svc.speed.col-down">↓ Мбит/с</th><th data-i18n="svc.speed.col-up">↑ Мбит/с</th><th data-i18n="th.time">Пинг</th></tr></thead>
+              <tbody id="svc-speed-rows"><tr><td colspan="4" class="empty" data-i18n="svc.speed.empty">замер ещё не выполнялся</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2><span class="ic">🤖</span><span data-i18n="svc.auto.head">Автопроверка ключей</span><span class="count"><span class="badge" id="auto-state">—</span></span></h2>
+          <p class="hint" data-i18n="svc.auto.hint">Проверять пул по расписанию: мёртвые ключи уходят сами, панель поднимает живой. Журнал — последние события.</p>
+          <div class="widget-body" style="display:flex;flex-direction:column;gap:10px;font-size:13px">
+            <label class="chk"><input type="checkbox" id="svc-auto-on"> <span data-i18n="svc.auto.enable">Включить автопроверку</span></label>
+            <div class="cmd-row">
+              <select id="svc-auto-interval">
+                <option value="60">1 ч</option>
+                <option value="180">3 ч</option>
+                <option value="360">6 ч</option>
+                <option value="720">12 ч</option>
+                <option value="1440">24 ч</option>
+                <option value="10080">7 дней</option>
+              </select>
+              <button class="btn small" data-act="svc-auto-save" data-i18n="btn.save">Сохранить</button>
+              <button class="btn small" data-act="svc-auto-run" data-i18n="svc.auto.run">Проверить сейчас</button>
+            </div>
+            <div class="hint" style="margin:0"><span data-i18n="svc.auto.next">Следующий запуск:</span> <b class="mono" id="auto-next">—</b></div>
+          </div>
+          <div class="logbox tall" id="svc-auto-log" style="margin-top:10px"><span data-i18n="svc.auto.empty">событий пока нет</span></div>
+        </div>
+
+        <div class="card">
+          <h2><span class="ic">🗄️</span><span data-i18n="svc.backup.head">Бэкап и восстановление</span></h2>
+          <p class="hint" data-i18n="svc.backup.hint">Настройки, пул ключей и конфиги WARP/MASQUE упаковываются в ZIP, зашифрованный паролем. Порты и учётные данные панели в архив не попадают.</p>
+          <div class="cmd-row" style="margin-top:0">
+            <input type="password" id="svc-backup-pass" data-i18n-placeholder="svc.backup.pass-ph" placeholder="Пароль архива (минимум 8 символов)" autocomplete="off" style="flex:1;min-width:200px">
+            <button class="btn primary" data-act="svc-backup-export">⬇ <span data-i18n="svc.backup.export">Скачать бэкап</span></button>
+          </div>
+          <div class="cmd-row" style="margin-top:10px">
+            <input type="file" id="svc-backup-file" accept=".zip,application/zip" hidden>
+            <button class="btn small" data-act="svc-backup-pick">📂 <span data-i18n="svc.backup.pick">Выбрать файл</span></button>
+            <span class="badge mono" id="svc-backup-name">—</span>
+            <button class="btn small primary" data-act="svc-backup-import">♻️ <span data-i18n="svc.backup.restore">Восстановить</span></button>
+          </div>
+        </div>
+      </section>
+
     </div>
   </div>
 </div>
@@ -822,7 +906,7 @@
       <div class="setup-head">
         <span class="ic">⚙️</span>
         <b>Первый запуск Aurora</b>
-        <span class="badge mono" id="setup-progress">1/7</span>
+        <span class="badge mono" id="setup-progress">1/8</span>
       </div>
       <div class="setup-body">
         <section class="setup-step" data-setup-step="0">
@@ -892,7 +976,7 @@
             <button class="btn small" id="setup-warp-test" type="button">Проверить выбранный</button>
             <span class="badge mono" id="setup-warp-result">—</span>
           </div>
-          <p class="hint" id="setup-warp-note">Проверка поднимает туннель и показывает выходной IP. Нужно ~20 секунд.</p>
+          <p class="hint" id="setup-warp-note">Проверка поднимает туннель и показывает выходной IP. Если активный конфиг мёртв — мастер сам переберёт остальные.</p>
         </section>
         <div id="setup-error" class="setup-error" style="display:none"></div>
       </div>

@@ -630,3 +630,60 @@ def storage_version_name(data):
     if version == 1:
         return "aurora1-legacy"
     return "aurora2-aead"
+
+
+# --- бэкап по паролю (A-1040) ---
+# Архив настроек/ключей должен переноситься между машинами, где файл-ключ
+# data/.aurora_key другой. Поэтому он шифруется не машинным ключом, а ключом,
+# выведенным из пароля владельца (scrypt) и AEAD AURORA2 поверх ChaCha20-Poly1305.
+_BACKUP_MAGIC = b"AURORABK1"
+_BACKUP_SALT_LEN = 16
+
+
+class BackupPasswordError(StorageError):
+    pass
+
+
+def _password_key(password, salt):
+    if not isinstance(password, str) or not password:
+        raise BackupPasswordError("пустой пароль архива")
+    try:
+        raw = password.encode("utf-8")
+    except UnicodeEncodeError as e:
+        raise BackupPasswordError("пароль архива не кодируется") from e
+    try:
+        return hashlib.scrypt(raw, salt=bytes(salt), n=16384, r=8, p=1, dklen=32)
+    except (TypeError, ValueError) as e:
+        raise BackupPasswordError("не удалось вывести ключ архива") from e
+
+
+def seal_password(plain, password):
+    """Запечатать байты паролем: магия + соль + nonce + AEAD-тело."""
+    salt = secrets.token_bytes(_BACKUP_SALT_LEN)
+    key = _password_key(password, salt)
+    nonce = secrets.token_bytes(_NONCE_LEN)
+    body = _aead_seal(key, nonce, bytes(plain), _BACKUP_MAGIC)
+    return _BACKUP_MAGIC + salt + nonce + body
+
+
+def open_password(data, password):
+    """Обратная операция. Неверный пароль/битый архив -> BackupPasswordError."""
+    if not isinstance(data, (bytes, bytearray)):
+        raise BackupPasswordError("архив не байты")
+    data = bytes(data)
+    need = len(_BACKUP_MAGIC) + _BACKUP_SALT_LEN + _NONCE_LEN + _TAG_LEN + 1
+    if len(data) < need or not data.startswith(_BACKUP_MAGIC):
+        raise BackupPasswordError("это не архив Aurora")
+    off = len(_BACKUP_MAGIC)
+    salt = data[off:off + _BACKUP_SALT_LEN]
+    off += _BACKUP_SALT_LEN
+    nonce = data[off:off + _NONCE_LEN]
+    off += _NONCE_LEN
+    try:
+        return _aead_open(_password_key(password, salt), nonce, data[off:], _BACKUP_MAGIC)
+    except StorageError as e:
+        raise BackupPasswordError("не удалось открыть архив: %s" % e) from e
+
+
+def is_backup_blob(data):
+    return isinstance(data, (bytes, bytearray)) and bytes(data[:len(_BACKUP_MAGIC)]) == _BACKUP_MAGIC

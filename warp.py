@@ -437,6 +437,51 @@ def active_name():
     return ""
 
 
+# --- A-1040: снимок списка для бэкапа и восстановления ---
+def backup_snapshot():
+    """Полный слепок конфигов (включая ключи WireGuard) для архива."""
+    store = _read_store()
+    items = {}
+    for name, entry in (store.get("items") or {}).items():
+        if not isinstance(entry, dict):
+            continue
+        try:
+            items[str(name)] = json.loads(json.dumps(entry))
+        except (TypeError, ValueError):
+            continue
+    return {"active": str(store.get("active") or ""), "items": items}
+
+
+def restore_snapshot(snapshot):
+    """Восстановить список из слепка. Возвращает (ok, count, error)."""
+    if not isinstance(snapshot, dict):
+        return False, 0, "bad snapshot"
+    raw_items = snapshot.get("items")
+    if not isinstance(raw_items, dict) or not raw_items:
+        return False, 0, "empty snapshot"
+    items = {}
+    for name, entry in raw_items.items():
+        key = clean_name(str(name), "")
+        if not key or not isinstance(entry, dict):
+            continue
+        if not isinstance(entry.get("outbounds"), list) or not entry.get("outbounds"):
+            continue
+        try:
+            items[key] = json.loads(json.dumps(entry))
+        except (TypeError, ValueError):
+            continue
+    if not items:
+        return False, 0, "no valid configs"
+    active = clean_name(str(snapshot.get("active") or ""), "")
+    if active not in items:
+        active = sorted(items)[0]
+    _save_store({"active": active, "items": items})
+    with _LOCK:
+        _CACHE["mtime"] = None
+        _CACHE["value"] = None
+    return True, len(items), ""
+
+
 def clear():
     """Udalit VSE konfigy rezerva (vydacha rezerva obratno v keys)."""
     for path in (WARP_STORE, WARP_FILE):

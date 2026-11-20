@@ -19,7 +19,30 @@
       'nav.connect': 'Внешний доступ', 'nav.rusegment': 'Ру-сегмент', 'nav.tgws': 'TG-WS',
       'nav.mesh': 'Меш-сеть', 'nav.mesh-join': 'Подключение', 'nav.mesh-topo': 'Топология', 'nav.mesh-routes': 'Маршруты',
       'nav.shop': 'Магазин', 'nav.shop-plans': 'Тарифы VPN', 'nav.shop-features': 'Дополнительные возможности Aurora', 'nav.shop-billing': 'Платежи',
-      'nav.update': 'Обновление', 'nav.versions': 'Версии', 'nav.settings': 'Сервер', 'nav.security': 'Безопасность', 'nav.logs': 'Логи',
+      'nav.update': 'Обновление', 'nav.versions': 'Версии', 'nav.service': 'Сервис', 'nav.settings': 'Сервер', 'nav.security': 'Безопасность', 'nav.logs': 'Логи',
+      // A-1040 «Кот-смотритель»: вкладка «Сервис»
+      'svc.diag.head': 'Диагностика',
+      'svc.diag.hint': 'Одна кнопка проверяет канал целиком: порт xray, прямой выход, выход через прокси, выходной IP, DNS, TG-WS и резервные каналы. Запускается в фоне.',
+      'svc.diag.run': 'Проверить всё', 'svc.diag.running': 'проверка идёт…',
+      'svc.diag.empty': 'проверка ещё не запускалась',
+      'svc.diag.c1': 'Проверка', 'svc.diag.c2': 'Статус', 'svc.diag.c3': 'Время', 'svc.diag.c4': 'Подробность',
+      'svc.diag.ok': 'порядок', 'svc.diag.bad': 'проблема', 'svc.diag.skip': '—',
+      'svc.speed.head': 'Замер скорости',
+      'svc.speed.hint': 'Замер идёт через тот же mixed-порт, что используете вы. Скачивается 5 МБ и отправляется 1 МБ — при дорогом канале жмите по необходимости.',
+      'svc.speed.run': 'Замерить', 'svc.speed.ping': 'Пинг', 'svc.speed.down': 'Загрузка',
+      'svc.speed.up': 'Отдача', 'svc.speed.target': 'Сервер', 'svc.speed.empty': 'замер ещё не выполнялся',
+      'svc.speed.col-down': '↓ Мбит/с', 'svc.speed.col-up': '↑ Мбит/с',
+      'svc.auto.head': 'Автопроверка ключей',
+      'svc.auto.hint': 'Проверять пул по расписанию: мёртвые ключи уходят сами, панель поднимает живой. Журнал — последние события.',
+      'svc.auto.enable': 'Включить автопроверку', 'svc.auto.run': 'Проверить сейчас',
+      'svc.auto.next': 'Следующий запуск:', 'svc.auto.empty': 'событий пока нет',
+      'svc.backup.head': 'Бэкап и восстановление',
+      'svc.backup.hint': 'Настройки, пул ключей и конфиги WARP/MASQUE упаковываются в ZIP, зашифрованный паролем. Порты и учётные данные панели в архив не попадают.',
+      'svc.backup.pass-ph': 'Пароль архива (минимум 8 символов)',
+      'svc.backup.export': 'Скачать бэкап', 'svc.backup.pick': 'Выбрать файл',
+      'svc.backup.restore': 'Восстановить', 'svc.backup.pass-err': 'Пароль архива должен быть не короче 8 символов',
+      'svc.backup.no-file': 'Сначала выберите файл архива', 'svc.backup.big': 'Файл больше 8 МБ — это не похоже на бэкап',
+      'svc.backup.export-ok': 'Архив создан и скачивается 🗄️', 'svc.backup.import-ok': 'Бэкап восстановлен 🐾',
       'nav.group.home': 'Домашний прокси', 'nav.group.upd': 'Обновления', 'nav.group.set': 'Настройки',
       'g.you': 'Вы', 'g.yours': 'ваш', 'status.on': 'онлайн', 'status.off': 'оффлайн', 'status.warn': 'нестабильно',
       'status.online': 'работает', 'status.stopped': 'остановлен', 'status.active': 'активен', 'status.dead': 'мёртв',
@@ -1366,15 +1389,23 @@
   var WARP_STATE = null;
   var WARP_USE_BUSY = false;
 
+  /* ---- A-MASQUE-PUB: rezerv WARP cherez mihomo ---- */
   function masqueRender(m) {
     if (!m) return;
     function put(id, val) { var el = $(id); if (el) el.textContent = String(val); }
     var cfgs = (m.configs && m.configs.length) ? m.configs : [];
     var cur = String(m.name || '');
-    put('masque-state', !m.loaded ? 'конфигов нет' : (cfgs.length + ' конфиг(ов)' + (cur ? ' · выбран ' + cur : '')));
+    put('masque-state', !m.loaded ? 'конфигов нет'
+      : (cfgs.length + ' конфиг(ов)' + (cur ? ' · выбран ' + cur : '')));
     put('masque-ep', cur || (m.loaded ? 'без имени' : '—'));
     put('masque-ip', (m.egress && m.egress !== '-') ? m.egress : 'не проверен');
     put('masque-active', m.loaded ? 'готов' : '—');
+    // A-MASQUE-AUTO: состояние фоновой автопроверки канала.
+    var ac = m.autocheck;
+    put('masque-auto', (ac && ac.interval)
+      ? ('каждые ' + ac.interval + ' с' + (ac.last && ac.last.action
+        ? (' · ' + (ac.last.ok ? 'ок' : '✗') + ' ' + String(ac.last.action)) : ''))
+      : '—');
     // A-118: подпись выключателя внешнего канала.
     var mtog = $('masque-toggle');
     if (mtog) mtog.textContent = (m.enabled === false)
@@ -1392,15 +1423,38 @@
             '<td class="mono">' + esc(c.endpoint || '—') + '</td>' +
             '<td class="mono">' + esc(eg) + '</td>' +
             '<td>' + (c.active ? '' :
-              '<button class="btn small primary" data-act="masque-select" data-name2="' + esc(n) + '">📌 Активный</button> ') +
-            '<button class="btn small" data-act="masque-probe-one" data-name2="' + esc(n) + '">🧪</button> ' +
-            '<button class="btn small" data-act="masque-remove-one" data-name2="' + esc(n) + '">🗑</button>' +
+              '<button class="btn small primary" title="Сделать активным" data-act="masque-select" data-name2="' + esc(n) + '">📌 Активный</button> ') +
+            '<button class="btn small" title="Проверить" data-act="masque-probe-one" data-name2="' + esc(n) + '">🧪</button> ' +
+            '<button class="btn small" title="Удалить" data-act="masque-remove-one" data-name2="' + esc(n) + '">🗑</button>' +
             '</td></tr>';
         }).join('');
       }
     }
   }
-  function masqueUpload() { var inp = $('masque-file'); if (!inp) return; inp.value = ''; inp.click(); }
+  function masqueUpload() {
+    var inp = $('masque-file');
+    if (!inp) return;
+    inp.value = '';
+    inp.click();
+  }
+  // A-MASQUE-FIX: свежий конфиг с генератора -> активный -> поднять -> проба.
+  // Кнопка держится занятой: fetch_apply синхронный (генератор + mihomo + проба).
+  var MASQUE_FETCH_BUSY = false;
+  function masqueFetch() {
+    if (MASQUE_FETCH_BUSY) return toast('конфиг уже выпускается — ждите', false);
+    MASQUE_FETCH_BUSY = true;
+    toast('🐾 Выпускаю MASQUE-конфиг: генератор → mihomo → проба (~30 с)…', true);
+    postJSON('/api/masque/fetch', {}).then(function (j) {
+      MASQUE_FETCH_BUSY = false;
+      if (j && j.configs) masqueRender(j);
+      if (j && j.ok) {
+        toast('MASQUE готов: ' + (j.egress || '–') +
+          (j.endpoint ? (' · ' + j.endpoint) : ''), true);
+      } else {
+        toast('MASQUE: ' + ((j && (j.error || j.msg)) || 'не прошло'), false);
+      }
+    }).catch(function () { MASQUE_FETCH_BUSY = false; });
+  }
   function masqueOnFile() {
     var f = document.getElementById('masque-file') && document.getElementById('masque-file').files[0];
     if (!f) return;
@@ -1454,21 +1508,6 @@
       if (j && j.ok) { V.S = V.S || {}; V.S.masque = j; }
       toast((j && j.ok) ? (next ? 'Внешний канал включён' : 'Внешний канал выключен')
         : 'MASQUE: ошибка', !!(j && j.ok));
-    });
-  }
-  function setupWarpTest() {
-    var tr = (document.querySelector('input[name="setup-warp"]:checked') || {}).value || 'off';
-    var res = $('setup-warp-result');
-    var note = $('setup-warp-note');
-    if (tr === 'off') { if (res) res.textContent = 'не выбран'; return; }
-    if (res) res.textContent = 'проверяю…';
-    postJSON('/api/setup/warp_test', { transport: tr }).then(function (r) {
-      var ok = r && r.ok && r.egress && r.egress !== '-';
-      if (res) res.textContent = ok ? ('выход ' + r.egress) : ('не работает: ' + ((r && (r.error || r.msg)) || '?'));
-      if (note) note.textContent = ok ? 'Транспорт работает.' : 'Транспорт не прошёл проверку.';
-    }).catch(function (e) {
-      if (res) res.textContent = 'ошибка';
-      if (note) note.textContent = (e && e.message) || 'Ошибка';
     });
   }
 
@@ -2725,6 +2764,194 @@ function loadTG() {
     });
   }
 
+  /* ================= A-1040 «Кот-смотритель»: Сервис ================= */
+  function loadService() {
+    Promise.all([getJSON('/api/diag'), getJSON('/api/speed'),
+                 getJSON('/api/autocheck')]).then(function (arr) {
+      renderDiag(arr[0] || {});
+      renderSpeed(arr[1] || {});
+      renderAuto(arr[2] || {});
+    }).catch(function () { });
+  }
+  function renderDiag(j) {
+    j = j || {};
+    var rows = Array.isArray(j.results) ? j.results : [];
+    var badge = $('diag-state');
+    if (badge) {
+      if (j.running) {
+        badge.className = 'badge warn';
+        badge.textContent = _t('svc.diag.running');
+      } else if (!rows.length) {
+        badge.className = 'badge';
+        badge.textContent = '—';
+      } else {
+        badge.className = 'badge ' + (j.ok ? 'on' : 'off');
+        badge.textContent = j.ok ? _t('svc.diag.ok') : _t('svc.diag.bad');
+      }
+    }
+    var ts = $('diag-ts');
+    if (ts) ts.textContent = j.ts ? fmtDate(j.ts) : '—';
+    var tb = $('svc-diag-rows');
+    if (!tb) return;
+    if (!rows.length) {
+      tb.innerHTML = '<tr><td colspan="4" class="empty">' + esc(_t('svc.diag.empty')) + '</td></tr>';
+      return;
+    }
+    tb.innerHTML = rows.map(function (r) {
+      var st = r.ok ? _t('svc.diag.ok') : _t('svc.diag.bad');
+      var cls = r.ok ? 'ok' : 'dead';
+      return '<tr><td>' + esc(r.name) + '</td>' +
+        '<td><span class="chip st-' + cls + '">' + esc(st) + '</span></td>' +
+        '<td class="mono">' + esc(r.ms != null ? r.ms + ' мс' : '—') + '</td>' +
+        '<td class="mono" style="font-size:12px">' + esc(r.detail || '') + '</td></tr>';
+    }).join('');
+  }
+  function renderSpeed(j) {
+    j = j || {};
+    var last = j.last || null;
+    function put(id, val) { var el = $(id); if (el) el.textContent = String(val); }
+    put('speed-ping', last && last.ping_ms != null ? last.ping_ms + ' мс' : '–');
+    put('speed-down', last && last.down_mbps != null ? Number(last.down_mbps).toFixed(2) + ' Мбит/с' : '–');
+    put('speed-up', last && last.up_mbps != null ? Number(last.up_mbps).toFixed(2) + ' Мбит/с' : '—');
+    put('speed-target', last && last.target ? last.target : '–');
+    var badge = $('speed-state');
+    if (badge) {
+      if (j.running) { badge.className = 'badge warn'; badge.textContent = _t('svc.speed.run') + '…'; }
+      else { badge.className = 'badge mono'; badge.textContent = last ? (last.ok ? '✓' : '✕') : '—'; }
+    }
+    put('speed-ts', last && last.ts ? fmtDate(last.ts) : '—');
+    var tb = $('svc-speed-rows');
+    if (!tb) return;
+    var hist = Array.isArray(j.history) ? j.history.slice(-12).reverse() : [];
+    if (!hist.length) {
+      tb.innerHTML = '<tr><td colspan="4" class="empty">' + esc(_t('svc.speed.empty')) + '</td></tr>';
+      return;
+    }
+    tb.innerHTML = hist.map(function (h) {
+      return '<tr><td class="mono">' + esc(fmtDate(h.ts)) + '</td>' +
+        '<td class="mono">' + esc(h.down_mbps != null ? Number(h.down_mbps).toFixed(2) : '—') + '</td>' +
+        '<td class="mono">' + esc(h.up_mbps != null ? Number(h.up_mbps).toFixed(2) : '—') + '</td>' +
+        '<td class="mono">' + esc(h.ping_ms != null ? h.ping_ms + ' мс' : '—') + '</td></tr>';
+    }).join('');
+  }
+  function renderAuto(j) {
+    j = j || {};
+    var cb = $('svc-auto-on');
+    if (cb) cb.checked = !!j.enabled;
+    var sel = $('svc-auto-interval');
+    if (sel && j.interval_min) {
+      var want = String(j.interval_min);
+      for (var i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].value === want) { sel.value = want; break; }
+      }
+    }
+    var badge = $('auto-state');
+    if (badge) {
+      badge.className = 'badge ' + (j.enabled ? 'on' : 'off');
+      badge.textContent = j.enabled ? _t('status.enabled') : _t('status.disabled');
+    }
+    var next = $('auto-next');
+    if (next) next.textContent = j.next_ts ? fmtDate(j.next_ts) : '—';
+    var box = $('svc-auto-log');
+    if (box) {
+      var lines = Array.isArray(j.log) ? j.log : [];
+      box.innerHTML = lines.length
+        ? lines.map(function (x) { return esc((x.ts ? fmtDate(x.ts) + ' · ' : '') + (x.msg || '')); }).join('\n')
+        : _t('svc.auto.empty');
+      box.scrollTop = box.scrollHeight;
+    }
+  }
+  function svcDiagRun() {
+    postJSON('/api/diag/run', {}).then(function (j) {
+      toast((j && j.ok) ? _t('svc.diag.running') : ((j && j.error) || _t('t.err-gen')), !!(j && j.ok));
+      loadService();
+    });
+  }
+  function svcSpeedRun() {
+    postJSON('/api/speed/run', {}).then(function (j) {
+      toast((j && j.ok) ? _t('svc.speed.run') + '…' : ((j && j.error) || _t('t.err-gen')), !!(j && j.ok));
+      loadService();
+    });
+  }
+  function svcAutoSave() {
+    var on = !!(($('svc-auto-on') || {}).checked);
+    var sel = $('svc-auto-interval');
+    var iv = parseInt((sel && sel.value) || '60', 10);
+    if (!isFinite(iv)) iv = 60;
+    postJSON('/api/autocheck/save', { enabled: on, interval_min: iv }).then(function (j) {
+      toast((j && j.ok) ? _t('set.saved') : ((j && j.error) || _t('set.save-err')), !!(j && j.ok));
+      if (j && j.autocheck) renderAuto(j.autocheck);
+    });
+  }
+  function svcAutoRun() {
+    postJSON('/api/autocheck/run', {}).then(function (j) {
+      toast((j && j.ok) ? _t('svc.auto.run') : ((j && j.error) || _t('t.err-gen')), !!(j && j.ok));
+      loadService();
+    });
+  }
+  function svcBackupPick() {
+    var inp = $('svc-backup-file');
+    if (inp) { inp.value = ''; inp.click(); }
+  }
+  function svcBackupPicked() {
+    var inp = $('svc-backup-file');
+    var f = inp && inp.files && inp.files[0];
+    var tag = $('svc-backup-name');
+    if (tag) tag.textContent = f ? f.name : '—';
+  }
+  function svcBackupExport() {
+    var p = ($('svc-backup-pass').value || '');
+    if (p.length < 8) { toast(_t('svc.backup.pass-err'), false); return; }
+    fetch('/api/backup/export', {
+      method: 'POST', headers: authHdr(), body: JSON.stringify({ password: p })
+    }).then(function (r) {
+      if (!r.ok) {
+        return r.text().then(function (txt) {
+          var e = {};
+          try { e = JSON.parse(txt); } catch (x) { }
+          throw new Error((e && e.error) || ('HTTP ' + r.status));
+        });
+      }
+      return r.blob().then(function (blob) {
+        var cd = r.headers.get('content-disposition') || '';
+        var m = /filename="?([^";]+)"?/i.exec(cd);
+        var name = m ? m[1] : 'aurora-backup.zip';
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = name;
+        document.body.appendChild(a); a.click();
+        setTimeout(function () {
+          URL.revokeObjectURL(url);
+          if (a.parentNode) a.parentNode.removeChild(a);
+        }, 200);
+      });
+    }).then(function () {
+      toast(_t('svc.backup.export-ok'), true);
+    }).catch(function (e) {
+      toast(String((e && e.message) || e), false);
+    });
+  }
+  function svcBackupImport() {
+    var inp = $('svc-backup-file');
+    var f = inp && inp.files && inp.files[0];
+    if (!f) { toast(_t('svc.backup.no-file'), false); return; }
+    if (f.size > 8 * 1024 * 1024) { toast(_t('svc.backup.big'), false); return; }
+    var p = ($('svc-backup-pass').value || '');
+    if (p.length < 8) { toast(_t('svc.backup.pass-err'), false); return; }
+    var rd = new FileReader();
+    rd.onload = function () {
+      var res = String(rd.result || '');
+      var comma = res.indexOf(',');
+      var b64 = (comma >= 0 ? res.slice(comma + 1) : res).replace(/\s+/g, '');
+      postJSON('/api/backup/import', { password: p, data: b64 }).then(function (j) {
+        toast((j && j.ok) ? _t('svc.backup.import-ok') : ((j && j.error) || _t('t.err-gen')), !!(j && j.ok));
+        if (j && j.ok) loadState(true);
+      });
+    };
+    rd.onerror = function () { toast(_t('t.err-gen'), false); };
+    rd.readAsDataURL(f);
+  }
+
   /* ================= NAV ================= */
   var TABS = {};
   var TB_META = {};
@@ -2757,6 +2984,7 @@ function loadTG() {
     if (t === 'settings') loadSettings();
     if (t === 'security') loadSecurity();
     if (t === 'tgws') loadTG();
+    if (t === 'service') loadService();
   }
 
   /* A-105: подсказка «нужен токен» вместо молчаливого отказа */
@@ -3163,6 +3391,36 @@ function loadTG() {
 
   function setupBack() { setupError(''); SETUP.step = Math.max(0, SETUP.step - 1); setupRender(); }
 
+  // A-MASQUE-PUB: проверка выбранного транспорта WARP прямо в мастере настройки.
+  function setupWarpTest() {
+    var tr = (document.querySelector('input[name="setup-warp"]:checked') || {}).value || 'off';
+    var res = $('setup-warp-result');
+    var note = $('setup-warp-note');
+    if (tr === 'off') {
+      if (res) res.textContent = 'не выбран';
+      if (note) note.textContent = 'Выберите WireGuard или MASQUE и проверьте.';
+      return;
+    }
+    if (res) res.textContent = 'проверяю…';
+    if (note) note.textContent = 'Поднимаю туннель, это займёт до минуты (перебор конфигов при неудаче)…';
+    var btn = $('setup-warp-test');
+    if (btn) btn.disabled = true;
+    function done() { if (btn) btn.disabled = false; }
+    postJSON('/api/setup/warp_test', { transport: tr }).then(function (r) {
+      done();
+      var ok = r && r.ok && r.egress && r.egress !== '-';
+      var via = (r && r.name) ? (' · конфиг «' + r.name + '»') : '';
+      if (res) res.textContent = ok ? ('выход ' + r.egress + via) : ('не работает: ' + ((r && (r.error || r.msg)) || '?'));
+      if (note) note.textContent = ok
+        ? ('Транспорт работает' + via + '. Он будет развёрнут на этом сервере.')
+        : 'Транспорт не прошёл проверку — выберите другой.';
+    }).catch(function (e) {
+      done();
+      if (res) res.textContent = 'ошибка';
+      if (note) note.textContent = (e && e.message) || 'Ошибка';
+    });
+  }
+
   var ACTS = {
     nav: function (t) { navTo(t.getAttribute('data-tab')); },
     toast: function (t) { toast(t.getAttribute('data-msg') || '', true); },
@@ -3217,7 +3475,9 @@ function loadTG() {
     // otkryvaet dialog nativno. Label (A-837) u menya dialog ne
     // otkryval, vozvrayom button + inp.click().
     'warp-upload': function () { warpUpload(); },
+    // A-MASQUE-PUB: rezerv WARP cherez mihomo
     'masque-upload': function () { masqueUpload(); },
+    'masque-fetch': function () { masqueFetch(); },
     'masque-select': function (t) { masqueSelect(t.getAttribute('data-name2') || ''); },
     'masque-probe-one': function (t) { masqueProbeOne(t.getAttribute('data-name2') || ''); },
     'masque-remove-one': function (t) { masqueRemoveOne(t.getAttribute('data-name2') || ''); },
@@ -3225,6 +3485,14 @@ function loadTG() {
     'masque-clear': function () { masqueClear(); },
     'masque-toggle': function () { masqueToggle(); },
     'cx-toggle': function () { vlessToggle(); },
+    // A-1040: вкладка «Сервис»
+    'svc-diag-run': function () { svcDiagRun(); },
+    'svc-speed-run': function () { svcSpeedRun(); },
+    'svc-auto-save': function () { svcAutoSave(); },
+    'svc-auto-run': function () { svcAutoRun(); },
+    'svc-backup-pick': function () { svcBackupPick(); },
+    'svc-backup-export': function () { svcBackupExport(); },
+    'svc-backup-import': function () { svcBackupImport(); },
   };
   function actTarget(ev) {
     var node = ev && ev.target;
@@ -3286,6 +3554,7 @@ function loadTG() {
     $('setup-next') && ($('setup-next').onclick = setupNext);
     $('setup-finish') && ($('setup-finish').onclick = setupFinish);
     $('setup-warp-test') && ($('setup-warp-test').onclick = setupWarpTest);
+    $('svc-backup-file') && ($('svc-backup-file').addEventListener('change', svcBackupPicked));
     Array.prototype.forEach.call(document.querySelectorAll('#nav button[data-t]'), function (b) {
       b.onclick = function () { navTo(b.getAttribute('data-t')); };
     });
@@ -3351,6 +3620,7 @@ function loadTG() {
     setInterval(loadExt, 3600000);
     setInterval(function () { loadUpdate(); }, 30000);
     setInterval(function () { if (CFG.tab === 'logs') loadLog(); }, 10000);
+    setInterval(function () { if (CFG.tab === 'service') loadService(); }, 6000);
     setInterval(function () { if (CFG.tab === 'shop-plans' || CFG.tab === 'shop-billing') loadSubs(); }, 15000);
     var orig = loadState;
     loadState = function (soft) { orig(soft); };

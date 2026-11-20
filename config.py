@@ -14,13 +14,14 @@ import urllib.request
 import uuid
 from collections import deque
 
-VERSION = "1.10.25"
-VERSION_NAME = "Кот-кран"
+VERSION = "1.10.26"
+VERSION_NAME = "Кот-смотритель"
 APP_NAME = "Aurora"
 
 # История версий для вкладки «Версии» (v, имя, дата).
 # ВАЖНО: без дублей — иначе вкладка показывает одну версию несколько раз.
 VERSION_HISTORY = (
+    ("1.10.26", "Кот-смотритель", "19.11.2026"),
     ("1.10.25", "Кот-кран", "18.11.2026"),
     ("1.10.24", "Кот-выключатель", "18.11.2026"),
     ("1.10.23", "Кот-обновщик", "18.11.2026"),
@@ -61,6 +62,7 @@ VERSION_HISTORY = (
 
 # Описания версий для вкладки «Версии» (v -> текст). Показываются в панели.
 VERSION_NOTES = {
+    "1.10.26": "Кот-смотритель принёс в панель вкладку «Сервис» с четырьмя полезными приборами. Диагностика: одна кнопка проверяет порт xray, прямой выход, выход через прокси, выходной IP, DNS, IPv6, TG-WS, ру-сегмент и оба резервных канала — с временем каждой проверки и итогом. Замер скорости: ping, загрузка и отдача через тот же порт, что у владельца, с историей последних замеров. Автопроверка ключей: расписание (раз в N минут) с журналом событий, чтобы мёртвые ключи не ждали утреннего нажатия кнопки. Бэкап: настройки, пул ключей и конфиги WARP/MASQUE упаковываются в ZIP, зашифрованный паролем владельца (scrypt + ChaCha20-Poly1305), и восстанавливаются на этой или другой машине; порты и учётные данные панели в архив не попадают, чтобы восстановление не могло закрыть доступ к серверу.",
     "1.10.25": "Кот-кран добавил выключатель внешнего VLESS-Reality :8443 на вкладку «Внешний доступ»: выключенный inbound исчезает из xray и порт закрывается, включённый — возвращается. Настройки по-прежнему берутся из env AURORA_VLESS_*, кнопка только гасит/поднимает сам inbound.",
     "1.10.24": "Кот-выключатель добавил в панель выключатели внешнего резервного канала (MASQUE/mihomo) и Telegram WS-прокси. На серверах, где внешний выход и TG не нужны, их теперь можно погасить одной кнопкой: выключенный канал останавливает mihomo, выключенный TG-WS останавливает прокси и не поднимает его. Заодно в Windows-сборку дотянуты обработчики MASQUE (вкладка там раньше отвечала ошибкой).",
     "1.10.23": "Кот-обновщик починил доставку новых модулей при автообновлении: в список доставляемых файлов добавлен masque.py, а логика новых модулей теперь понимает файлы в корне архива (раньше такие молча пропускались, и узел падал на ModuleNotFoundError после обновления). Уже обновившиеся узлы с прошлым релизом починим доставкой masque.py.",
@@ -753,6 +755,10 @@ _SETTINGS_DEFAULTS = {
     "auto_join": False,          # при старте регистрироваться в меше головного (авто-джуin)
     "master_only": False,        # замок: подключиться/использовать может только головной
     "setup_complete": False,    # первый запуск public-сервера завершён
+    # A-1040 «Кот-смотритель»: автопроверка пула ключей по расписанию.
+    # 0 минут = выключено (тогда keycheck_enabled тоже не важен).
+    "keycheck_enabled": False,
+    "keycheck_interval_min": 60,
     "ui_port": UI_PORT,
     "xray_port": XRAY_PORT,
     "xray_api_port": XRAY_API_PORT,
@@ -1076,7 +1082,7 @@ def _validate_settings(raw):
         "vpn_mode", "auto_recovery", "auto_refresh", "lan_only",
         "block_scanners", "rate_limit", "twofa", "show_mesh", "show_subs",
         "mesh_master", "auto_join", "master_only", "setup_complete",
-        "masque_enabled", "tgws_enabled", "vless_enabled",
+        "masque_enabled", "tgws_enabled", "vless_enabled", "keycheck_enabled",
     )
     string_keys = (
         "continue_text", "ui_token", "server_name", "mesh_id", "mesh_token",
@@ -1096,6 +1102,11 @@ def _validate_settings(raw):
             raise ValueError("%s is not a string list" % key)
     if "policy_rev_accepted" in raw and not _is_nonnegative_int(raw["policy_rev_accepted"]):
         raise ValueError("policy_rev_accepted is not a nonnegative integer")
+    # A-1040: интервал автопроверки. 0 = выключено, максимум неделя.
+    if "keycheck_interval_min" in raw:
+        value = raw["keycheck_interval_min"]
+        if (type(value) is not int or value < 0 or value > 10080):
+            raise ValueError("keycheck_interval_min is out of range")
     if raw.get("ui_pin") and not re.fullmatch(r"[0-9]{6}", raw["ui_pin"]):
         raise ValueError("ui_pin must be six ASCII digits")
     if raw.get("ui_token") and not 12 <= len(raw["ui_token"]) <= 256:

@@ -4,8 +4,8 @@
 
 **Свой прокси, своя панель, до 5 игровых mesh-клиентов, чат и голос — бесплатно и без квот.**
 
-![Version](https://img.shields.io/badge/version-1.10.21-blue)
-![Release](https://img.shields.io/badge/release-1.10.21%20%22%D0%9A%D0%BE%D1%82-%D0%B4%D0%B5%D0%B1%D0%B0%D0%B3%22-blue)
+![Version](https://img.shields.io/badge/version-1.10.26-blue)
+![Release](https://img.shields.io/badge/release-1.10.26%20%22%D0%9A%D0%BE%D1%82-%D1%81%D0%BC%D0%BE%D1%82%D1%80%D0%B8%D1%82%D0%B5%D0%BB%D1%8C%22-blue)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 ![Platform](https://img.shields.io/badge/platform-linux%20%7C%20windows-lightgrey)
 ![Python](https://img.shields.io/badge/Python-3.12%20stdlib-3776AB?logo=python)
@@ -47,7 +47,7 @@
 - 🐾 **общая меш-сеть** — я умею ждать друзей, играть с ними в общей группе, переписываться и
   разговаривать.
 
-**Версия:** `VERSION=1.10.21`, `VERSION_NAME=Кот-дебаг`
+**Версия:** `VERSION=1.10.26`, `VERSION_NAME=Кот-смотритель`
 **Политика:** ревизия 2 (принимается при первом запуске)
 
 ### 🐾 Честно сразу
@@ -66,16 +66,16 @@ Aurora — **не VPN-сервис**, **не анонимайзер** и **не 
 
 ## 📦 Загрузка
 
-Мяу! Всё лежит в [Release v1.10.21 «Кот-дебаг»](https://github.com/efremov-aa/aurora-proxy/releases).
+Мяу! Всё лежит в [Release v1.10.26 «Кот-смотритель»](https://github.com/efremov-aa/aurora-proxy/releases).
 
 <details>
 <summary>📋 Ассеты релиза</summary>
 
 | Ассет | Что внутри |
 |---|---|
-| `Aurora-v1.10.21-linux.zip` | Linux-версия: модули, `ui/`, `proxy/`, `Dockerfile`, `docker-compose.yml`, systemd-юниты |
-| `Aurora-v1.10.21-windows.zip` | Windows-версия (папка `windows/`): те же модули + `bin/`, `nssm/`, `installer/`, `download_xray.ps1` |
-| `Aurora-Setup-1.10.21.exe` 🪟 | **Установщик для Windows**: ставит Aurora как службу **NSSM «Aurora»**, xray и TG-WS внутри, авто-обновление |
+| `Aurora-v1.10.26-linux.zip` | Linux-версия: модули, `ui/`, `proxy/`, `Dockerfile`, `docker-compose.yml`, systemd-юниты |
+| `Aurora-v1.10.26-windows.zip` | Windows-версия (папка `windows/`): те же модули + `bin/`, `nssm/`, `installer/`, `download_xray.ps1` |
+| `Aurora-Setup-1.10.26.exe` 🪟 | **Установщик для Windows**: ставит Aurora как службу **NSSM «Aurora»**, xray и TG-WS внутри, авто-обновление |
 | `*.sig` | Подпись Ed25519 каждого ассета: авто-обновление не примет неподписанный файл 🐾 |
 
 Подпись релизов проверена: Ed25519, fingerprint `ca4f87c9999e0282…`. Скачанный архив побайтно
@@ -94,6 +94,7 @@ Aurora — **не VPN-сервис**, **не анонимайзер** и **не 
 | 🐾 Общая меш-сеть | узлы в ролях `hub`/`node`, подписанный одноразовый invite (proof вместо токена) |
 | 🐾 До 5 mesh-клиентов для игр | групповая L3-подсеть `10.<группа>.<узел>.1`, прямой UDP-канал и рель с честной плашкой «через рель, +N мс» |
 | 🐾 Чат и голос | внутри общей сети, без отдельной подписки и без счётчиков |
+| 🐾 Сервис | диагностика канала, замер скорости, автопроверка ключей по расписанию, бэкап с паролем |
 
 Ни квот по трафику, ни лимита устройств, ни сроков. Ключи и xray — твои, панель — твоя,
 хвост наружу не торчит.
@@ -159,6 +160,11 @@ Aurora — **не VPN-сервис**, **не анонимайзер** и **не 
   при выключенном — пропуск.
 - 🌍 **Языки** — интерфейс на 10 языках (ru, en, es, de, fr, tr, pt, zh, ar, hi), тёмная и светлая тема,
   выбор языка живёт в браузере.
+- 🧰 **Сервис** — вкладка с четырьмя приборами: **диагностика** (порт xray, прямой выход, выход через
+  прокси, выходной IP, DNS/IPv6, TG-WS, ру-сегмент, WARP/MASQUE), **замер скорости** (ping/загрузка/
+  отдача через mixed-порт, история), **автопроверка ключей** по расписанию с журналом и **бэкап**
+  (настройки + пул ключей + конфиги WARP/MASQUE в ZIP, зашифрованный паролем владельца; порты и
+  учётные данные панели в архив не попадают).
 
 ### 🪟 Windows-сборка
 
@@ -206,6 +212,9 @@ aurora/
 ├── updater.py        # авто-обновление с GitHub Releases
 ├── release_sign.py   # Ed25519: подпись и проверка ассетов
 ├── warp.py           # резервный канал Cloudflare WARP: конфиги, режим, проба
+├── diag.py           # A-1040: самопроверка канала + замер скорости
+├── autocheck.py      # A-1040: автопроверка пула ключей по расписанию
+├── backup.py         # A-1040: бэкап/восстановление (ZIP по паролю)
 ├── meshtunnel.py     # релей-туннель узел↔мастер (поверх внешнего VLESS)
 ├── meshsignal.py     # сигналинг mesh для клиентов: offer/answer/ICE, чат и голос
 ├── mesh.py           # меш-сеть: узлы, invite, политика
@@ -266,7 +275,7 @@ docker compose up -d --build
 <details>
 <summary>🪟 Вариант 3 — Windows</summary>
 
-Скачайте `Aurora-Setup-1.10.21.exe` и запустите: ставится служба **NSSM «Aurora»**.
+Скачайте `Aurora-Setup-1.10.26.exe` и запустите: ставится служба **NSSM «Aurora»**.
 Данные — в `%LOCALAPPDATA%\Aurora`. Альтернатива — ручная установка из [`windows/README-windows.md`](windows/README-windows.md).
 
 </details>
@@ -326,6 +335,9 @@ docker compose up -d --build
 - `GET /api/warp`, `POST /api/warp/upload`, `POST /api/warp/use`, `POST /api/warp/mode` — резервный канал WARP.
 - `GET /api/mesh/policy`, `POST /api/mesh/node/add`, `POST /api/mesh/regenerate` — меш-сеть.
 - `POST /api/tgws/restart`, `POST /api/rusegment/check` — обслуживание каналов.
+- `GET /api/diag`, `POST /api/diag/run`; `GET /api/speed`, `POST /api/speed/run`;
+  `GET /api/autocheck`, `POST /api/autocheck/save`, `POST /api/autocheck/run`;
+  `POST /api/backup/export`, `POST /api/backup/import` — вкладка «Сервис» (только доверенный доступ).
 - `GET /api/log`, `GET /api/recovery/log`, `GET /api/tgws/status`.
 - `GET /api/security/status`; `POST /api/security/rotate`.
 - `GET /api/update/status|check|apply`.
@@ -356,7 +368,9 @@ docker compose up -d --build
 - релей-туннель между узлами: `test_a160_relay_tunnel.py`;
 - меш-реестр, ключи, recovery, телеметрия, RU-сегмент: `test_a064_mesh_invite.py`,
   `test_a041_vless.py`, `test_a032_recovery.py`, `test_a034_telemetry.py`,
-  `test_a033_direct.py`, `test_a043_bt.py`.
+  `test_a033_direct.py`, `test_a043_bt.py`;
+- вкладка «Сервис» (A-1040): `test_a1040_service.py` (диагностика/автопроверка/бэкап,
+  Linux+Windows) и `test_a1040_api.py` (живой smoke маршрутов).
 
 **Полный прогон разом** — обвязкой, которая заканчивается строкой `ALL_LOCAL_TEST_SCRIPTS_OK`.
 
@@ -371,7 +385,7 @@ python tests/test_a160_relay_tunnel.py # A160_RELAY_TUNNEL_OK
 И быстрая проверка синтаксиса:
 
 ```bash
-python -m py_compile api.py config.py core.py crypt.py extgate.py mesh.py     meshtunnel.py pool.py recovery.py run.py subs.py telemetry.py tgws.py updater.py warp.py
+python -m py_compile api.py autocheck.py backup.py config.py core.py crypt.py diag.py extgate.py mesh.py     meshtunnel.py pool.py recovery.py run.py subs.py telemetry.py tgws.py updater.py warp.py
 node --check ui/app.js && node --check ui/qr.js
 ```
 
@@ -461,6 +475,7 @@ node --check ui/app.js && node --check ui/qr.js
 | 🐾 Shared mesh network | nodes in `hub`/`node` roles, signed one-time invite (proof instead of token) |
 | 🐾 Up to 5 mesh clients for games | group L3 subnet `10.<group>.<node>.1`, direct UDP channel, and relay with an honest “via relay, +N ms” badge |
 | 🐾 Chat and voice | inside the shared network, with no separate subscription and no counters |
+| 🐾 Service tab | channel diagnostics, speed test, scheduled key checks, password-protected backup |
 
 No traffic quotas, no device limits, no expiry dates. The keys and xray are yours, the panel is yours,
 and the tail does not stick out.
