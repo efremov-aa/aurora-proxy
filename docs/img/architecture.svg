@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 560" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#7a8aa0"/>
+    </marker>
+    <style>
+      .box{fill:#ffffff;stroke:#d7e3ea;stroke-width:1.5;rx:10}
+      .pink{fill:#ffe3ef;stroke:#ff7ab8}
+      .mint{fill:#dff7ee;stroke:#3ecf9a}
+      .blue{fill:#e3efff;stroke:#5aa2ff}
+      .warn{fill:#fff3d6;stroke:#f0b429}
+      .t{font-size:14px;fill:#24313f}
+      .h{font-size:16px;font-weight:700;fill:#24313f}
+      .s{font-size:12px;fill:#5b6b7c}
+      .ln{stroke:#7a8aa0;stroke-width:1.6;fill:none;marker-end:url(#arr)}
+      .dash{stroke-dasharray:5 4}
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="960" height="560" fill="#f7fbfd"/>
+  <text x="24" y="34" class="h">🐱 Aurora — архитектура канала</text>
+  <text x="24" y="54" class="s">Клиент → xray → живой outbound. Панель управляет конфигом, резервом и мешем.</text>
+
+  <!-- Clients -->
+  <rect x="24" y="90" width="180" height="120" class="box blue" rx="10"/>
+  <text x="40" y="118" class="h">📱 Устройства</text>
+  <text x="40" y="142" class="t">LAN / телефон / ПК</text>
+  <text x="40" y="164" class="s">mixed :8899 (HTTP+SOCKS)</text>
+  <text x="40" y="184" class="s">внешний VLESS :8443</text>
+
+  <!-- xray -->
+  <rect x="270" y="80" width="220" height="150" class="box pink" rx="10"/>
+  <text x="286" y="108" class="h">🧠 xray</text>
+  <text x="286" y="132" class="t">inbounds: http-in / vless-in</text>
+  <text x="286" y="152" class="t">routing: правила + sniffing</text>
+  <text x="286" y="172" class="s">BitTorrent → direct</text>
+  <text x="286" y="192" class="s">catch-all → активный тег</text>
+  <text x="286" y="212" class="s">final = живой ключ с egress</text>
+
+  <!-- Outbounds -->
+  <rect x="560" y="60" width="180" height="64" class="box mint" rx="10"/>
+  <text x="576" y="86" class="h">🔑 VLESS Reality</text>
+  <text x="576" y="106" class="s">пул ключей + ротация</text>
+
+  <rect x="560" y="140" width="180" height="64" class="box mint" rx="10"/>
+  <text x="576" y="166" class="h">🌀 WARP</text>
+  <text x="576" y="186" class="s">WireGuard / noise</text>
+
+  <rect x="560" y="220" width="180" height="76" class="box mint" rx="10"/>
+  <text x="576" y="246" class="h">🛡️ MASQUE</text>
+  <text x="576" y="266" class="s">mihomo SOCKS :18808</text>
+  <text x="576" y="284" class="s">ключ + /reg локально</text>
+
+  <rect x="560" y="312" width="180" height="56" class="box" rx="10"/>
+  <text x="576" y="338" class="h">🏠 direct</text>
+  <text x="576" y="356" class="s">белый IP / свои сайты</text>
+
+  <!-- Internet -->
+  <rect x="800" y="150" width="136" height="120" class="box blue" rx="10"/>
+  <text x="816" y="180" class="h">🌍 Интернет</text>
+  <text x="816" y="204" class="s">Instagram / YouTube</text>
+  <text x="816" y="224" class="s">egress-IP Cloudflare</text>
+  <text x="816" y="244" class="s">или белый IP хоста</text>
+
+  <!-- Panel -->
+  <rect x="270" y="290" width="220" height="120" class="box warn" rx="10"/>
+  <text x="286" y="318" class="h">🏠 Панель :8890</text>
+  <text x="286" y="342" class="t">api.py / ui · state · ключи</text>
+  <text x="286" y="362" class="s">MASQUE ➕ Создать · WARP</text>
+  <text x="286" y="382" class="s">Сервис: диагностика/бэкап</text>
+  <text x="286" y="400" class="s">updater · подпись Ed25519</text>
+
+  <!-- TG-WS -->
+  <rect x="24" y="290" width="180" height="80" class="box" rx="10"/>
+  <text x="40" y="318" class="h">✈️ TG-WS :443</text>
+  <text x="40" y="340" class="s">секрет через FD 3</text>
+  <text x="40" y="358" class="s">systemd-режим</text>
+
+  <!-- Mesh -->
+  <rect x="270" y="450" width="470" height="80" class="box pink" rx="10"/>
+  <text x="286" y="478" class="h">🕸 Меш-сеть</text>
+  <text x="286" y="500" class="t">релей-туннель поверх VLESS :8443 · invite · политика хаба</text>
+  <text x="286" y="518" class="s">групповая L3-подсеть 10.&lt;группа&gt;.&lt;узел&gt;.1 · чат и голос</text>
+
+  <!-- Cloudflare API -->
+  <rect x="800" y="312" width="136" height="76" class="box" rx="10"/>
+  <text x="816" y="338" class="h">☁️ Cloudflare</text>
+  <text x="816" y="358" class="s">WARP API /reg</text>
+  <text x="816" y="376" class="s">MASQUE endpoint</text>
+
+  <!-- links -->
+  <path class="ln" d="M204,150 L270,150"/>
+  <path class="ln" d="M490,110 L560,92"/>
+  <path class="ln" d="M490,150 L560,172"/>
+  <path class="ln" d="M490,190 L560,258"/>
+  <path class="ln" d="M490,215 L560,340"/>
+  <path class="ln" d="M740,92 L800,180"/>
+  <path class="ln" d="M740,172 L800,200"/>
+  <path class="ln" d="M740,258 L800,220"/>
+  <path class="ln" d="M740,340 L800,240"/>
+  <path class="ln dash" d="M380,230 L380,290"/>
+  <path class="ln dash" d="M490,350 L560,258"/>
+  <path class="ln dash" d="M740,258 L800,350"/>
+  <path class="ln dash" d="M114,210 L114,290"/>
+  <path class="ln dash" d="M380,410 L380,450"/>
+  <path class="ln dash" d="M204,180 L270,480"/>
+</svg>
