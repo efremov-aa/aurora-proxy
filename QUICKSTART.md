@@ -39,7 +39,7 @@ systemctl --user enable --now aurora
 Открой `http://<host>:8890/`. Если панель отвечает `host not allowed`, добавь адрес:
 
 ```bash
-AURORA_EXTRA_HOSTS="10.1.0.238;myhost.lan"
+AURORA_EXTRA_HOSTS="10.0.0.5;myhost.lan"
 ```
 
 ### 🐳 Docker
