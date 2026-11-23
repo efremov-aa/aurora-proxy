@@ -1,0 +1,44 @@
+name: "✨ Предложить улучшение"
+description: "Идея для панели, канала, меш-сети или документации."
+title: "[feat] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Мяу! Идеи приветствуются 🐾. Сначала опиши **проблему**, потом решение —
+        так проще понять, нужно ли это всем.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Какую проблему решаем
+      description: "Что сейчас неудобно или невозможно."
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Что предлагаешь
+      description: "Как это должно работать в панели/API/CLI."
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Альтернативы
+      description: "Что пробовал сейчас и почему не подошло."
+  - type: dropdown
+    id: area
+    attributes:
+      label: Область
+      options:
+        - Панель / UI
+        - VLESS / ключи
+        - WARP / MASQUE
+        - Telegram WS
+        - Меш-сеть / чат / голос
+        - Сервис / диагностика / бэкап
+        - Документация
+        - Другое
+    validations:
+      required: true

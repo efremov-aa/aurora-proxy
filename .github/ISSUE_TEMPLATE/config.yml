@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Обсуждения и вопросы
+    url: https://github.com/efremov-aa/aurora-proxy/discussions
+    about: "Вопросы «как сделать», идеи и помощь — в Discussions, не в issue."
+  - name: ⚡ Быстрый старт
+    url: https://github.com/efremov-aa/aurora-proxy/blob/Aurora/QUICKSTART.md
+    about: "Короткая дорожка от установки до работающего прокси."
+  - name: 📖 README
+    url: https://github.com/efremov-aa/aurora-proxy/blob/Aurora/README.md
+    about: "Полное описание возможностей, ENV и API."

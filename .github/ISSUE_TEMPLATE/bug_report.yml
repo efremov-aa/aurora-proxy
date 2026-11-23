@@ -1,0 +1,77 @@
+name: "🐛 Сообщить о проблеме"
+description: "Что-то не работает: канал, панель, обновление, MASQUE/WARP."
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Мяу! Спасибо, что помогаешь сделать Aurora лучше 🐾.
+        **Не публикуй ключи, UUID, admin-токены и реальные IP** — замени их на `***`.
+  - type: input
+    id: version
+    attributes:
+      label: Версия Aurora
+      description: "Видно в панели или в `config.py` (например 1.10.27)."
+      placeholder: "1.10.27"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Как установлена
+      options:
+        - Windows (установщик)
+        - Windows (вручную)
+        - Linux (systemd)
+        - Docker
+        - Другое
+    validations:
+      required: true
+  - type: dropdown
+    id: channel
+    attributes:
+      label: Какой канал затронут
+      options:
+        - VLESS / ключи
+        - WARP
+        - MASQUE
+        - Telegram WS
+        - Меш-сеть
+        - Панель / UI
+        - Обновление
+        - Не знаю
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: Что происходит
+      description: "Ожидаемое и фактическое поведение."
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Шаги воспроизведения
+      placeholder: |
+        1. Открыл вкладку …
+        2. Нажал …
+        3. Увидел …
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Логи / вывод диагностики
+      description: "Вкладка «Сервис → Диагностика» или `GET /api/log`. Убери секреты."
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Проверки
+      options:
+        - label: Я убрал ключи, токены и реальные IP из текста.
+          required: true
+        - label: Я поискал похожие issue и Discussions.
+          required: true

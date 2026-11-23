@@ -14,6 +14,8 @@
 Что я умею, политика, окружение и меш-сеть — в [корневом README](../README.md); здесь только
 отличия Windows-сборки. 🐾
 
+⚡ Короткий путь «скачал → прокси работает» — в [QUICKSTART.md](../QUICKSTART.md).
+
 ## 📥 Установка (рекомендуется)
 
 1. Скачайте **`Aurora-Setup-1.10.27.exe`** из [Releases](https://github.com/efremov-aa/aurora-proxy/releases)

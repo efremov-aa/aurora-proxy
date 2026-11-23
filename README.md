@@ -21,6 +21,8 @@
 ## 📑 Содержание
 
 - [🚀 О проекте](#-о-проекте)
+- [📸 Как я выгляжу](#-как-я-выгляжу)
+- [⚡ Быстрый старт](QUICKSTART.md)
 - [📦 Загрузка](#-загрузка)
 - [✨ Что я умею бесплатно](#-что-я-умею-бесплатно)
 - [🧩 Дополнительные услуги](#-дополнительные-услуги-aurora)
@@ -33,6 +35,7 @@
 - [🛡 Безопасность и политика](#-моя-безопасность)
 - [📝 Замечания и честные грабли](#-замечания-и-честные-грабли)
 - [🧭 Решения и дорожная карта](#-решения-и-дорожная-карта)
+- [💬 Сообщество](#-сообщество)
 - [🇬🇧 English](#-english)
 
 ---
@@ -57,10 +60,20 @@ Aurora — **не VPN-сервис**, **не анонимайзер** и **не 
 **услуги самой Aurora** можно купить: это расширения и режимы для **твоей** Aurora, а не VPN и не
 обход белых списков. Туннель, ключи и панель — твои. Никаких продаж VPN в этой сборке нет.
 
-<!-- TODO: добавить скриншот веб-панели: docs/assets/panel.png -->
-<!-- TODO: добавить схему меш-сети: docs/assets/mesh.png -->
-<!-- TODO: добавить GIF чата/голоса: docs/assets/chat.gif -->
-<!-- TODO: добавить схему архитектуры: docs/assets/architecture.svg -->
+---
+
+## 📸 Как я выгляжу
+
+Мяу! Вот моя панель — без прикрас, скриншоты из демо-сборки 🐾.
+
+| Обзор | MASQUE | Сервис |
+| --- | --- | --- |
+| ![Панель Aurora](docs/img/panel.png) | ![Вкладка MASQUE](docs/img/masque.png) | ![Вкладка Сервис](docs/img/service.png) |
+
+> Данные на скриншотах обезличены (демо-IP из RFC 5737). Живой ключ и реальный адрес
+> владельца в репозиторий не попадают.
+
+⚡ Короткая дорожка «скачал → прокси работает» — в [QUICKSTART.md](QUICKSTART.md).
 
 ---
 
@@ -245,6 +258,8 @@ Windows-зеркало — в `windows/` (те же модули + `bin/`, `nssm
 
 ## 🚀 Как меня запустить
 
+> ⚡ Сначала загляни в [QUICKSTART.md](QUICKSTART.md) — там короткий путь без лишних деталей.
+
 <details>
 <summary>🐳 Вариант 1 — Docker (рекомендуется)</summary>
 
@@ -334,6 +349,9 @@ docker compose up -d --build
 - `POST /api/keys/check` — проверить все ключи (TCP + egress), мёртвые в блеклист.
 - `POST /api/keys/add {uri}` / `POST /api/keys/remove {uri}` / `POST /api/keys/active {tag}` / `POST /api/rotate`.
 - `GET /api/warp`, `POST /api/warp/upload`, `POST /api/warp/use`, `POST /api/warp/mode` — резервный канал WARP.
+- `GET /api/masque`, `POST /api/masque/create`, `POST /api/masque/fetch`, `POST /api/masque/upload`,
+  `POST /api/masque/select`, `POST /api/masque/apply`, `POST /api/masque/probe`,
+  `POST /api/masque/enable` — резерв MASQUE через mihomo; `create` делает ключ и регистрацию локально.
 - `GET /api/mesh/policy`, `POST /api/mesh/node/add`, `POST /api/mesh/regenerate` — меш-сеть.
 - `POST /api/tgws/restart`, `POST /api/rusegment/check` — обслуживание каналов.
 - `GET /api/diag`, `POST /api/diag/run`; `GET /api/speed`, `POST /api/speed/run`;
@@ -436,6 +454,16 @@ node --check ui/app.js && node --check ui/qr.js
 
 🐾 Ни один пункт из раздела «В будущих обновлениях» в ROADMAP.md нельзя считать выполненным,
 пока он там не отмечен как реализованный. Мяу!
+
+---
+
+## 💬 Сообщество
+
+Мяу! Если что-то непонятно или есть идея — приходи 🐾:
+
+- 💬 **[Discussions](https://github.com/efremov-aa/aurora-proxy/discussions)** — вопросы «как сделать», идеи, помощь.
+- 🐛 **[Issues](https://github.com/efremov-aa/aurora-proxy/issues)** — баги и предложения по шаблонам (ключи и токены не публикуй).
+- ⚡ **[QUICKSTART.md](QUICKSTART.md)** — быстрый старт.
 
 ---
 
