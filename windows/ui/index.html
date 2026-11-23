@@ -315,13 +315,14 @@
             <div class="kchk-foot">
               <input type="file" id="masque-file" accept=".json,.yaml,.yml,application/json,text/yaml" hidden>
               <input type="text" id="masque-name" class="inp" placeholder="Имя конфига" maxlength="40" style="width:150px">
-              <button class="btn small primary" data-act="masque-fetch" title="Выпустить свежий MASQUE-конфиг и сразу поднять канал">✨ Получить конфиг с сайта</button>
+              <button class="btn small primary" data-act="masque-create" title="Создать MASQUE-конфиг локально: ключ + регистрация Cloudflare, без сайта">➕ Создать конфиг</button>
+              <button class="btn small" data-act="masque-fetch" title="Выпустить свежий MASQUE-конфиг и сразу поднять канал">✨ Получить конфиг с сайта</button>
               <button class="btn small" data-act="masque-upload">⬇ Загрузить конфиг</button>
               <button class="btn small" data-act="masque-apply">▶ Применить</button>
               <button class="btn small" data-act="masque-clear">🗑 Удалить всё</button>
               <button class="btn small" id="masque-toggle" data-act="masque-toggle">⏹ Выключить внешний канал</button>
             </div>
-            <div class="hint" id="masque-note">«Получить конфиг с сайта» — свежие ключи с генератора, эндпоинт и проверка выхода автоматически. Конфиг вручную: https://warp-generation.github.io/ — JSON или Clash-YAML.</div>
+            <div class="hint" id="masque-note">«➕ Создать конфиг» — свежий ключ и регистрация в Cloudflare прямо здесь, без сайта-генератора 🐾. «✨ Получить конфиг с сайта» — запасной вариант. Конфиг вручную: https://warp-generation.github.io/ — JSON или Clash-YAML.</div>
           </div>
         </div>
       </section>

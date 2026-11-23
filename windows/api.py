@@ -813,6 +813,44 @@ def _project_update_status(trusted):
     return out
 
 
+def _reserve_egress(st):
+    """A-MASQUE-EGRESS: IP активного резерва, когда xray-канал молчит.
+
+    MASQUE/WARP поднимаются отдельным процессом mihomo, поэтому
+    core.egress_ip() о них не знает и отдаёт '-' — панель показывала
+    «Выходной IP -» даже при работающем туннеле. Берём самый свежий
+    результат пробы у активного канала (MASQUE или обычный WARP).
+    """
+    best = ("", 0)
+
+    def _take(item):
+        if not isinstance(item, dict):
+            return
+        ip = str(item.get("egress") or "").strip()
+        if ip == "-" or not re.match(r"^\d{1,3}(\.\d{1,3}){3}$", ip):
+            return
+        try:
+            ts = int(item.get("egress_ts") or 0)
+        except (TypeError, ValueError):
+            ts = 0
+        nonlocal best
+        if ts >= best[1]:
+            best = (ip, ts)
+
+    for key in ("masque", "warp"):
+        ch = st.get(key) or {}
+        if not isinstance(ch, dict) or not ch.get("active"):
+            continue
+        # Верхнее поле живёт в памяти и сбрасывается при рестарте панели,
+        # а egress в configs[...] читается из файла — надёжнее.
+        _take(ch)
+        for item in (ch.get("configs") or []):
+            if isinstance(item, dict) and (item.get("active")
+                                           or item.get("name") == ch.get("name")):
+                _take(item)
+    return best[0]
+
+
 def build_state(local=True):
     st = config.get_state()
     st["version"] = config.VERSION
@@ -885,6 +923,12 @@ def build_state(local=True):
     except Exception:
         st["masque"] = {"loaded": False, "count": 0, "name": "",
                         "endpoint": "", "egress": "-"}
+    # A-MASQUE-EGRESS: показать живой IP резерва, если xray не дал свой.
+    # В windows-ветке блок `not local` уже очистил поле — не воскрешаем его.
+    if local and st.get("egress_ip") in ("", "-", None):
+        fallback = _reserve_egress(st)
+        if fallback:
+            st["egress_ip"] = fallback
     # A-118: выключатели внешнего канала и TG-WS — в состоянии панели.
     try:
         st["masque_enabled"] = masque.enabled()
@@ -1392,6 +1436,8 @@ class Handler(BaseHTTPRequestHandler):
             "/api/masque/apply": self._masque_apply,
             "/api/masque/probe": self._masque_probe,
             "/api/masque/fetch": self._masque_fetch,
+            # A-MASQUE-CREATE: sozdat konfig LOKALNO (bez sayta-generatora).
+            "/api/masque/create": self._masque_create,
             "/api/masque/enable": self._masque_enable,
             "/api/keys/add": self._keys_add,
             "/api/keys/refresh": self._keys_refresh,
@@ -1644,6 +1690,20 @@ class Handler(BaseHTTPRequestHandler):
         """A-MASQUE-FIX: sam sozdat konfig na sayte i primenit k mihomo."""
         res = masque.fetch_apply()
         config.log("api: A-MASQUE avto-sozdanie ok=%s %s"
+                   % (res.get("ok"), res.get("name") or res.get("error")))
+        out = masque.status()
+        out.update(res)
+        self._send(*_json(out))
+
+    def _masque_create(self, data):
+        """A-MASQUE-CREATE: sozdat MASQUE-konfig localno i podnyat kanal."""
+        name = data.get("name") if isinstance(data.get("name"), str) else ""
+        try:
+            res = masque.create_apply(name)
+        except Exception as exc:
+            config.log("api: A-MASQUE-CREATE isklyuchenie: %s" % str(exc)[:120])
+            res = {"ok": False, "error": "create failed: %s" % str(exc)[:80]}
+        config.log("api: A-MASQUE-CREATE ok=%s %s"
                    % (res.get("ok"), res.get("name") or res.get("error")))
         out = masque.status()
         out.update(res)

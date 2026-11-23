@@ -4,8 +4,8 @@
 
 **Свой прокси, своя панель, до 5 игровых mesh-клиентов, чат и голос — бесплатно и без квот.**
 
-![Version](https://img.shields.io/badge/version-1.10.26-blue)
-![Release](https://img.shields.io/badge/release-1.10.26%20%22%D0%9A%D0%BE%D1%82-%D1%81%D0%BC%D0%BE%D1%82%D1%80%D0%B8%D1%82%D0%B5%D0%BB%D1%8C%22-blue)
+![Version](https://img.shields.io/badge/version-1.10.27-blue)
+![Release](https://img.shields.io/badge/release-1.10.27%20%22%D0%9A%D0%BE%D1%82-%D1%81%D0%BE%D0%B7%D0%B4%D0%B0%D1%82%D0%B5%D0%BB%D1%8C%22-blue)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 ![Platform](https://img.shields.io/badge/platform-linux%20%7C%20windows-lightgrey)
 ![Python](https://img.shields.io/badge/Python-3.12%20stdlib-3776AB?logo=python)
@@ -47,7 +47,7 @@
 - 🐾 **общая меш-сеть** — я умею ждать друзей, играть с ними в общей группе, переписываться и
   разговаривать.
 
-**Версия:** `VERSION=1.10.26`, `VERSION_NAME=Кот-смотритель`
+**Версия:** `VERSION=1.10.27`, `VERSION_NAME=Кот-создатель`
 **Политика:** ревизия 2 (принимается при первом запуске)
 
 ### 🐾 Честно сразу
@@ -66,16 +66,16 @@ Aurora — **не VPN-сервис**, **не анонимайзер** и **не 
 
 ## 📦 Загрузка
 
-Мяу! Всё лежит в [Release v1.10.26 «Кот-смотритель»](https://github.com/efremov-aa/aurora-proxy/releases).
+Мяу! Всё лежит в [Release v1.10.27 «Кот-создатель»](https://github.com/efremov-aa/aurora-proxy/releases).
 
 <details>
 <summary>📋 Ассеты релиза</summary>
 
 | Ассет | Что внутри |
 |---|---|
-| `Aurora-v1.10.26-linux.zip` | Linux-версия: модули, `ui/`, `proxy/`, `Dockerfile`, `docker-compose.yml`, systemd-юниты |
-| `Aurora-v1.10.26-windows.zip` | Windows-версия (папка `windows/`): те же модули + `bin/`, `nssm/`, `installer/`, `download_xray.ps1` |
-| `Aurora-Setup-1.10.26.exe` 🪟 | **Установщик для Windows**: ставит Aurora как службу **NSSM «Aurora»**, xray и TG-WS внутри, авто-обновление |
+| `Aurora-v1.10.27-linux.zip` | Linux-версия: модули, `ui/`, `proxy/`, `Dockerfile`, `docker-compose.yml`, systemd-юниты |
+| `Aurora-v1.10.27-windows.zip` | Windows-версия (папка `windows/`): те же модули + `bin/`, `nssm/`, `installer/`, `download_xray.ps1` |
+| `Aurora-Setup-1.10.27.exe` 🪟 | **Установщик для Windows**: ставит Aurora как службу **NSSM «Aurora»**, xray и TG-WS внутри, авто-обновление |
 | `*.sig` | Подпись Ed25519 каждого ассета: авто-обновление не примет неподписанный файл 🐾 |
 
 Подпись релизов проверена: Ed25519, fingerprint `ca4f87c9999e0282…`. Скачанный архив побайтно
@@ -95,6 +95,7 @@ Aurora — **не VPN-сервис**, **не анонимайзер** и **не 
 | 🐾 До 5 mesh-клиентов для игр | групповая L3-подсеть `10.<группа>.<узел>.1`, прямой UDP-канал и рель с честной плашкой «через рель, +N мс» |
 | 🐾 Чат и голос | внутри общей сети, без отдельной подписки и без счётчиков |
 | 🐾 Сервис | диагностика канала, замер скорости, автопроверка ключей по расписанию, бэкап с паролем |
+| 🐾 Резерв WARP/MASQUE | конфиг создаётся прямо в панели (`➕ Создать`), ключ и регистрация Cloudflare — локально, сайт-генератор остался запасным; канал поднимается через mihomo, выход проверяется автоматически |
 
 Ни квот по трафику, ни лимита устройств, ни сроков. Ключи и xray — твои, панель — твоя,
 хвост наружу не торчит.
@@ -275,7 +276,7 @@ docker compose up -d --build
 <details>
 <summary>🪟 Вариант 3 — Windows</summary>
 
-Скачайте `Aurora-Setup-1.10.26.exe` и запустите: ставится служба **NSSM «Aurora»**.
+Скачайте `Aurora-Setup-1.10.27.exe` и запустите: ставится служба **NSSM «Aurora»**.
 Данные — в `%LOCALAPPDATA%\Aurora`. Альтернатива — ручная установка из [`windows/README-windows.md`](windows/README-windows.md).
 
 </details>

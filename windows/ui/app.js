@@ -1455,6 +1455,23 @@
       }
     }).catch(function () { MASQUE_FETCH_BUSY = false; });
   }
+  // A-MASQUE-CREATE: создать конфиг локально (свой EC-ключ + /reg Cloudflare).
+  // Разделяем busy-флаг с fetch, чтобы две кнопки не лезли в mihomo одновременно.
+  function masqueCreate() {
+    if (MASQUE_FETCH_BUSY) return toast('конфиг уже создаётся — ждите', false);
+    MASQUE_FETCH_BUSY = true;
+    toast('🐾 Создаю MASQUE-конфиг локально: ключ → Cloudflare → mihomo → проба (~30 с)…', true);
+    postJSON('/api/masque/create', {}).then(function (j) {
+      MASQUE_FETCH_BUSY = false;
+      if (j && j.configs) masqueRender(j);
+      if (j && j.ok) {
+        toast('MASQUE создан: ' + (j.egress || '–') +
+          (j.endpoint ? (' · ' + j.endpoint) : ''), true);
+      } else {
+        toast('MASQUE: ' + ((j && (j.error || j.msg)) || 'не прошло'), false);
+      }
+    }).catch(function () { MASQUE_FETCH_BUSY = false; });
+  }
   function masqueOnFile() {
     var f = document.getElementById('masque-file') && document.getElementById('masque-file').files[0];
     if (!f) return;
@@ -3477,6 +3494,7 @@ function loadTG() {
     'warp-upload': function () { warpUpload(); },
     // A-MASQUE-PUB: rezerv WARP cherez mihomo
     'masque-upload': function () { masqueUpload(); },
+    'masque-create': function () { masqueCreate(); },
     'masque-fetch': function () { masqueFetch(); },
     'masque-select': function (t) { masqueSelect(t.getAttribute('data-name2') || ''); },
     'masque-probe-one': function (t) { masqueProbeOne(t.getAttribute('data-name2') || ''); },

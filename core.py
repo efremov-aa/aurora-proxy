@@ -172,6 +172,40 @@ def _mesh_rule_position(rules):
     return len(rules)
 
 
+def _masque_outbounds():
+    """A-MASQUE-ROUTE: zhivoy vyhod cherez lokalnyy mihomo (MASQUE).
+
+    Chistyy WireGuard WARP na nekotoryh masterakh ne otvechaet: ipify i
+    instagram cherez xray visnut, togda kak mihomo na mixed-port 18808
+    normalno otdayot 104.28.x.x. Podmenyaem outbound-y s tegami warp/
+    warp-noise na freedom cherez lokalnyy SOCKS mihomo. Catch-all pravila
+    i status kanala ostayutsya na tege "warp" - menyaetsya tolko to,
+    kuda on realno vedom.
+    """
+    try:
+        import masque as _masque
+        st = _masque.status()
+        if not st.get("loaded"):
+            return None
+        port = int(getattr(_masque, "MIXED_PORT", 18808))
+        sk = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sk.settimeout(0.6)
+        try:
+            sk.connect(("127.0.0.1", port))
+        finally:
+            sk.close()
+    except Exception:
+        return None
+    socks = {"tag": "masque-socks", "protocol": "socks",
+             "settings": {"servers": [{"address": "127.0.0.1", "port": port}]}}
+
+    def _via(tag):
+        return {"tag": tag, "protocol": "freedom", "settings": {},
+                "streamSettings": {"sockopt": {"dialerProxy": "masque-socks"}}}
+
+    return [socks, _via(warp.WARP_TAG), _via(warp.NOISE_TAG)]
+
+
 def _warp_outbounds(target=None):
     """A-WARP-PUB: outbound-y WARP+noise iz zagruzhennogo konfiga (ili None).
 
@@ -182,6 +216,10 @@ def _warp_outbounds(target=None):
     """
     if warp.mode() == "off" and target != warp.WARP_TAG:
         return None
+    # A-MASQUE-ROUTE: snachala zhivoy MASQUE, potom staryy WireGuard.
+    via = _masque_outbounds()
+    if via:
+        return via
     return warp.load()
 
 

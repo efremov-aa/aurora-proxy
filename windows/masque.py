@@ -8,9 +8,12 @@ MASQUE) — это JSON с privKey/peer_pub/client_ipv4, либо Clash-YAML
 с type: masque.
 """
 
+import base64
+import datetime
 import json
 import os
 import re
+import secrets
 import subprocess
 import sys
 import threading
@@ -64,6 +67,9 @@ MIHOMO_BIN = os.path.join(MIHOMO_DIR, "mihomo.exe" if sys.platform.startswith("w
 MIHOMO_CFG = os.path.join(MIHOMO_DIR, "config.yaml")
 MIXED_PORT = 18808
 PROBE_URL = "http://api.ipify.org"
+# A-MASQUE-EGRESS: несколько источников IP — если один недоступен из-под
+# туннеля, проба всё равно должна показать живой выход.
+PROBE_URLS = (PROBE_URL, "https://api.ipify.org", "https://ifconfig.me/ip")
 STORE = os.path.join(config.DATA_DIR, "masque_configs.json")
 MAX_CONFIGS = 32
 MAX_CONFIG_BYTES = 256 * 1024
@@ -95,6 +101,109 @@ _LOCK = __import__("threading").RLock()
 _LAST = {"ip": "-", "ts": 0.0, "reason": ""}
 _NAME_RE = re.compile(r"^[A-Za-z0-9 _.\-]{1,%d}$" % MAX_NAME_LEN)
 _B64_RE = re.compile(r"^[A-Za-z0-9+/=_-]{40,}$")
+
+# A-MASQUE-CREATE: локальный выпуск конфига без сайта-генератора.
+# Server EC P-256 public key (SubjectPublicKeyInfo DER), стабилен у Cloudflare;
+# совпадает с peer_pub у https://masque-vercel.warp-api.cfd (проверено 3 запроса).
+MASQUE_SERVER_PUB = (
+    "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEIaU7MToJm9NKp8YfGxR6r+"
+    "/h4mcG7SxI8tsW8OR1A5tv/zCzVbCRRh2t87/kxnP6lAy0lkr7qYwu+ox+k3dr6w=="
+)
+CF_WARP_API = "https://api.cloudflareclient.com/v0i1909051800"
+
+# secp256r1 (NIST P-256), параметры кривой — только stdlib, без cryptography.
+_P256_P = 0xffffffff00000001000000000000000000000000ffffffffffffffffffffffff
+_P256_A = _P256_P - 3
+_P256_B = 0x5ac635d8aa3a93e7b3ebbd55769886bc651d06b0cc53b0f63bce3c3e27d2604b
+_P256_GX = 0x6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296
+_P256_GY = 0x4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5
+_P256_N = 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551
+_OID_EC_PUBLIC_KEY = bytes.fromhex("06072a8648ce3d0201")
+_OID_PRIME256V1 = bytes.fromhex("06082a8648ce3d030107")
+
+
+def _der_len(value):
+    if value < 128:
+        return bytes((value,))
+    raw = value.to_bytes((value.bit_length() + 7) // 8, "big")
+    return bytes((0x80 | len(raw),)) + raw
+
+
+def _der(tag, payload):
+    return bytes((tag,)) + _der_len(len(payload)) + payload
+
+
+def _der_int(value):
+    raw = value.to_bytes(max(1, (value.bit_length() + 7) // 8), "big")
+    if raw[0] & 0x80:
+        raw = b"\x00" + raw
+    return _der(0x02, raw)
+
+
+def _p256_inv(value):
+    return pow(value, _P256_P - 2, _P256_P)
+
+
+def _p256_add(a, b):
+    if a is None:
+        return b
+    if b is None:
+        return a
+    x1, y1 = a
+    x2, y2 = b
+    if x1 == x2:
+        if (y1 + y2) % _P256_P == 0:
+            return None
+        slope = (3 * x1 * x1 + _P256_A) * _p256_inv(2 * y1) % _P256_P
+    else:
+        slope = (y2 - y1) * _p256_inv(x2 - x1) % _P256_P
+    x3 = (slope * slope - x1 - x2) % _P256_P
+    y3 = (slope * (x1 - x3) - y1) % _P256_P
+    return x3, y3
+
+
+def _p256_mul(scalar, point=None):
+    """Скалярное умножение точки P-256 (double-and-add)."""
+    if point is None:
+        point = (_P256_GX, _P256_GY)
+    result = None
+    while scalar:
+        if scalar & 1:
+            result = _p256_add(result, point)
+        point = _p256_add(point, point)
+        scalar >>= 1
+    return result
+
+
+def _p256_keypair():
+    """Свежая пара EC P-256: (priv DER/SEC1, pub DER/SPKI) в base64."""
+    secret = secrets.randbelow(_P256_N - 1) + 1
+    qx, qy = _p256_mul(secret)
+    point = (b"\x04" + qx.to_bytes(32, "big") + qy.to_bytes(32, "big"))
+    priv = _der(0x30,
+                _der_int(1)
+                + _der(0x04, secret.to_bytes(32, "big"))
+                + _der(0xa0, _OID_PRIME256V1)
+                + _der(0xa1, _der(0x03, b"\x00" + point)))
+    spki = _der(0x30,
+                _der(0x30, _OID_EC_PUBLIC_KEY + _OID_PRIME256V1)
+                + _der(0x03, b"\x00" + point))
+    return base64.b64encode(priv).decode(), base64.b64encode(spki).decode()
+
+
+def _cf_api(method, path, payload=None, token=""):
+    """Один вызов Cloudflare WARP API (A-MASQUE-CREATE)."""
+    import urllib.error
+    import urllib.request
+    headers = {"User-Agent": "CloudflareWarp/1.0",
+               "Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = "Bearer " + token
+    body = json.dumps(payload).encode("utf-8") if payload is not None else None
+    req = urllib.request.Request(CF_WARP_API + path, data=body,
+                                 method=method, headers=headers)
+    with urllib.request.urlopen(req, timeout=20) as resp:
+        return json.loads(resp.read().decode("utf-8"))
 
 
 def clean_name(value, fallback=""):
@@ -348,47 +457,84 @@ def _service_cmd(action):
     return ["systemctl", "--user", action, "mihomo"]
 
 
+def _mihomo_release_tag():
+    """A-MASQUE-FIX: свежий тег mihomo через redirect /releases/latest.
+
+    Без GitHub API (там rate limit) и без хардкода версии: GitHub сам
+    редиректит на /releases/tag/vX.Y.Z, откуда берём тег для имени ассета.
+    """
+    import urllib.request
+    try:
+        req = urllib.request.Request(
+            "https://github.com/MetaCubeX/mihomo/releases/latest",
+            headers={"User-Agent": "Aurora/" + str(config.VERSION)})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            final_url = r.geturl()
+        m = re.search(r"/tag/(v\d+\.\d+\.\d+)", final_url)
+        return m.group(1) if m else ""
+    except Exception:
+        return ""
+
+
 def ensure_mihomo():
-    """Проверить/скачать mihomo. Возвращает (ok, error)."""
+    """Проверить/скачать mihomo. Возвращает (ok, error).
+
+    A-MASQUE-FIX: раньше качали mihomo-windows-amd64-compatible.exe и
+    mihomo-linux-amd64-compatible.gz. С v1.19.x ассеты переименованы:
+    …-compatible-v1.19.34.zip (Windows) и …-compatible-v1.19.34.gz.
+    Старые URL дают 404 — канал не поднимался на свежей установке.
+    """
     if os.path.isfile(MIHOMO_BIN):
         return True, ""
     os.makedirs(MIHOMO_DIR, exist_ok=True)
     arch = "amd64" if sys.maxsize > 2 ** 32 else "386"
-    if sys.platform.startswith("win"):
-        name = "mihomo-windows-%s-compatible.exe" % arch
-        url = ("https://github.com/MetaCubeX/mihomo/releases/latest/download/"
-               + name)
-        dest = MIHOMO_BIN
-    elif sys.platform == "darwin":
-        name = "mihomo-darwin-%s-compatible.gz" % arch
-        url = ("https://github.com/MetaCubeX/mihomo/releases/latest/download/"
-               + name)
-        dest = os.path.join(MIHOMO_DIR, "m.gz")
-    else:
-        name = "mihomo-linux-%s-compatible.gz" % arch
-        url = ("https://github.com/MetaCubeX/mihomo/releases/latest/download/"
-               + name)
-        dest = os.path.join(MIHOMO_DIR, "m.gz")
+    is_win = sys.platform.startswith("win")
+    is_mac = sys.platform == "darwin"
+    plat = "windows" if is_win else ("darwin" if is_mac else "linux")
+    ext = "zip" if is_win else "gz"
     import urllib.request
-    try:
-        with urllib.request.urlopen(url, timeout=60) as r:
-            data = r.read()
-        with open(dest, "wb") as f:
-            f.write(data)
-        if dest.endswith(".gz"):
-            import gzip
-            with gzip.open(dest, "rb") as f:
-                blob = f.read()
+    tag = _mihomo_release_tag()
+    # Новый формат имени ассета (с версией) + старый как запасной вариант.
+    names = []
+    if tag:
+        names.append("mihomo-%s-%s-compatible-%s.%s" % (plat, arch, tag, ext))
+    names.append("mihomo-%s-%s-compatible.%s" % (plat, arch, ext))
+    if is_win:
+        names.append("mihomo-windows-%s-compatible.exe" % arch)
+    base = "https://github.com/MetaCubeX/mihomo/releases/"
+    urls = [base + "download/" + tag + "/" + n for n in names if tag]
+    if tag:
+        urls.append(base + "latest/download/" + names[-1])
+    else:
+        urls = [base + "latest/download/" + n for n in names]
+    last_err = ""
+    for url in urls:
+        try:
+            with urllib.request.urlopen(url, timeout=60) as r:
+                data = r.read()
+            if len(data) < 100000:
+                last_err = "too small: %d" % len(data)
+                continue
+            if url.endswith(".zip"):
+                import io
+                import zipfile
+                with zipfile.ZipFile(io.BytesIO(data)) as z:
+                    exe = next((n for n in z.namelist()
+                                if n.lower().endswith(".exe")), "")
+                    if not exe:
+                        last_err = "no exe in zip"
+                        continue
+                    data = z.read(exe)
+            elif url.endswith(".gz"):
+                import gzip
+                data = gzip.decompress(data)
             with open(MIHOMO_BIN, "wb") as f:
-                f.write(blob)
-            try:
-                os.remove(dest)
-            except OSError:
-                pass
-        os.chmod(MIHOMO_BIN, 0o755)
-        return True, ""
-    except Exception as exc:
-        return False, "mihomo download failed: %s" % str(exc)[:120]
+                f.write(data)
+            os.chmod(MIHOMO_BIN, 0o755)
+            return True, ""
+        except Exception as exc:
+            last_err = str(exc)[:100]
+    return False, "mihomo download failed: %s" % last_err
 
 
 def apply(name=""):
@@ -459,6 +605,39 @@ def set_enabled(value):
     return st
 
 
+def _probe_egress(port=18809, timeout=8):
+    """A-MASQUE-EGRESS: узнать IP выхода через локальный mixed-port mihomo.
+
+    Раньше проба звала внешний `curl` из PATH. На минимальных установках
+    (в т.ч. на мастере) его нет — канал работает, а панель показывает
+    "Выходной IP -". Теперь основной путь — чистый stdlib urllib через
+    HTTP-прокси 127.0.0.1:<port>; curl остаётся только запасным вариантом.
+    Возвращает IPv4-строку или "".
+    """
+    import urllib.request
+    proxy = "http://127.0.0.1:%d" % int(port)
+    attempt = max(2, min(int(timeout), 4))
+    opener = urllib.request.build_opener(
+        urllib.request.ProxyHandler({"http": proxy, "https": proxy}))
+    for url in PROBE_URLS:
+        try:
+            with opener.open(url, timeout=attempt) as resp:
+                text = resp.read(256).decode("utf-8", "replace").strip()
+            if re.match(r"^\d{1,3}(\.\d{1,3}){3}$", text):
+                return text
+        except Exception:
+            continue
+    # Запасной путь: системный curl (если есть), один адрес, короткий таймаут.
+    curls = (["curl.exe"] if sys.platform.startswith("win") else ["curl"])
+    r = _run(curls + ["-sS", "-m", str(attempt), "-x", proxy, PROBE_URLS[0]],
+             timeout=attempt + 4)
+    if r is not None and getattr(r, "returncode", 1) == 0:
+        text = r.stdout.decode("utf-8", "replace").strip()
+        if re.match(r"^\d{1,3}(\.\d{1,3}){3}$", text):
+            return text
+    return ""
+
+
 def probe(timeout=20, name=""):
     """Поднять временный mihomo с выбранным конфигом и узнать выходной IP.
 
@@ -501,19 +680,12 @@ def _probe_impl(timeout=20, name=""):
     try:
         proc = subprocess.Popen([MIHOMO_BIN, "-d", tmp_dir],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        ip = None
+        ip = ""
         deadline = time.time() + max(5, int(timeout))
         while time.time() < deadline:
-            args = ["curl", "-sS", "-m", "8", "-x", "http://127.0.0.1:18809", PROBE_URL]
-            if sys.platform.startswith("win"):
-                args = ["curl.exe", "-sS", "-m", "8", "-x",
-                        "http://127.0.0.1:18809", PROBE_URL]
-            r = _run(args, timeout=12)
-            if r is not None and getattr(r, "returncode", 1) == 0:
-                text = r.stdout.decode("utf-8", "replace").strip()
-                if re.match(r"^\d{1,3}(\.\d{1,3}){3}$", text):
-                    ip = text
-                    break
+            ip = _probe_egress(18809, 8)
+            if ip:
+                break
             time.sleep(1.0)
         if ip:
             record_probe(ip, "probe", key)
@@ -535,6 +707,88 @@ def _probe_impl(timeout=20, name=""):
 
 
 MSQUE_BACKEND = "https://masque-vercel.warp-api.cfd"
+
+
+def create(name="", endpoint=None):
+    """A-MASQUE-CREATE: СОЗДАТЬ MASQUE-конфиг локально, без сайта-генератора.
+
+    Рецепт проверен вживую (egress 104.28.245.231):
+      1) генерируем свежую пару EC P-256 (только stdlib, DER SEC1 + SPKI);
+      2) регистрируем публичку через POST /reg (иначе нет egress — проверено);
+      3) собираем JSON генератора: privKey/peer_pub/client_ipv4,
+         эндпоинт подбираем сами, т.к. сайт его не отдаёт.
+    Возвращает то же, что install(): {ok, name, endpoint, count}.
+    """
+    try:
+        priv_b64, pub_b64 = _p256_keypair()
+    except Exception as exc:
+        return {"ok": False, "error": "keygen failed: %s" % str(exc)[:80]}
+
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat(
+        timespec="milliseconds").replace("+00:00", "Z")
+    try:
+        reg = _cf_api("POST", "/reg", {
+            "install_id": "", "tos": now, "key": pub_b64,
+            "fcm_token": "", "type": "ios", "locale": "en_US",
+        })
+    except Exception as exc:
+        return {"ok": False, "error": "warp reg failed: %s" % str(exc)[:100]}
+    result = reg.get("result") if isinstance(reg, dict) else None
+    if not isinstance(result, dict) or not result.get("id"):
+        return {"ok": False, "error": "bad warp reg response"}
+
+    # PATCH не обязателен для выхода, но даёт адреса интерфейса; best-effort.
+    ip = "172.16.0.2"
+    ipv6 = ""
+    rid = str(result.get("id"))
+    token = str(result.get("token") or "")
+    if token:
+        try:
+            en = _cf_api("PATCH", "/reg/" + rid, {"warp_enabled": True}, token)
+            cfg = (((en.get("result") or {}).get("config") or {})
+                   .get("interface") or {}).get("addresses") or {}
+            ip = str(cfg.get("v4") or ip)
+            ipv6 = str(cfg.get("v6") or "")
+        except Exception:
+            pass
+
+    payload = {"privKey": priv_b64, "peer_pub": MASQUE_SERVER_PUB,
+               "client_ipv4": ip, "client_ipv6": ipv6,
+               "server": str(endpoint or pick_endpoint()), "port": 443}
+    out = install(json.dumps(payload), name or "Созданный")
+    if out.get("ok"):
+        config.log("masque: A-MASQUE-CREATE konfig sozdan localno: %s"
+                   % str(out.get("name", ""))[:40])
+    return out
+
+
+def create_apply(name=""):
+    """A-MASQUE-CREATE: создать локально -> активный -> поднять -> проба.
+
+    Аналог fetch_apply(), но без обращения к сайту-генератору.
+    """
+    r = create(name)
+    if not r.get("ok"):
+        return r
+    key = str(r.get("name") or "")
+    sel = select(key)
+    if not sel.get("ok"):
+        return {"ok": False, "error": sel.get("error", "select failed")}
+    ap = apply(key)
+    if not ap.get("ok"):
+        return {"ok": False, "name": key,
+                "error": ap.get("error", "apply failed")}
+    res = probe(30, key)
+    out = {"ok": bool(res.get("ok")), "name": key,
+           "endpoint": str(ap.get("endpoint") or "")}
+    if res.get("ok"):
+        out["egress"] = res.get("egress", "-")
+        config.log("masque: create_apply: %s -> %s" % (key, out["egress"]))
+    else:
+        out["error"] = str(res.get("error") or "no egress")[:120]
+        config.log("masque: create_apply: %s ne proshel probu (%s)"
+                   % (key, out["error"]))
+    return out
 
 
 def fetch_default(name="MASQUE"):
