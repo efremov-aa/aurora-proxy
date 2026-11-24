@@ -1221,6 +1221,20 @@ def _sync_impl():
             else:
                 final_tag = "direct"
 
+        # A-120 «Кот-диспетчер»: авто-переключение резерва. Если диспетчер
+        # включён и решил, что нужен резерв (основной канал умер), final
+        # уходит на тег warp — _warp_outbounds сам ведёт его через живой
+        # MASQUE или чистый WARP. Ручной режим WARP "on" (A-890) уже выше
+        # и не переопределяется: диспетчер только поднимает резерв.
+        try:
+            import failover
+            if failover.override_tag() == "reserve" \
+                    and _warp_outbounds(target=warp.WARP_TAG):
+                final_tag = warp.WARP_TAG
+                config.log("core: A-120 диспетчер перевёл канал на резерв")
+        except Exception:
+            pass
+
     previous = _read_config()
     cfg = build_xray_config(final_tag)
     cfg, final_tag = _authoritative_config(cfg, final_tag)
@@ -1299,6 +1313,15 @@ def _sync_impl():
     # при коллизии тег в xray.json мог быть переименован (-x) — в state пишем фактический
     if final_tag != "direct":
         final_tag = get_vless_now() or final_tag
+    # A-121: уведомляем владельца о смене выходного IP (кулдаун в notify).
+    try:
+        old_ip = str((config.get_state() or {}).get("egress_ip") or "")
+        new_ip = ip or config.WHITE_IP
+        if old_ip and new_ip and old_ip != new_ip and new_ip != "-":
+            import notify
+            notify.event("egress", "выходной IP сменился: %s -> %s" % (old_ip, new_ip))
+    except Exception:
+        pass
     config.update_state(vless_now=final_tag, final_mode=final_tag,
                         egress_ip=ip or config.WHITE_IP,
                         comm={"state": "idle", "msg": ""})

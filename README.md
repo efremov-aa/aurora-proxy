@@ -4,8 +4,8 @@
 
 **Свой прокси, своя панель, до 5 игровых mesh-клиентов, чат и голос — бесплатно и без квот.**
 
-![Version](https://img.shields.io/badge/version-1.10.27-blue)
-![Release](https://img.shields.io/badge/release-1.10.27%20%22%D0%9A%D0%BE%D1%82-%D1%81%D0%BE%D0%B7%D0%B4%D0%B0%D1%82%D0%B5%D0%BB%D1%8C%22-blue)
+![Version](https://img.shields.io/badge/version-1.10.28-blue)
+![Release](https://img.shields.io/badge/release-1.10.28%20%22%D0%9A%D0%BE%D1%82-%D0%B4%D0%B8%D1%81%D0%BF%D0%B5%D1%82%D1%87%D0%B5%D1%80%22-blue)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 ![Platform](https://img.shields.io/badge/platform-linux%20%7C%20windows-lightgrey)
 ![Python](https://img.shields.io/badge/Python-3.12%20stdlib-3776AB?logo=python)
@@ -50,7 +50,7 @@
 - 🐾 **общая меш-сеть** — я умею ждать друзей, играть с ними в общей группе, переписываться и
   разговаривать.
 
-**Версия:** `VERSION=1.10.27`, `VERSION_NAME=Кот-создатель`
+**Версия:** `VERSION=1.10.28`, `VERSION_NAME=Кот-диспетчер`
 **Политика:** ревизия 2 (принимается при первом запуске)
 
 ### 🐾 Честно сразу
@@ -91,16 +91,16 @@ Aurora — **не VPN-сервис**, **не анонимайзер** и **не 
 
 ## 📦 Загрузка
 
-Мяу! Всё лежит в [Release v1.10.27 «Кот-создатель»](https://github.com/efremov-aa/aurora-proxy/releases).
+Мяу! Всё лежит в [Release v1.10.28 «Кот-диспетчер»](https://github.com/efremov-aa/aurora-proxy/releases).
 
 <details>
 <summary>📋 Ассеты релиза</summary>
 
 | Ассет | Что внутри |
 |---|---|
-| `Aurora-v1.10.27-linux.zip` | Linux-версия: модули, `ui/`, `proxy/`, `Dockerfile`, `docker-compose.yml`, systemd-юниты |
-| `Aurora-v1.10.27-windows.zip` | Windows-версия (папка `windows/`): те же модули + `bin/`, `nssm/`, `installer/`, `download_xray.ps1` |
-| `Aurora-Setup-1.10.27.exe` 🪟 | **Установщик для Windows**: ставит Aurora как службу **NSSM «Aurora»**, xray и TG-WS внутри, авто-обновление |
+| `Aurora-v1.10.28-linux.zip` | Linux-версия: модули, `ui/`, `proxy/`, `Dockerfile`, `docker-compose.yml`, systemd-юниты |
+| `Aurora-v1.10.28-windows.zip` | Windows-версия (папка `windows/`): те же модули + `bin/`, `nssm/`, `installer/`, `download_xray.ps1` |
+| `Aurora-Setup-1.10.28.exe` 🪟 | **Установщик для Windows**: ставит Aurora как службу **NSSM «Aurora»**, xray и TG-WS внутри, авто-обновление |
 | `*.sig` | Подпись Ed25519 каждого ассета: авто-обновление не примет неподписанный файл 🐾 |
 
 Подпись релизов проверена: Ed25519, fingerprint `ca4f87c9999e0282…`. Скачанный архив побайтно
@@ -121,6 +121,10 @@ Aurora — **не VPN-сервис**, **не анонимайзер** и **не 
 | 🐾 Чат и голос | внутри общей сети, без отдельной подписки и без счётчиков |
 | 🐾 Сервис | диагностика канала, замер скорости, автопроверка ключей по расписанию, бэкап с паролем |
 | 🐾 Резерв WARP/MASQUE | конфиг создаётся прямо в панели (`➕ Создать`), ключ и регистрация Cloudflare — локально, сайт-генератор остался запасным; канал поднимается через mihomo, выход проверяется автоматически |
+| 🐾 Диспетчер канала | следит за VLESS-пулом, MASQUE и WARP: умер основной — сам уходит на живой резерв, ожил — возвращается; ручной выбор ставит паузу, переключения видны в журнале |
+| 🐾 TG-уведомления | бот пишет о переключениях канала, смене выходного IP, мёртвом пуле и обновлениях; кулдаун против спама, токен шифруется и нигде не светится |
+| 🐾 Экспорт конфигов | готовый профиль для v2rayN, sing-box и Clash.Meta из вкладки «Сервис» + QR; пометка, какой канал сейчас активен на сервере |
+| 🐾 Плановый бэкап | архив по расписанию тем же шифрованным ZIP, ротация N последних копий, скачивание из панели |
 
 Ни квот по трафику, ни лимита устройств, ни сроков. Ключи и xray — твои, панель — твоя,
 хвост наружу не торчит.
@@ -303,7 +307,7 @@ docker compose up -d --build
 <details>
 <summary>🪟 Вариант 3 — Windows</summary>
 
-Скачайте `Aurora-Setup-1.10.27.exe` и запустите: ставится служба **NSSM «Aurora»**.
+Скачайте `Aurora-Setup-1.10.28.exe` и запустите: ставится служба **NSSM «Aurora»**.
 Данные — в `%LOCALAPPDATA%\Aurora`. Альтернатива — ручная установка из [`windows/README-windows.md`](windows/README-windows.md).
 
 </details>
@@ -326,6 +330,7 @@ docker compose up -d --build
 | `AURORA_XRAY_API_PORT` | `8897` | dokodemo-API xray |
 | `AURORA_TGWS_PORT` | `443` | порт Telegram WS-прокси |
 | `AURORA_TGWS_RUNTIME_DIR` | `%t/aurora-tgws` | каталог временного runtime-секрета TG-WS |
+| `AURORA_TG_BOT_TOKEN` / `AURORA_TG_CHAT_ID` | пусто | токен и chat_id бота для уведомлений владельцу (можно задать в шифрованных настройках панели); в журнал и API не попадают |
 | `AURORA_ADMIN_TOKEN` | пусто | admin-токен панели |
 | `AURORA_VLESS_ENABLED` | `false` | включить внешний VLESS-Reality `:8443` |
 | `AURORA_VLESS_PORT` | `8443` | порт внешнего VLESS |
@@ -369,6 +374,11 @@ docker compose up -d --build
 - `GET /api/diag`, `POST /api/diag/run`; `GET /api/speed`, `POST /api/speed/run`;
   `GET /api/autocheck`, `POST /api/autocheck/save`, `POST /api/autocheck/run`;
   `POST /api/backup/export`, `POST /api/backup/import` — вкладка «Сервис» (только доверенный доступ).
+- `GET /api/failover`, `POST /api/failover/save`, `POST /api/failover/run` — диспетчер резерва канала.
+- `GET /api/notify`, `POST /api/notify/save`, `POST /api/notify/test` — TG-уведомления (токен не возвращается).
+- `GET /api/export/client?format=v2rayn|singbox|clash` — экспорт клиентского профиля.
+- `GET /api/autobackup`, `POST /api/autobackup/save`, `POST /api/autobackup/run`,
+  `POST /api/autobackup/download {name}` — плановый бэкап и ротация архивов.
 - `GET /api/log`, `GET /api/recovery/log`, `GET /api/tgws/status`.
 - `GET /api/security/status`; `POST /api/security/rotate`.
 - `GET /api/update/status|check|apply`.
@@ -401,7 +411,10 @@ docker compose up -d --build
   `test_a041_vless.py`, `test_a032_recovery.py`, `test_a034_telemetry.py`,
   `test_a033_direct.py`, `test_a043_bt.py`;
 - вкладка «Сервис» (A-1040): `test_a1040_service.py` (диагностика/автопроверка/бэкап,
-  Linux+Windows) и `test_a1040_api.py` (живой smoke маршрутов).
+  Linux+Windows) и `test_a1040_api.py` (живой smoke маршрутов);
+- «Кот-диспетчер» (A-120…A-124): `test_a120_failover.py`, `test_a121_notify.py`,
+  `test_a122_clientexport.py`, `test_a123_autobackup.py` — офлайн, обе сборки;
+  `test_a124_api.py` — живой smoke новых маршрутов.
 
 **Полный прогон разом** — обвязкой, которая заканчивается строкой `ALL_LOCAL_TEST_SCRIPTS_OK`.
 
@@ -452,7 +465,8 @@ node --check ui/app.js && node --check ui/qr.js
 
 ## 🧭 Решения и дорожная карта
 
-Подробный документ — **ROADMAP.md**. Коротко:
+Подробный документ — **[ROADMAP.md](ROADMAP.md)**. В 1.10.28 закрыты первые четыре пункта
+(авто-failover, TG-уведомления, экспорт клиентских конфигов, плановый бэкап). Коротко:
 
 - **Три независимых контура:** прокси (VLESS Reality + панель) и игровой mesh-контур. Туннель
   головного сервера слушает только свой адрес и наружу не выходит.

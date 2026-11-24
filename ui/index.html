@@ -873,6 +873,98 @@
             <button class="btn small primary" data-act="svc-backup-import">♻️ <span data-i18n="svc.backup.restore">Восстановить</span></button>
           </div>
         </div>
+
+        <!-- A-120 «Кот-диспетчер»: авто-переключение резерва -->
+        <div class="card">
+          <h2><span class="ic">🔀</span><span data-i18n="svc.fo.head">Авто-переключение резерва</span><span class="count"><span class="badge" id="fo-state">—</span></span></h2>
+          <p class="hint" data-i18n="svc.fo.hint">Диспетчер следит за VLESS-пулом, MASQUE и WARP: основной канал умер — трафик уходит на живой резерв, ожил — возвращается. Ручной выбор канала ставит паузу.</p>
+          <div class="widget-body" style="display:flex;flex-direction:column;gap:10px;font-size:13px">
+            <label class="chk"><input type="checkbox" id="svc-fo-on"> <span data-i18n="svc.fo.enable">Включить диспетчер</span></label>
+            <div class="cmd-row">
+              <select id="svc-fo-interval">
+                <option value="30">30 с</option>
+                <option value="60">1 мин</option>
+                <option value="120">2 мин</option>
+                <option value="300">5 мин</option>
+                <option value="600">10 мин</option>
+              </select>
+              <button class="btn small" data-act="svc-failover-save" data-i18n="btn.save">Сохранить</button>
+              <button class="btn small" data-act="svc-failover-run" data-i18n="svc.fo.run">Проверить сейчас</button>
+            </div>
+            <div class="hint" style="margin:0"><span data-i18n="svc.fo.decision">Решение:</span> <b class="mono" id="fo-decision">—</b></div>
+          </div>
+          <div class="logbox tall" id="svc-fo-log" style="margin-top:10px"><span data-i18n="svc.fo.empty">переключений пока нет</span></div>
+        </div>
+
+        <!-- A-121 «Кот-диспетчер»: TG-уведомления -->
+        <div class="card">
+          <h2><span class="ic">📨</span><span data-i18n="svc.nt.head">TG-уведомления</span><span class="count"><span class="badge" id="nt-state">—</span></span></h2>
+          <p class="hint" data-i18n="svc.nt.hint">Бот сообщает о переключениях канала, смене выходного IP, мёртвом пуле и обновлениях. Токен хранится в шифрованных настройках и не попадает в журнал.</p>
+          <div class="widget-body" style="display:flex;flex-direction:column;gap:10px;font-size:13px">
+            <label class="chk"><input type="checkbox" id="svc-nt-on"> <span data-i18n="svc.nt.enable">Включить уведомления</span></label>
+            <div class="cmd-row">
+              <input type="password" id="svc-nt-token" data-i18n-placeholder="svc.nt.token-ph" placeholder="Токен бота (BotFather)" autocomplete="off" style="flex:1;min-width:180px">
+              <input type="text" id="svc-nt-chat" data-i18n-placeholder="svc.nt.chat-ph" placeholder="chat_id" autocomplete="off" style="width:140px">
+            </div>
+            <div class="cmd-row">
+              <button class="btn small" data-act="svc-notify-save" data-i18n="btn.save">Сохранить</button>
+              <button class="btn small" data-act="svc-notify-test" data-i18n="svc.nt.test">Отправить тест</button>
+            </div>
+          </div>
+          <div class="logbox tall" id="svc-nt-log" style="margin-top:10px"><span data-i18n="svc.nt.empty">сообщений пока нет</span></div>
+        </div>
+
+        <!-- A-122 «Кот-диспетчер»: экспорт клиентских конфигов -->
+        <div class="card">
+          <h2><span class="ic">📤</span><span data-i18n="svc.exp.head">Экспорт клиентского конфига</span></h2>
+          <p class="hint" data-i18n="svc.exp.hint">Готовый профиль для подключения к этому серверу: v2rayN (ссылка), sing-box (JSON), Clash.Meta (YAML). Нужен включённый внешний VLESS.</p>
+          <div class="cmd-row" style="margin-top:0">
+            <select id="svc-export-format">
+              <option value="v2rayn">v2rayN (ссылка)</option>
+              <option value="singbox">sing-box (JSON)</option>
+              <option value="clash">Clash.Meta (YAML)</option>
+            </select>
+            <button class="btn primary" data-act="svc-export">📤 <span data-i18n="svc.exp.build">Собрать</span></button>
+            <button class="btn small" data-act="svc-export-copy">📋 <span data-i18n="svc.exp.copy">Копировать</span></button>
+          </div>
+          <div class="qr-box" id="svc-export-qr" style="margin-top:10px"></div>
+          <div class="logbox tall" id="svc-export-out" style="margin-top:10px"><span data-i18n="svc.exp.empty">профиль ещё не собран</span></div>
+        </div>
+
+        <!-- A-123 «Кот-диспетчер»: плановый бэкап -->
+        <div class="card">
+          <h2><span class="ic">⏰</span><span data-i18n="svc.ab.head">Плановый бэкап</span><span class="count"><span class="badge" id="ab-state">—</span></span></h2>
+          <p class="hint" data-i18n="svc.ab.hint">Архив по расписанию тем же шифрованным ZIP. Храним N последних копий, старые удаляются. Пароль расписания хранится в настройках панели.</p>
+          <div class="widget-body" style="display:flex;flex-direction:column;gap:10px;font-size:13px">
+            <label class="chk"><input type="checkbox" id="svc-ab-on"> <span data-i18n="svc.ab.enable">Включить расписание</span></label>
+            <div class="cmd-row">
+              <select id="svc-ab-interval">
+                <option value="6">6 ч</option>
+                <option value="12">12 ч</option>
+                <option value="24">24 ч</option>
+                <option value="48">2 дня</option>
+                <option value="168">7 дней</option>
+              </select>
+              <select id="svc-ab-keep">
+                <option value="3">хранить 3</option>
+                <option value="7">хранить 7</option>
+                <option value="14">хранить 14</option>
+                <option value="30">хранить 30</option>
+              </select>
+              <button class="btn small" data-act="svc-abackup-save" data-i18n="btn.save">Сохранить</button>
+              <button class="btn small" data-act="svc-abackup-run" data-i18n="svc.ab.run">Сделать сейчас</button>
+            </div>
+            <div class="cmd-row">
+              <input type="password" id="svc-ab-pass" data-i18n-placeholder="svc.ab.pass-ph" placeholder="Пароль расписания (минимум 8 символов)" autocomplete="off" style="flex:1;min-width:200px">
+            </div>
+            <div class="hint" style="margin:0"><span data-i18n="svc.auto.next">Следующий запуск:</span> <b class="mono" id="ab-next">—</b></div>
+            <div class="cmd-row">
+              <select id="svc-ab-file"></select>
+              <button class="btn small" data-act="svc-abackup-download">⬇ <span data-i18n="svc.ab.download">Скачать</span></button>
+            </div>
+          </div>
+          <div class="logbox tall" id="svc-ab-log" style="margin-top:10px"><span data-i18n="svc.ab.empty">событий пока нет</span></div>
+        </div>
       </section>
 
     </div>

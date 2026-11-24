@@ -31,6 +31,9 @@ _MODULES = [
     "meshtun.py", "meshsignal.py", "effects.py", "masque.py",
     # A-1040 «Кот-смотритель»: обслуживание канала и данных
     "diag.py", "autocheck.py", "backup.py",
+    # A-120/A-121/A-122/A-123 «Кот-диспетчер»: новые модули должны доезжать
+    # автообновлением (урок A-10.23: иначе ModuleNotFoundError после апдейта).
+    "failover.py", "notify.py", "clientexport.py", "autobackup.py",
     "proxy/__init__.py", "proxy/_aes.py", "proxy/balancer.py",
     "proxy/bridge.py", "proxy/config.py", "proxy/fake_tls.py", "proxy/pool.py", 
     "proxy/raw_websocket.py", "proxy/stats.py", "proxy/tg_ws_proxy.py", "proxy/utils.py",
@@ -160,6 +163,13 @@ def check():
             _STATE["update"] = update
         _set_state("ready" if update else "done",
                    ("доступно: v%s" % latest) if update else ("актуально: v%s" % config.VERSION))
+        # A-121 «Кот-диспетчер»: сообщаем владельцу о доступном обновлении.
+        if update:
+            try:
+                import notify
+                notify.event("update", "доступно обновление Aurora v%s" % latest)
+            except Exception:
+                pass
         return {"ok": True, "current": config.VERSION, "latest": latest, "update": update,
                 "integrity_broken": broken}
     except Exception as e:

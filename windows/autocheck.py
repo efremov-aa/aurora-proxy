@@ -100,6 +100,13 @@ def _watch_done():
     except Exception:
         pass
     _log("проверка завершена: живых %d из %d" % (alive, total))
+    # A-121 «Кот-диспетчер»: мёртвый пул — событие владельцу (кулдаун в notify).
+    if total and not alive:
+        try:
+            import notify
+            notify.event("keys", "пул ключей деградировал: живых 0 из %d" % total)
+        except Exception:
+            pass
 
 
 def tick():

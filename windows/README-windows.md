@@ -1,14 +1,14 @@
-# 🐱 Aurora на Windows — сборка v1.10.27 «Кот-создатель» 🐾
+# 🐱 Aurora на Windows — сборка v1.10.28 «Кот-диспетчер» 🐾
 
 > Мяу! На Windows у меня всё то же, что на Linux и в Docker — те же модули, та же логика, — но
 > живёт я под службой **NSSM «Aurora»**. Окна консоли не вылезают, IP я нахожу сама, обновление
 > подписано и проверяется. Мягкие лапки, острый туннель. 🐾
 
 ![mascot](https://img.shields.io/badge/mascot-%F0%9F%90%B1-pink)
-![version](https://img.shields.io/badge/version-1.10.27-pink)
+![version](https://img.shields.io/badge/version-1.10.28-pink)
 ![windows](https://img.shields.io/badge/windows-10%2F11%20x64-blue)
 
-**Версия:** `VERSION=1.10.27`, `VERSION_NAME=Кот-создатель`
+**Версия:** `VERSION=1.10.28`, `VERSION_NAME=Кот-диспетчер`
 
 Основа — публичный репозиторий [`aurora-proxy`](https://github.com/efremov-aa/aurora-proxy).
 Что я умею, политика, окружение и меш-сеть — в [корневом README](../README.md); здесь только
@@ -18,7 +18,7 @@
 
 ## 📥 Установка (рекомендуется)
 
-1. Скачайте **`Aurora-Setup-1.10.27.exe`** из [Releases](https://github.com/efremov-aa/aurora-proxy/releases)
+1. Скачайте **`Aurora-Setup-1.10.28.exe`** из [Releases](https://github.com/efremov-aa/aurora-proxy/releases)
    и запустите от администратора.
 2. Установщик собирает `Aurora.exe` + `_internal\` (xray v26.9.9, geoip/geosite, `wintun.dll`,
    `tg-ws-proxy.exe`, nssm, `ui\`), ставит службу **NSSM «Aurora»** (автозапуск, авто-рестарт)
@@ -70,6 +70,10 @@
 - 🌐 Интерфейс на 10 языках, тёмная/светлая тема, шифрование хранилищ AURORA2 (ChaCha20-Poly1305).
 - 🔏 Авто-обновление с GitHub: ассет сверяется по digest + SHA-256 + подписи Ed25519 (`.sig`),
   неподписанный файл не применяется (fail-closed).
+- 🔀 Вкладка «Сервис» (1.10.28): диспетчер резерва (VLESS → MASQUE/WARP), TG-уведомления,
+  экспорт клиентских конфигов (v2rayN / sing-box / Clash.Meta), плановый бэкап с ротацией.
+  Токен бота и пароль бэкапа лежат в шифрованном `settings.json` или в env
+  `AURORA_TG_BOT_TOKEN` / `AURORA_TG_CHAT_ID`.
 
 ## 🚪 Мои порты
 

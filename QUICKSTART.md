@@ -11,9 +11,9 @@
 
 | Вариант | Когда брать | Файл |
 | --- | --- | --- |
-| 🪟 Windows | домашний ПК / ноутбук | `Aurora-Setup-1.10.27.exe` |
-| 🐧 Linux + systemd | VPS / выделенный сервер | `Aurora-v1.10.27-linux.zip` |
-| 🐳 Docker | контейнерный хост | `Aurora-v1.10.27-linux.zip` |
+| 🪟 Windows | домашний ПК / ноутбук | `Aurora-Setup-1.10.28.exe` |
+| 🐧 Linux + systemd | VPS / выделенный сервер | `Aurora-v1.10.28-linux.zip` |
+| 🐳 Docker | контейнерный хост | `Aurora-v1.10.28-linux.zip` |
 
 Все файлы — в [Releases](https://github.com/efremov-aa/aurora-proxy/releases). Подписи `.sig` проверяются автоматически.
 
@@ -23,7 +23,7 @@
 
 ### 🪟 Windows
 
-1. Запусти `Aurora-Setup-1.10.27.exe` от администратора.
+1. Запусти `Aurora-Setup-1.10.28.exe` от администратора.
 2. Служба **NSSM «Aurora»** встанет сама, xray и TG-WS внутри.
 3. Открой `http://127.0.0.1:8890/`.
 
@@ -31,7 +31,7 @@
 
 ```bash
 # Python 3.12+ и xray v26.9.9 уже должны быть на хосте
-unzip Aurora-v1.10.27-linux.zip -d ~/aurora
+unzip Aurora-v1.10.28-linux.zip -d ~/aurora
 cd ~/aurora
 systemctl --user enable --now aurora
 ```
@@ -45,7 +45,7 @@ AURORA_EXTRA_HOSTS="10.0.0.5;myhost.lan"
 ### 🐳 Docker
 
 ```bash
-unzip Aurora-v1.10.27-linux.zip -d aurora && cd aurora
+unzip Aurora-v1.10.28-linux.zip -d aurora && cd aurora
 cp .env.example .env
 docker compose up -d --build
 ```
@@ -62,6 +62,8 @@ docker compose up -d --build
 4. Включи резерв: вкладка **🛡️ MASQUE → ➕ Создать конфиг**.
    Ключ и регистрация Cloudflare делаются локально, сайт-генератор не нужен.
 5. Проверь **🌍 Выходной IP** — должен появиться адрес Cloudflare, а не `-`.
+6. Загляни во вкладку **🧰 Сервис**: включи диспетчер резерва, при желании TG-уведомления
+   и плановый бэкап. Там же можно собрать клиентский конфиг и QR.
 
 ---
 
@@ -69,6 +71,8 @@ docker compose up -d --build
 
 - Локальный mixed-прокси: `http://<host>:8899` (HTTP + SOCKS).
 - Внешний VLESS-Reality `:8443` включается в панели; ссылка и QR появятся там же.
+- Готовый профиль для v2rayN / sing-box / Clash.Meta — **🧰 Сервис → Экспорт клиентского конфига**;
+  нужен включённый внешний VLESS.
 - Telegram WS-прокси живёт на `:443` в systemd-режиме.
 
 ---

@@ -4,9 +4,11 @@ import os
 import threading
 
 import autocheck
+import autobackup  # A-123 «Кот-диспетчер»: плановый бэкап
 import config
 import core
 import extgate
+import failover  # A-120 «Кот-диспетчер»: авто-переключение резерва
 import meshtunnel
 import mesh
 import pool
@@ -106,6 +108,10 @@ def _boot():
     threading.Thread(target=telemetry.resolve_names, daemon=True).start()
     # A-1040 «Кот-смотритель»: автопроверка пула ключей по расписанию
     autocheck.start()
+    # A-120/A-123 «Кот-диспетчер»: авто-переключение резерва и плановый бэкап.
+    # Оба выключены по умолчанию — включаются из вкладки «Сервис».
+    failover.start()
+    autobackup.start()
     # A-MASQUE-AUTO: автопроверка MASQUE-канала. Конфиги живут недолго и
     # умирают молча (эндпоинт перестаёт отвечать по UDP) - без этого цикла
     # панель месяцами показывала "no egress", а канал стоял. Каждые N минут:

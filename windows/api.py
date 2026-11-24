@@ -14,15 +14,19 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import autocheck
+import autobackup  # A-123 «Кот-диспетчер»: плановый бэкап
 import backup
+import clientexport  # A-122: экспорт клиентских конфигов
 import config
 import crypt
 import diag
 import extgate
 import effects
+import failover  # A-120: авто-переключение резерва
 import core
 import mesh
 import meshsignal
+import notify  # A-121: TG-уведомления владельцу
 import pool
 import recovery
 import rusegment
@@ -1146,7 +1150,8 @@ class Handler(BaseHTTPRequestHandler):
         trusted = _trusted_read(self)
         if not trusted and path in ("/api/log", "/api/logs", "/api/recovery/log",
                                     "/api/routes", "/api/diag", "/api/speed",
-                                    "/api/autocheck"):
+                                    "/api/autocheck", "/api/failover", "/api/notify",
+                                    "/api/autobackup", "/api/export/client"):
             self._send(*_json({"error": "management authentication required"}, 403))
             return
         # гейт видимости: меш-разделы и подписки закрыты, пока головной сервер
@@ -1181,6 +1186,24 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/autocheck":
             self._send(*_json(autocheck.status()))
+            return
+        # A-120/A-121/A-122/A-123 «Кот-диспетчер»: новые приборы «Сервиса».
+        if path == "/api/failover":
+            self._send(*_json(failover.status()))
+            return
+        if path == "/api/notify":
+            self._send(*_json(notify.status()))
+            return
+        if path == "/api/autobackup":
+            self._send(*_json(autobackup.status()))
+            return
+        if path == "/api/export/client":
+            qs = urllib.parse.parse_qs(self.path.split("?", 1)[1] if "?" in self.path else "")
+            fmt = (qs.get("format") or [""])[0]
+            try:
+                self._send(*_json(clientexport.build(fmt)))
+            except ValueError as e:
+                self._send(*_json({"ok": False, "error": str(e)[:200]}, 400))
             return
         if path == "/api/ext/download":
             # A-161: архив браузерного расширения - по подписке (триал или PRO).
@@ -1450,6 +1473,14 @@ class Handler(BaseHTTPRequestHandler):
             "/api/speed/run": self._speed_run,
             "/api/autocheck/save": self._autocheck_save,
             "/api/autocheck/run": self._autocheck_run,
+            # A-120/A-121/A-123 «Кот-диспетчер»: диспетчер, уведомления, плановый бэкап.
+            "/api/failover/save": self._failover_save,
+            "/api/failover/run": self._failover_run,
+            "/api/notify/save": self._notify_save,
+            "/api/notify/test": self._notify_test,
+            "/api/autobackup/save": self._autobackup_save,
+            "/api/autobackup/run": self._autobackup_run,
+            "/api/autobackup/download": self._autobackup_download,
             "/api/backup/export": self._backup_export,
             "/api/recovery/limit": self._rc_limit,
             "/api/recovery/region": self._rc_region,
@@ -1508,6 +1539,7 @@ class Handler(BaseHTTPRequestHandler):
         self._send(*_json(resp))
 
     def _rotate(self, data):
+        failover.hold()  # A-120: ручной выбор канала ставит диспетчер на паузу
         if data.get("tag"):
             ok, msg = core.set_active_tag(data.get("tag", ""))
         else:
@@ -1584,6 +1616,92 @@ class Handler(BaseHTTPRequestHandler):
     def _autocheck_run(self, data):
         self._send(*_json(autocheck.run_now()))
 
+    # --- A-120/A-121/A-123 «Кот-диспетчер» ---
+    def _failover_save(self, data):
+        values = {}
+        enabled = data.get("enabled")
+        if type(enabled) is not bool:
+            self._send(*_json({"ok": False, "error": "enabled must be boolean"}, 400))
+            return
+        values["failover_enabled"] = enabled
+        interval = data.get("interval_s", config.get("failover_interval_s", 60))
+        if type(interval) is not int or interval < 30 or interval > 3600:
+            self._send(*_json({"ok": False, "error": "interval is out of range"}, 400))
+            return
+        values["failover_interval_s"] = interval
+        if not config.set_many(values):
+            self._send(*_json({"ok": False, "error": "settings save failed"}, 500))
+            return
+        self._send(*_json({"ok": True, "failover": failover.status()}))
+
+    def _failover_run(self, data):
+        self._send(*_json(failover.run_now()))
+
+    def _notify_save(self, data):
+        values = {}
+        enabled = data.get("enabled")
+        if type(enabled) is not bool:
+            self._send(*_json({"ok": False, "error": "enabled must be boolean"}, 400))
+            return
+        values["notify_enabled"] = enabled
+        for key in ("token", "chat"):
+            if key in data:
+                value = data[key]
+                if not isinstance(value, str) or len(value) > 256:
+                    self._send(*_json({"ok": False, "error": "%s is invalid" % key}, 400))
+                    return
+                values["notify_tg_" + key] = value.strip()
+        if not config.set_many(values):
+            self._send(*_json({"ok": False, "error": "settings save failed"}, 500))
+            return
+        # Токен в ответ не возвращаем — только факт настройки.
+        self._send(*_json({"ok": True, "notify": notify.status()}))
+
+    def _notify_test(self, data):
+        self._send(*_json(notify.test()))
+
+    def _autobackup_save(self, data):
+        values = {}
+        enabled = data.get("enabled")
+        if type(enabled) is not bool:
+            self._send(*_json({"ok": False, "error": "enabled must be boolean"}, 400))
+            return
+        values["backup_schedule_enabled"] = enabled
+        interval = data.get("interval_h", config.get("backup_interval_h", 24))
+        if type(interval) is not int or interval < 1 or interval > 168:
+            self._send(*_json({"ok": False, "error": "interval_h is out of range"}, 400))
+            return
+        values["backup_interval_h"] = interval
+        keep = data.get("keep", config.get("backup_keep", 7))
+        if type(keep) is not int or keep < 1 or keep > 60:
+            self._send(*_json({"ok": False, "error": "keep is out of range"}, 400))
+            return
+        values["backup_keep"] = keep
+        if "password" in data:
+            password = data["password"]
+            if not isinstance(password, str) or len(password) > 256:
+                self._send(*_json({"ok": False, "error": "password is invalid"}, 400))
+                return
+            if password and len(password) < backup.MIN_PASSWORD_LEN:
+                self._send(*_json({"ok": False, "error": "пароль минимум 8 символов"}, 400))
+                return
+            values["backup_password"] = password
+        if not config.set_many(values):
+            self._send(*_json({"ok": False, "error": "settings save failed"}, 500))
+            return
+        self._send(*_json({"ok": True, "autobackup": autobackup.status()}))
+
+    def _autobackup_run(self, data):
+        self._send(*_json(autobackup.run_now()))
+
+    def _autobackup_download(self, data):
+        name = str(data.get("name") or "")
+        blob = autobackup.read_file(name)
+        if blob is None:
+            self._send(*_json({"ok": False, "error": "архив не найден"}, 404))
+            return
+        self._send_binary(200, "application/zip", blob, name)
+
     def _backup_export(self, data):
         password = data.get("password")
         try:
@@ -1634,6 +1752,7 @@ class Handler(BaseHTTPRequestHandler):
         self._send(*_json(st))
 
     def _masque_select(self, data):
+        failover.hold()  # A-120: ручной выбор канала ставит диспетчер на паузу
         name = data.get("name") if isinstance(data.get("name"), str) else ""
         res = masque.select(name)
         config.log("masque: vybor name=%s ok=%s" % (name[:40], bool(res.get("ok"))))
@@ -1661,6 +1780,7 @@ class Handler(BaseHTTPRequestHandler):
         self._send(*_json(st))
 
     def _masque_apply(self, data):
+        failover.hold()  # A-120: ручное применение конфига — пауза диспетчера
         res = masque.apply()
         st = masque.status()
         st.update(res)
@@ -1743,6 +1863,7 @@ class Handler(BaseHTTPRequestHandler):
         self._send(*_json({"ok": removed}))
 
     def _keys_active(self, data):
+        failover.hold()  # A-120: ручной выбор канала ставит диспетчер на паузу
         tag = data.get("tag", "")
         ok, msg = core.set_active_tag(tag)
         # A-949: prichina otkaza dolzhna byt v zhurnale, a ne tolko v toste
@@ -2601,6 +2722,7 @@ class Handler(BaseHTTPRequestHandler):
         if m not in warp.MODES:
             self._send(*_json({"ok": False, "error": "bad mode"}, 400))
             return
+        failover.hold()  # A-120: ручной режим WARP не оспариваем
         if not config.set("warp_mode", m):
             self._send(*_json({"ok": False, "error": "save failed"}, 400))
             return
@@ -2636,6 +2758,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _warp_select(self, data):
         """A-WARP-M: sdelat vybrannyy konfig aktivnym (rezerv ukazyvaet na nego)."""
+        failover.hold()  # A-120: ручной выбор канала ставит диспетчер на паузу
         name = data.get("name") if isinstance(data.get("name"), str) else ""
         res = warp.select(name)
         config.log("api: A-WARP-M vybor konfiga name=%s ok=%s"

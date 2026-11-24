@@ -21,12 +21,13 @@ from collections import deque
 # (xray run/keytest/statsquery/netstat/netsh/taskkill/tg-ws-proxy и т.п.).
 HIDE_FLAG = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
 
-VERSION = "1.10.27"
-VERSION_NAME = "Кот-создатель"
+VERSION = "1.10.28"
+VERSION_NAME = "Кот-диспетчер"
 APP_NAME = "Aurora"
 
 # История версий для вкладки «Версии» (v, имя, дата).
 VERSION_HISTORY = (
+    ("1.10.28", "Кот-диспетчер", "23.11.2026"),
     ("1.10.27", "Кот-создатель", "23.11.2026"),
     ("1.10.26", "Кот-смотритель", "19.11.2026"),
     ("1.10.25", "Кот-кран", "18.11.2026"),
@@ -68,6 +69,7 @@ VERSION_HISTORY = (
 )
 
 VERSION_NOTES = {
+    "1.10.28": "Кот-диспетчер взял канал под присмотр 🐾. Четыре новые возможности во вкладке «Сервис». Авто-переключение резерва: диспетчер оценивает здоровье VLESS-пула, MASQUE и WARP и сам переводит трафик на живой резерв, когда основной умирает, а когда основной оживает — возвращает обратно; ручной выбор канала ставит паузу, чтобы диспетчер не спорил с владельцем, все переключения видны в журнале. TG-уведомления: опциональный бот сообщает о переключениях канала, смене выходного IP, мёртвом пуле ключей и доступном обновлении; токен и chat_id хранятся в шифрованных настройках или env, в журнал и API не попадают, повторные события гасятся кулдауном. Экспорт клиентских конфигов: готовый профиль для подключения к этому серверу в v2rayN (ссылка), sing-box (JSON) и Clash.Meta (YAML) с QR и пометкой, какой канал сейчас активен на сервере. Плановый бэкап: архив по расписанию тем же шифрованным ZIP, хранение N последних копий с ротацией, скачивание и восстановление из панели. Новая дорожная карта проекта — в ROADMAP.md.",
     "1.10.27": "Кот-создатель убирает главную боль MASQUE: конфиг теперь можно СОЗДАТЬ прямо в панели 🐾. Раньше были только загрузка готового JSON/Clash-YAML и получение с сайта-генератора. Кнопка «➕ Создать конфиг» генерирует свежую пару EC P-256 на чистом stdlib (без зависимости от cryptography), регистрирует публичный ключ через Cloudflare WARP API, выбирает живой MASQUE-эндпоинт, применяет конфиг, поднимает mihomo и проверяет выходной IP. Сайт-генератор остался запасным вариантом. Починено скачивание mihomo: свежие релизы v1.19.x перешли на версионированные zip/gz, а старый URL .exe отдавал 404 — чистая установка теперь работает. Проба выхода больше не зависит от внешнего curl: используется stdlib-запрос через локальный mixed-port, curl оставлен запасным. Исправлен «Выходной IP -»: панель берёт свежий IP активного MASQUE/WARP из сохранённых конфигов, даже если xray молчит или панель только что перезапустилась. Клиентский трафик на мастере переведён с мёртвого WireGuard WARP на живой MASQUE через локальный SOCKS mihomo — Instagram и ipify снова открываются.",
     "1.10.26": "Кот-смотритель принёс в панель вкладку «Сервис» с четырьмя полезными приборами. Диагностика: одна кнопка проверяет порт xray, прямой выход, выход через прокси, выходной IP, DNS, IPv6, TG-WS, ру-сегмент и оба резервных канала — с временем каждой проверки и итогом. Замер скорости: ping, загрузка и отдача через тот же порт, что у владельца, с историей последних замеров. Автопроверка ключей: расписание (раз в N минут) с журналом событий, чтобы мёртвые ключи не ждали утреннего нажатия кнопки. Бэкап: настройки, пул ключей и конфиги WARP/MASQUE упаковываются в ZIP, зашифрованный паролем владельца (scrypt + ChaCha20-Poly1305), и восстанавливаются на этой или другой машине; порты и учётные данные панели в архив не попадают, чтобы восстановление не могло закрыть доступ к серверу.",
     "1.10.25": "Кот-кран добавил выключатель внешнего VLESS-Reality :8443 на вкладку «Внешний доступ»: выключенный inbound исчезает из xray и порт закрывается, включённый — возвращается. Настройки по-прежнему берутся из env AURORA_VLESS_*, кнопка только гасит/поднимает сам inbound.",
@@ -999,6 +1001,18 @@ _SETTINGS_DEFAULTS = {
     # 0 минут = выключено (тогда keycheck_enabled тоже не важен).
     "keycheck_enabled": False,
     "keycheck_interval_min": 60,
+    # A-120 «Кот-диспетчер»: авто-переключение резерва канала.
+    "failover_enabled": False,
+    "failover_interval_s": 60,
+    # A-121: TG-уведомления владельцу (бот, не TG-WS-прокси).
+    "notify_enabled": False,
+    "notify_tg_token": "",
+    "notify_tg_chat": "",
+    # A-123: плановый бэкап по расписанию.
+    "backup_schedule_enabled": False,
+    "backup_interval_h": 24,
+    "backup_keep": 7,
+    "backup_password": "",
     "ui_port": UI_PORT,
     "xray_port": XRAY_PORT,
     "xray_api_port": XRAY_API_PORT,
@@ -1326,11 +1340,13 @@ def _validate_settings(raw):
         "block_scanners", "rate_limit", "twofa", "show_mesh", "show_subs",
         "mesh_master", "auto_join", "master_only", "setup_complete",
         "masque_enabled", "tgws_enabled", "vless_enabled", "keycheck_enabled",
+        "failover_enabled", "notify_enabled", "backup_schedule_enabled",
     )
     string_keys = (
         "continue_text", "ui_token", "server_name", "mesh_id", "mesh_token",
         "ui_pin", "segment_title", "segment_custom", "master_addr",
         "master_token", "mesh_own_secret", "white_ip",
+        "notify_tg_token", "notify_tg_chat", "backup_password",
     )
     list_keys = ("segment_regions", "bypass_domains")
     for key in bool_keys:
@@ -1350,6 +1366,19 @@ def _validate_settings(raw):
         value = raw["keycheck_interval_min"]
         if (type(value) is not int or value < 0 or value > 10080):
             raise ValueError("keycheck_interval_min is out of range")
+    # A-120/A-123: интервалы диспетчера и планового бэкапа.
+    if "failover_interval_s" in raw:
+        value = raw["failover_interval_s"]
+        if (type(value) is not int or value < 30 or value > 3600):
+            raise ValueError("failover_interval_s is out of range")
+    if "backup_interval_h" in raw:
+        value = raw["backup_interval_h"]
+        if (type(value) is not int or value < 1 or value > 168):
+            raise ValueError("backup_interval_h is out of range")
+    if "backup_keep" in raw:
+        value = raw["backup_keep"]
+        if (type(value) is not int or value < 1 or value > 60):
+            raise ValueError("backup_keep is out of range")
     if raw.get("ui_pin") and not re.fullmatch(r"[0-9]{6}", raw["ui_pin"]):
         raise ValueError("ui_pin must be six ASCII digits")
     if raw.get("ui_token") and not 12 <= len(raw["ui_token"]) <= 256:

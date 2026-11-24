@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  var V = { S: null, SUBS: null, STATS: null, MESH: null, RU: null, UPD: null, ROUTES: null, SET: null, SEC: null, TG: null };
+  var V = { S: null, SUBS: null, STATS: null, MESH: null, RU: null, UPD: null, ROUTES: null, SET: null, SEC: null, TG: null, EXP: null };
   var CFG = { tab: 'dashboard', ruFailOnly: false, _rid: 0, policyOnce: false };
   var LS = { theme: 'aurora_theme', sec: 'aurora_sec_tok', tfa: 'aurora_2fa', lang: 'aurora_lang' };
 
@@ -43,6 +43,30 @@
       'svc.backup.restore': 'Восстановить', 'svc.backup.pass-err': 'Пароль архива должен быть не короче 8 символов',
       'svc.backup.no-file': 'Сначала выберите файл архива', 'svc.backup.big': 'Файл больше 8 МБ — это не похоже на бэкап',
       'svc.backup.export-ok': 'Архив создан и скачивается 🗄️', 'svc.backup.import-ok': 'Бэкап восстановлен 🐾',
+      // A-120/A-121/A-122/A-123 «Кот-диспетчер»: новые приборы «Сервиса».
+      'svc.fo.head': 'Авто-переключение резерва',
+      'svc.fo.hint': 'Диспетчер следит за VLESS-пулом, MASQUE и WARP: основной канал умер — трафик уходит на живой резерв, ожил — возвращается. Ручной выбор канала ставит паузу.',
+      'svc.fo.enable': 'Включить диспетчер', 'svc.fo.run': 'Проверить сейчас',
+      'svc.fo.decision': 'Решение:', 'svc.fo.empty': 'переключений пока нет',
+      'svc.fo.held': 'пауза', 'svc.fo.vless': 'VLESS-пул', 'svc.fo.reserve': 'резерв MASQUE/WARP', 'svc.fo.direct': 'прямой выход',
+      'svc.nt.head': 'TG-уведомления',
+      'svc.nt.hint': 'Бот сообщает о переключениях канала, смене выходного IP, мёртвом пуле и обновлениях. Токен хранится в шифрованных настройках и не попадает в журнал.',
+      'svc.nt.enable': 'Включить уведомления', 'svc.nt.test': 'Отправить тест',
+      'svc.nt.token-ph': 'Токен бота (BotFather)', 'svc.nt.chat-ph': 'chat_id',
+      'svc.nt.empty': 'сообщений пока нет', 'svc.nt.unconf': 'не настроен',
+      'svc.nt.test-ok': 'Тестовое сообщение отправлено 📨',
+      'svc.nt.keep': 'Пустые поля оставляют прежние значения',
+      'svc.exp.head': 'Экспорт клиентского конфига',
+      'svc.exp.hint': 'Готовый профиль для подключения к этому серверу: v2rayN (ссылка), sing-box (JSON), Clash.Meta (YAML). Нужен включённый внешний VLESS.',
+      'svc.exp.build': 'Собрать', 'svc.exp.copy': 'Копировать', 'svc.exp.empty': 'профиль ещё не собран',
+      'svc.exp.ok': 'Профиль собран 🐾', 'svc.exp.nothing': 'Сначала соберите профиль',
+      'svc.exp.copied': 'Профиль скопирован 📋',
+      'svc.ab.head': 'Плановый бэкап',
+      'svc.ab.hint': 'Архив по расписанию тем же шифрованным ZIP. Храним N последних копий, старые удаляются. Пароль расписания хранится в настройках панели.',
+      'svc.ab.enable': 'Включить расписание', 'svc.ab.run': 'Сделать сейчас',
+      'svc.ab.pass-ph': 'Пароль расписания (минимум 8 символов)',
+      'svc.ab.download': 'Скачать', 'svc.ab.empty': 'событий пока нет',
+      'svc.ab.no-file': 'Сначала выберите архив', 'svc.ab.dl-ok': 'Архив скачивается 🗄️',
       'nav.group.home': 'Домашний прокси', 'nav.group.upd': 'Обновления', 'nav.group.set': 'Настройки',
       'g.you': 'Вы', 'g.yours': 'ваш', 'status.on': 'онлайн', 'status.off': 'оффлайн', 'status.warn': 'нестабильно',
       'status.online': 'работает', 'status.stopped': 'остановлен', 'status.active': 'активен', 'status.dead': 'мёртв',
@@ -2784,10 +2808,16 @@ function loadTG() {
   /* ================= A-1040 «Кот-смотритель»: Сервис ================= */
   function loadService() {
     Promise.all([getJSON('/api/diag'), getJSON('/api/speed'),
-                 getJSON('/api/autocheck')]).then(function (arr) {
+                 getJSON('/api/autocheck'),
+                 // A-120/A-121/A-123 «Кот-диспетчер»: новые приборы.
+                 getJSON('/api/failover'), getJSON('/api/notify'),
+                 getJSON('/api/autobackup')]).then(function (arr) {
       renderDiag(arr[0] || {});
       renderSpeed(arr[1] || {});
       renderAuto(arr[2] || {});
+      renderFailover(arr[3] || {});
+      renderNotify(arr[4] || {});
+      renderAbackup(arr[5] || {});
     }).catch(function () { });
   }
   function renderDiag(j) {
@@ -2967,6 +2997,201 @@ function loadTG() {
     };
     rd.onerror = function () { toast(_t('t.err-gen'), false); };
     rd.readAsDataURL(f);
+  }
+
+  /* ============ A-120/A-121/A-122/A-123 «Кот-диспетчер»: Сервис ============ */
+  function svcLogBox(id, lines, emptyKey) {
+    var box = $(id);
+    if (!box) return;
+    box.innerHTML = (lines && lines.length)
+      ? lines.map(function (x) { return esc((x.ts ? fmtDate(x.ts) + ' · ' : '') + (x.msg || '')); }).join('\n')
+      : _t(emptyKey);
+    box.scrollTop = box.scrollHeight;
+  }
+  function svcSelectSet(id, value) {
+    var sel = $(id);
+    if (!sel || value == null) return;
+    var want = String(value);
+    for (var i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === want) { sel.value = want; return; }
+    }
+  }
+  function renderFailover(j) {
+    j = j || {};
+    var cb = $('svc-fo-on');
+    if (cb) cb.checked = !!j.enabled;
+    svcSelectSet('svc-fo-interval', j.interval_s);
+    var badge = $('fo-state');
+    if (badge) {
+      if (j.held) { badge.className = 'badge warn'; badge.textContent = _t('svc.fo.held'); }
+      else {
+        badge.className = 'badge ' + (j.enabled ? 'on' : 'off');
+        badge.textContent = j.enabled ? _t('status.enabled') : _t('status.disabled');
+      }
+    }
+    var dec = $('fo-decision');
+    if (dec) {
+      var ch = (j.decision && j.decision.channel) || '';
+      var label = ch === 'vless' ? _t('svc.fo.vless')
+        : ch === 'reserve' ? _t('svc.fo.reserve')
+        : ch === 'direct' ? _t('svc.fo.direct') : '—';
+      if (j.held && j.hold_left_s) label += ' · ' + _t('svc.fo.held') + ' ' + Math.ceil(j.hold_left_s / 60) + ' мин';
+      dec.textContent = label;
+    }
+    svcLogBox('svc-fo-log', j.log, 'svc.fo.empty');
+  }
+  function renderNotify(j) {
+    j = j || {};
+    var cb = $('svc-nt-on');
+    if (cb) cb.checked = !!j.enabled;
+    var badge = $('nt-state');
+    if (badge) {
+      if (!j.configured) { badge.className = 'badge warn'; badge.textContent = _t('svc.nt.unconf'); }
+      else {
+        badge.className = 'badge ' + (j.enabled ? 'on' : 'off');
+        badge.textContent = j.enabled ? _t('status.enabled') : _t('status.disabled');
+      }
+    }
+    svcLogBox('svc-nt-log', j.log, 'svc.nt.empty');
+  }
+  function renderAbackup(j) {
+    j = j || {};
+    var cb = $('svc-ab-on');
+    if (cb) cb.checked = !!j.enabled;
+    svcSelectSet('svc-ab-interval', j.interval_h);
+    svcSelectSet('svc-ab-keep', j.keep);
+    var badge = $('ab-state');
+    if (badge) {
+      badge.className = 'badge ' + (j.enabled ? 'on' : 'off');
+      badge.textContent = j.enabled ? _t('status.enabled') : _t('status.disabled');
+    }
+    var next = $('ab-next');
+    if (next) next.textContent = j.next_ts ? fmtDate(j.next_ts) : '—';
+    var sel = $('svc-ab-file');
+    if (sel) {
+      var files = Array.isArray(j.files) ? j.files : [];
+      var keep = sel.value;
+      sel.innerHTML = files.map(function (f) {
+        return '<option value="' + esc(f.name) + '">' + esc(f.name) + ' · ' + Math.round((f.bytes || 0) / 1024) + ' КБ</option>';
+      }).join('');
+      if (keep) svcSelectSet('svc-ab-file', keep);
+    }
+    svcLogBox('svc-ab-log', j.log, 'svc.ab.empty');
+  }
+  function svcFailoverSave() {
+    var on = !!(($('svc-fo-on') || {}).checked);
+    var sel = $('svc-fo-interval');
+    var iv = parseInt((sel && sel.value) || '60', 10);
+    if (!isFinite(iv)) iv = 60;
+    postJSON('/api/failover/save', { enabled: on, interval_s: iv }).then(function (j) {
+      toast((j && j.ok) ? _t('set.saved') : ((j && j.error) || _t('set.save-err')), !!(j && j.ok));
+      if (j && j.failover) renderFailover(j.failover);
+    });
+  }
+  function svcFailoverRun() {
+    postJSON('/api/failover/run', {}).then(function (j) {
+      toast((j && j.ok) ? _t('svc.fo.run') : ((j && j.error) || (j && j.msg) || _t('t.err-gen')), !!(j && j.ok));
+      loadService();
+    });
+  }
+  function svcNotifySave() {
+    var on = !!(($('svc-nt-on') || {}).checked);
+    var body = { enabled: on };
+    // Пустое поле = оставить прежнее значение: токен сервер не отдаёт,
+    // и затирать его пустой строкой при каждом сохранении нельзя.
+    var tok = (($('svc-nt-token') || {}).value || '').trim();
+    var chat = (($('svc-nt-chat') || {}).value || '').trim();
+    if (tok) body.token = tok;
+    if (chat) body.chat = chat;
+    postJSON('/api/notify/save', body).then(function (j) {
+      toast((j && j.ok) ? _t('set.saved') : ((j && j.error) || _t('set.save-err')), !!(j && j.ok));
+      if (j && j.ok) {
+        var t = $('svc-nt-token'); if (t) t.value = '';
+        if (j.notify) renderNotify(j.notify);
+      }
+    });
+  }
+  function svcNotifyTest() {
+    postJSON('/api/notify/test', {}).then(function (j) {
+      toast((j && j.ok) ? _t('svc.nt.test-ok') : ((j && j.error) || _t('t.err-gen')), !!(j && j.ok));
+      loadService();
+    });
+  }
+  function svcExport() {
+    var sel = $('svc-export-format');
+    var fmt = (sel && sel.value) || 'v2rayn';
+    getJSON('/api/export/client?format=' + encodeURIComponent(fmt)).then(function (j) {
+      if (!j || !j.ok) { toast((j && j.error) || _t('t.err-gen'), false); return; }
+      V.EXP = j;
+      var out = $('svc-export-out');
+      if (out) { out.textContent = j.content + '\n\n# ' + (j.note || ''); out.scrollTop = 0; }
+      qrRender($('svc-export-qr'), j.link, 3);
+      toast(_t('svc.exp.ok'), true);
+    });
+  }
+  function svcExportCopy() {
+    if (!V.EXP || !V.EXP.content) { toast(_t('svc.exp.nothing'), false); return; }
+    var val = V.EXP.content;
+    var done = function () { toast(_t('svc.exp.copied'), true); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(val).then(done).catch(function () { legacyCopy(val, done); });
+    } else { legacyCopy(val, done); }
+  }
+  function svcAbackupSave() {
+    var on = !!(($('svc-ab-on') || {}).checked);
+    var iv = parseInt((($('svc-ab-interval') || {}).value) || '24', 10);
+    var keep = parseInt((($('svc-ab-keep') || {}).value) || '7', 10);
+    if (!isFinite(iv)) iv = 24;
+    if (!isFinite(keep)) keep = 7;
+    var body = { enabled: on, interval_h: iv, keep: keep };
+    var p = (($('svc-ab-pass') || {}).value || '');
+    if (p) {
+      if (p.length < 8) { toast(_t('svc.backup.pass-err'), false); return; }
+      body.password = p;
+    }
+    postJSON('/api/autobackup/save', body).then(function (j) {
+      toast((j && j.ok) ? _t('set.saved') : ((j && j.error) || _t('set.save-err')), !!(j && j.ok));
+      if (j && j.ok) {
+        var el = $('svc-ab-pass'); if (el) el.value = '';
+        if (j.autobackup) renderAbackup(j.autobackup);
+      }
+    });
+  }
+  function svcAbackupRun() {
+    postJSON('/api/autobackup/run', {}).then(function (j) {
+      toast((j && j.ok) ? _t('svc.backup.export-ok') : ((j && j.error) || _t('t.err-gen')), !!(j && j.ok));
+      loadService();
+    });
+  }
+  function svcAbackupDownload() {
+    var sel = $('svc-ab-file');
+    var name = (sel && sel.value) || '';
+    if (!name) { toast(_t('svc.ab.no-file'), false); return; }
+    fetch('/api/autobackup/download', {
+      method: 'POST', headers: authHdr(), body: JSON.stringify({ name: name })
+    }).then(function (r) {
+      if (!r.ok) {
+        return r.text().then(function (txt) {
+          var e = {};
+          try { e = JSON.parse(txt); } catch (x) { }
+          throw new Error((e && e.error) || ('HTTP ' + r.status));
+        });
+      }
+      return r.blob().then(function (blob) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = name;
+        document.body.appendChild(a); a.click();
+        setTimeout(function () {
+          URL.revokeObjectURL(url);
+          if (a.parentNode) a.parentNode.removeChild(a);
+        }, 200);
+      });
+    }).then(function () {
+      toast(_t('svc.ab.dl-ok'), true);
+    }).catch(function (e) {
+      toast(String((e && e.message) || e), false);
+    });
   }
 
   /* ================= NAV ================= */
@@ -3511,6 +3736,16 @@ function loadTG() {
     'svc-backup-pick': function () { svcBackupPick(); },
     'svc-backup-export': function () { svcBackupExport(); },
     'svc-backup-import': function () { svcBackupImport(); },
+    // A-120/A-121/A-122/A-123 «Кот-диспетчер»: новые приборы «Сервиса».
+    'svc-failover-save': function () { svcFailoverSave(); },
+    'svc-failover-run': function () { svcFailoverRun(); },
+    'svc-notify-save': function () { svcNotifySave(); },
+    'svc-notify-test': function () { svcNotifyTest(); },
+    'svc-export': function () { svcExport(); },
+    'svc-export-copy': function () { svcExportCopy(); },
+    'svc-abackup-save': function () { svcAbackupSave(); },
+    'svc-abackup-run': function () { svcAbackupRun(); },
+    'svc-abackup-download': function () { svcAbackupDownload(); },
   };
   function actTarget(ev) {
     var node = ev && ev.target;
