@@ -14,13 +14,14 @@ import urllib.request
 import uuid
 from collections import deque
 
-VERSION = "1.10.28"
-VERSION_NAME = "Кот-диспетчер"
+VERSION = "2.0.0"
+VERSION_NAME = "Кот-хозяин"
 APP_NAME = "Aurora"
 
 # История версий для вкладки «Версии» (v, имя, дата).
 # ВАЖНО: без дублей — иначе вкладка показывает одну версию несколько раз.
 VERSION_HISTORY = (
+    ("2.0.0", "Кот-хозяин", "28.11.2026"),
     ("1.10.28", "Кот-диспетчер", "23.11.2026"),
     ("1.10.27", "Кот-создатель", "23.11.2026"),
     ("1.10.26", "Кот-смотритель", "19.11.2026"),
@@ -64,6 +65,7 @@ VERSION_HISTORY = (
 
 # Описания версий для вкладки «Версии» (v -> текст). Показываются в панели.
 VERSION_NOTES = {
+    "2.0.0": "🐾 Чистая сборка 2.0.0: подписки, платежи, лицензии, политика «Кот в законе» и подключение к головному серверу удалены полностью. Всё, что раньше требовало подписки, доступно сразу; меш работает локально; сохранены прокси, VLESS для дома, TG-WS, WARP/MASQUE, DNS и бэкапы. Linux и Windows-зеркало синхронны.",
     "1.10.28": "Кот-диспетчер взял канал под присмотр 🐾. Четыре новые возможности во вкладке «Сервис». Авто-переключение резерва: диспетчер оценивает здоровье VLESS-пула, MASQUE и WARP и сам переводит трафик на живой резерв, когда основной умирает, а когда основной оживает — возвращает обратно; ручной выбор канала ставит паузу, чтобы диспетчер не спорил с владельцем, все переключения видны в журнале. TG-уведомления: опциональный бот сообщает о переключениях канала, смене выходного IP, мёртвом пуле ключей и доступном обновлении; токен и chat_id хранятся в шифрованных настройках или env, в журнал и API не попадают, повторные события гасятся кулдауном. Экспорт клиентских конфигов: готовый профиль для подключения к этому серверу в v2rayN (ссылка), sing-box (JSON) и Clash.Meta (YAML) с QR и пометкой, какой канал сейчас активен на сервере. Плановый бэкап: архив по расписанию тем же шифрованным ZIP, хранение N последних копий с ротацией, скачивание и восстановление из панели. Новая дорожная карта проекта — в ROADMAP.md.",
     "1.10.27": "Кот-создатель убирает главную боль MASQUE: конфиг теперь можно СОЗДАТЬ прямо в панели 🐾. Раньше были только загрузка готового JSON/Clash-YAML и получение с сайта-генератора. Кнопка «➕ Создать конфиг» генерирует свежую пару EC P-256 на чистом stdlib (без зависимости от cryptography), регистрирует публичный ключ через Cloudflare WARP API, выбирает живой MASQUE-эндпоинт, применяет конфиг, поднимает mihomo и проверяет выходной IP. Сайт-генератор остался запасным вариантом. Починено скачивание mihomo: свежие релизы v1.19.x перешли на версионированные zip/gz, а старый URL .exe отдавал 404 — чистая установка теперь работает. Проба выхода больше не зависит от внешнего curl: используется stdlib-запрос через локальный mixed-port, curl оставлен запасным. Исправлен «Выходной IP -»: панель берёт свежий IP активного MASQUE/WARP из сохранённых конфигов, даже если xray молчит или панель только что перезапустилась. Клиентский трафик на мастере переведён с мёртвого WireGuard WARP на живой MASQUE через локальный SOCKS mihomo — Instagram и ipify снова открываются.",
     "1.10.26": "Кот-смотритель принёс в панель вкладку «Сервис» с четырьмя полезными приборами. Диагностика: одна кнопка проверяет порт xray, прямой выход, выход через прокси, выходной IP, DNS, IPv6, TG-WS, ру-сегмент и оба резервных канала — с временем каждой проверки и итогом. Замер скорости: ping, загрузка и отдача через тот же порт, что у владельца, с историей последних замеров. Автопроверка ключей: расписание (раз в N минут) с журналом событий, чтобы мёртвые ключи не ждали утреннего нажатия кнопки. Бэкап: настройки, пул ключей и конфиги WARP/MASQUE упаковываются в ZIP, зашифрованный паролем владельца (scrypt + ChaCha20-Poly1305), и восстанавливаются на этой или другой машине; порты и учётные данные панели в архив не попадают, чтобы восстановление не могло закрыть доступ к серверу.",
@@ -168,53 +170,6 @@ VERSION_CHRONICLE = {
 }
 
 
-# --- политика сервиса (GitHub-сборки: первая страница — правила) ---
-# POLICY_REV меняется ТОЛЬКО при изменении POLICY_TEXT.
-# REV > принятого => панель снова требует принять политику (после обновления).
-POLICY_REV = 2
-POLICY_TEXT = """ПОЛИТИКА И ПРАВИЛА ПРОЕКТА AURORA «Кот в законе»
-
-1. НАЗНАЧЕНИЕ
-Aurora — персональный VPN/прокси-сервер. Установка и использование подразумевают
-полное согласие с настоящей политикой. Если вы не согласны — не устанавливайте.
-
-2. РАЗРЕШЕНО
-- подключать собственные устройства (телефоны, планшеты, ПК, телевизоры);
-- использовать прокси в личных целях: приватность, доступ к заблокированным
-  сайтам, безопасные подключения в общественных сетях;
-- привлекать в свою сеть (меш) друзей с их согласия и на тех же правилах.
-
-3. ЗАПРЕЩЕНО
-- раздавать доступ посторонним без явного согласия владельца сервера;
-- использовать канал для DDoS, массового сканирования, покупки запрещённого,
-  кражи данных, мошенничества и любых нарушений закона;
-- обходить лимиты тарифов, маскировать свой трафик против владельца сервера;
-- продавать/перепродавать ключи и подписки без разрешения владельца;
-- вмешиваться в работу серверного ПО или панели управления.
-
-4. ОБЯЗАТЕЛЬСТВА ВЛАДЕЛЬЦА СЕРВЕРА
-- шифровать хранимые данные (подписки, ключи) и ограничивать доступ к файлам;
-- не передавать персональные данные клиентов третьим лицам без оснований;
-- немедленно уведомлять клиентов об изменении правил.
-При изменении текста политики ревизия увеличивается, и при следующем запуске
-панель снова запросит принятие — это обязательное условие продолжения работы.
-
-5. СОТРУДНИЧЕСТВО С ПРАВООХРАНИТЕЛЬНЫМИ ОРГАНАМИ
-Владелец гарантирует анонимность и конфиденциальность ВСЕГДА — до момента
-нарушения закона. По официальному письменному запросу правоохранительных
-органов (в т.ч. по официальным каналам связи) владелец обязан предоставить
-все имеющиеся данные об абоненте (адрес, логи, тайминг и т.п.).
-При нарушении закона любой страны владелец обязан сотрудничать
-с правоохранительными органами. Без официального запроса данные не передаются.
-
-6. ОГРАНИЧЕНИЕ ОТВЕТСТВЕННОСТИ
-Сервер предоставляется «как есть». Владелец не отвечает за доступность сторонних
-ресурсов, за действия клиентов сети и за последствия нарушения настоящих правил.
-
-7. СОГЛАСИЕ
-Нажатие кнопки «Принять» на панели управления означает безоговорочное принятие
-настоящей политики для всего оборудования, подключённого к серверу."""
-
 _BOOT_TS = time.time()   # время старта процесса (для /api/settings.uptime)
 
 # --- периметр plaintext-файлов Xray/keytest (A-072) ---
@@ -232,21 +187,6 @@ UPDATE_REPO = "efremov-aa/aurora-proxy"
 UPDATE_PUBKEY = "6159031f0fd9ab6c5074f9bef99f5ac125df75e05bdeaa772860236fb85e3371"
 UPDATE_CHECK_INTERVAL = 15 * 60  # проверка признаков обновления каждые 15 минут
 
-# --- A-945: закреплённая личность головного сервера --------------------------
-# Здесь НЕТ env-переопределения намеренно. Сборка публичная: если бы ключ или
-# master_id читались из окружения, кто угодно подставил бы свои значения и
-# подписал под них поддельную политику - подмена ключа и подмена данных шли бы
-# одной подписью. Ключ мастера публичен, подделать им подпись нельзя.
-# Смена ключа на мастере = перепривязка узла (node rebind), не env-переменная.
-MASTER_ED_PUBKEY = "zNoKk_FNrNjrx3rKAHyYeozU6AKg8bgeT1lq0-Pe57o"  # base64url, 32 байта
-MASTER_ID = "aurora-home-b953902a8beb"
-
-# Публичные адреса мастера. Панель :8890 - только LAN: узлу она не нужна и не
-# должна быть доступна (A-945).
-MASTER_PUBLIC_URL = "https://5.141.235.56.sslip.io:8445"
-MASTER_POLICY_URL = "http://5.141.235.56:8891"
-MESH_POLICY_PORT = 8891
-
 # --- пути (относительно корня проекта) ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.environ.get("AURORA_DATA_DIR", os.path.join(BASE_DIR, "data"))
@@ -255,168 +195,19 @@ LOG_FILE = os.path.join(BASE_DIR, "aurora.log")
 
 os.makedirs(DATA_DIR, exist_ok=True)
 
-# --- подписки (продаваемые VLESS-ключи клиентам) ---
-SUBS_FILE = os.path.join(DATA_DIR, "subs.json")
-SUBS_PLANS_FILE = os.path.join(DATA_DIR, "plans.json")
-SUBS_EXTRAS_FILE = os.path.join(DATA_DIR, "extras.json")
 AUTO_REFRESH_INTERVAL = 1800   # фоновый цикл обновления github-ключей (сек)
-
-# A-945: локальных тарифов в сборке НЕТ. Числа не зашиты в код - витрина
-# строится из catalog.plans, приходящего в подписанной политике мастера.
-# Пока мастер не ответил, магазин честно пуст ("цены задаёт головной сервер"),
-# вместо того чтобы показывать уровень, которого никто не продаёт.
-SUBS_PLANS = {}
-SUBS_PLAN_DEFAULT = ""   # A-945: нет тарифа по умолчанию, пока не пришёл каталог мастера
-SUBS_MASK_UUID = True  # в UI показывать маскированные uuid подключений
-
-# --- дополнительные возможности Aurora (витрина «Дополнительные возможности») ---
-# Каталог платных доп. услуг поверх тарифа. Показывается в панели, покупка — в Telegram-боте.
-# A-109: цены и описания витрины задаёт ТОЛЬКО головной сервер.
-# Клиентский дефолт пуст — реальный прайс приходит по меш-политике
-# (mesh._policy_loop) и хранится в data/extras.json.
-SUBS_EXTRAS = {}
-_EXTRAS_SOURCE = "local"
-_EXTRAS_GOOD = {}
-_EXTRAS_LOCK = threading.RLock()
-_EXTRAS_ID_RE = re.compile(r"^[a-z0-9_-]{1,40}$")
-
-
-def extras_source():
-    """Откуда взят текущий прайс витрины: local (заглушка) или master."""
-    return _EXTRAS_SOURCE
-
-
-def _validate_extras(raw):
-    """Строгая проверка каталога витрины: dict позиций, максимум 32 штуки."""
-    if not isinstance(raw, dict):
-        return None
-    out = {}
-    for key, value in list(raw.items())[:32]:
-        if not isinstance(key, str) or not isinstance(value, dict):
-            return None
-        kid = key.strip().lower()
-        if not _EXTRAS_ID_RE.match(kid):
-            return None
-        name = str(value.get("name") or "").strip()
-        if not name or len(name) > 120:
-            return None
-        try:
-            price = int(value.get("price") or 0)
-        except (TypeError, ValueError):
-            return None
-        if price < 0 or price > 1000000:
-            return None
-        out[kid] = {"name": name,
-                    "price": price,
-                    "unit": str(value.get("unit") or "").strip()[:40],
-                    "note": str(value.get("note") or "").strip()[:400]}
-    return out or None
-
-
-def save_extras(extras, buy_url=None):
-    """Принять каталог витрины от головного сервера и сохранить его локально."""
-    global BUY_URL, _EXTRAS_SOURCE, _EXTRAS_GOOD
-    valid = _validate_extras(extras)
-    if valid is None:
-        log("extras: каталог мастера отклонён (неверный формат)")
-        return False
-    with _EXTRAS_LOCK:
-        SUBS_EXTRAS.clear()
-        SUBS_EXTRAS.update(valid)
-        _EXTRAS_GOOD = {k: dict(v) for k, v in valid.items()}
-        _EXTRAS_SOURCE = "master"
-        payload = {"extras": {k: dict(v) for k, v in valid.items()}, "source": "master"}
-        if isinstance(buy_url, str) and buy_url.strip():
-            BUY_URL = buy_url.strip()[:200]
-            payload["buy_url"] = BUY_URL
-        try:
-            import crypt
-            crypt.save_json(SUBS_EXTRAS_FILE, payload)
-        except Exception as exc:
-            log("extras: не удалось сохранить каталог: %s" % exc)
-            return False
-    log("extras: прайс принят от мастера (%d позиций)" % len(SUBS_EXTRAS))
-    return True
-
-
-def load_extras():
-    """Поднять сохранённый прайс мастера из data/extras.json при старте."""
-    global BUY_URL, _EXTRAS_SOURCE, _EXTRAS_GOOD
-    try:
-        import crypt
-        raw = crypt.load_bytes(SUBS_EXTRAS_FILE)
-    except Exception:
-        return False
-    data = None
-    if isinstance(raw, dict):
-        data = raw
-    elif isinstance(raw, (bytes, bytearray)):
-        try:
-            data = json.loads(raw.decode("utf-8"))
-        except Exception:
-            data = None
-    if not isinstance(data, dict):
-        return False
-    source = data.get("extras")
-    valid = _validate_extras(source if isinstance(source, dict) else data)
-    if valid is None:
-        with _EXTRAS_LOCK:
-            SUBS_EXTRAS.clear()
-            SUBS_EXTRAS.update(_EXTRAS_GOOD)
-        return False
-    with _EXTRAS_LOCK:
-        SUBS_EXTRAS.clear()
-        SUBS_EXTRAS.update(valid)
-        _EXTRAS_GOOD = {k: dict(v) for k, v in valid.items()}
-        _EXTRAS_SOURCE = str(data.get("source") or "master")
-        if isinstance(data.get("buy_url"), str) and data["buy_url"].strip():
-            BUY_URL = data["buy_url"].strip()[:200]
-    return True
-
-
-def save_catalog(plans=None, extras=None, buy_url=None):
-    """Принять каталог мастера целиком: тарифы, витрина и ссылка оплаты.
-
-    A-945: тарифы ЗАМЕЩАЮТ локальный набор, а не дополняют его - иначе сборка
-    продолжала бы продавать витрину тарифа, который мастер уже убрал.
-    """
-    ok = False
-    if isinstance(plans, dict) and plans:
-        ok = bool(save_plans(plans, replace=True)) or ok
-    if isinstance(extras, dict):
-        ok = bool(save_extras(extras, buy_url)) or ok
-    return ok
 
 # --- порты (привязаны к клиентским устройствам, НЕ менять без запроса) ---
 UI_PORT = int(os.environ.get("AURORA_UI_PORT", "8890"))  # панель Aurora
 XRAY_PORT = int(os.environ.get("AURORA_XRAY_PORT", "8899"))  # mixed-вход xray (http+socks)
 XRAY_API_PORT = int(os.environ.get("AURORA_XRAY_API_PORT", "8897"))  # докодемо-API xray (статистика)
 TGWS_PORT = int(os.environ.get("AURORA_TGWS_PORT", "443"))  # Telegram WS-прокси (443; 1443 блокировался РКН снаружи)
-BUY_BOT = (os.environ.get("AURORA_BUY_BOT", "@aurorahomevpn_bot").strip() or "@aurorahomevpn_bot")  # бот для оплаты тарифов
-BUY_URL = "https://t.me/" + BUY_BOT.lstrip("@").strip("/")
 # Браузерное расширение (MV3/DNR): хост прокси, режим RU-байпаса, версия правил.
 RU_BYPASS = os.environ.get("AURORA_RU_BYPASS", "1").strip().lower() not in (
     "0", "false", "no", "off", "нет", "выкл")
 RULES_VERSION = (os.environ.get("AURORA_RULES_VERSION", "1").strip() or "1")[:32]
 EXT_HOST = os.environ.get("AURORA_EXT_HOST", "").strip()
 
-# --- A-111: лицензионный гейт PRO-функций (цены и доступ - у мастера) ---
-def _ext_int_env(name, default):
-    """Целое из окружения, мусор и пусто -> значение по умолчанию."""
-    try:
-        value = int(str(os.environ.get(name, "") or default).strip())
-    except (TypeError, ValueError):
-        return default
-    return value if value > 0 else default
-
-
-EXT_MASTER_URL = os.environ.get("AURORA_EXT_MASTER", MASTER_PUBLIC_URL).rstrip("/")
-EXT_TOKEN = os.environ.get("AURORA_EXT_TOKEN", "").strip()          # token из device-ссылки
-EXT_CREDENTIAL = os.environ.get("AURORA_EXT_CREDENTIAL", "").strip()  # credential из device-ссылки
-EXT_CHECK_INTERVAL_S = _ext_int_env("AURORA_EXT_CHECK_INTERVAL", 3600)
-EXT_OFFLINE_MAX_S = _ext_int_env("AURORA_EXT_OFFLINE_MAX_S", 72 * 3600)
-EXT_TIMEOUT = _ext_int_env("AURORA_EXT_TIMEOUT", 10)
-EXT_PRO_PLANS = os.environ.get("AURORA_EXT_PRO_PLANS", "").strip()  # пусто = все, кроме free
 
 # --- A-161: архивы браузерного расширения (PRO-фича) ---
 # Лежат в assets/ рядом с кодом; раздаёт их панель. Имя файла - только из
@@ -744,21 +535,14 @@ _SETTINGS_DEFAULTS = {
     "mesh_token": "",            # токен invite (генерируется при первом запросе)
     "twofa": False,              # требовать X-2FA на POST /api/*
     "ui_pin": "",                # пин 2FA (заголовок X-2FA)
-    "show_mesh": False,          # показывать вкладку «Меш-сеть» в панели (ТОЛЬКО по команде мастера)
-    "show_subs": False,          # показывать вкладку «Магазин» в панели (ТОЛЬКО по команде мастера)
-    "mesh_master": False,        # головной сервер: раздаёт политику видимости клиентам меша
+    "show_mesh": True,           # вкладка «Меш-сеть» доступна локально
     # --- v1.7.0: политика сервиса + сегменты ---
-    "policy_rev_accepted": 0,    # принятая ревизия политики (0 = не принимал)
+    "setup_complete": False,   # мастер первичной настройки завершён
     "segment_title": "",         # своё название сегмента монитора (пусто = авто)
     "segment_regions": [],       # выбранные регионы (ru/global/eu/asia)
     "segment_custom": "",        # пользовательские домены (по одному на строку)
     # --- v1.8.0: гологоловной сервер (master) / авто-джойн / замок тестового сервера ---
-    "master_addr": "",           # URL головного сервера (напр. http://10.1.136.56:5053)
-    "master_token": "",          # секрет регистрации у головного (выдаёт головной)
     "mesh_own_secret": "",       # секрет собственного mesh-узла
-    "auto_join": False,          # при старте регистрироваться в меше головного (авто-джуin)
-    "master_only": False,        # замок: подключиться/использовать может только головной
-    "setup_complete": False,    # первый запуск public-сервера завершён
     # A-1040 «Кот-смотритель»: автопроверка пула ключей по расписанию.
     # 0 минут = выключено (тогда keycheck_enabled тоже не важен).
     "keycheck_enabled": False,
@@ -1060,15 +844,6 @@ def segment_domains():
     return domains
 
 
-def policy_required():
-    """True, пока не принята актуальная ревизия политики (после обновления — снова True)."""
-    try:
-        acc = int(get("policy_rev_accepted", 0) or 0)
-    except (TypeError, ValueError):
-        acc = 0
-    return POLICY_REV > acc
-
-
 def _ts():
     import datetime
     return datetime.datetime.now().strftime("%H:%M:%S")
@@ -1096,15 +871,13 @@ def _validate_settings(raw):
         raise ValueError("root is not an object")
     bool_keys = (
         "vpn_mode", "auto_recovery", "auto_refresh", "lan_only",
-        "block_scanners", "rate_limit", "twofa", "show_mesh", "show_subs",
-        "mesh_master", "auto_join", "master_only", "setup_complete",
+        "block_scanners", "rate_limit", "twofa", "show_mesh", "setup_complete",
         "masque_enabled", "tgws_enabled", "vless_enabled", "keycheck_enabled",
         "failover_enabled", "notify_enabled", "backup_schedule_enabled",
     )
     string_keys = (
         "continue_text", "ui_token", "server_name", "mesh_id", "mesh_token",
-        "ui_pin", "segment_title", "segment_custom", "master_addr",
-        "master_token", "mesh_own_secret",
+        "ui_pin", "segment_title", "segment_custom", "mesh_own_secret",
         "notify_tg_token", "notify_tg_chat", "backup_password",
     )
     list_keys = ("segment_regions",)
@@ -1118,8 +891,6 @@ def _validate_settings(raw):
         if key in raw and (not isinstance(raw[key], list)
                            or any(not isinstance(x, str) for x in raw[key])):
             raise ValueError("%s is not a string list" % key)
-    if "policy_rev_accepted" in raw and not _is_nonnegative_int(raw["policy_rev_accepted"]):
-        raise ValueError("policy_rev_accepted is not a nonnegative integer")
     # A-1040: интервал автопроверки. 0 = выключено, максимум неделя.
     if "keycheck_interval_min" in raw:
         value = raw["keycheck_interval_min"]
@@ -1259,200 +1030,6 @@ def reset_settings():
     return True
 
 
-# --- тарифы: переопределение из data/plans.json (редактор тарифов в UI) ---
-_SUBS_PLANS_LOCK = threading.RLock()
-_PLAN_FIELDS = ("name", "price", "bytes", "days", "devices", "keys")
-_PLAN_LIST_FIELDS = ("features", "features_no")
-_PLAN_NAME_MAX = 40
-_PLAN_LIST_MAX = 100
-_PLAN_ITEM_MAX = 80
-_PLANS_GOOD = None
-
-
-def _plan_id(value):
-    if not isinstance(value, str) or not value or len(value) > 40:
-        return False
-    for ch in value:
-        if not (("a" <= ch <= "z") or ("0" <= ch <= "9") or ch in "_-"):
-            return False
-    return True
-
-
-def normalize_plan(plan_id, value, base=None):
-    """Строгая нормализация тарифа (контракт головного сервера)."""
-    if not _plan_id(plan_id):
-        raise ValueError("invalid plan id")
-    if not isinstance(value, dict):
-        raise ValueError("invalid plan record")
-    merged = dict(base or {})
-    merged.update(value)
-    if any(field not in merged for field in _PLAN_FIELDS):
-        raise ValueError("missing plan fields")
-    name = merged.get("name")
-    if not isinstance(name, str) or not 1 <= len(name.strip()) <= _PLAN_NAME_MAX:
-        raise ValueError("invalid plan name")
-    out = {"name": name.strip()}
-    for field in ("price", "bytes", "days"):
-        if not _is_nonnegative_int(merged.get(field)):
-            raise ValueError("invalid plan field %s" % field)
-        out[field] = int(merged[field])
-    for field in ("devices", "keys"):
-        if not _is_nonnegative_int(merged.get(field)) or int(merged[field]) < 1:
-            raise ValueError("invalid plan field %s" % field)
-        out[field] = int(merged[field])
-    for field in _PLAN_LIST_FIELDS:
-        if field not in merged:
-            continue
-        items = merged.get(field)
-        if not isinstance(items, list) or len(items) > _PLAN_LIST_MAX:
-            raise ValueError("invalid plan field %s" % field)
-        clean = []
-        for item in items:
-            if not isinstance(item, str) or not 1 <= len(item) <= _PLAN_ITEM_MAX:
-                if isinstance(item, str) and item.strip():
-                    # A-945: текст фичи обрезаем и пишем в лог, а не роняем
-                    # тариф целиком. Числа (price/bytes/days/devices/keys)
-                    # остаются строгими - обрезать их нельзя.
-                    short = item.strip()[:_PLAN_ITEM_MAX].rstrip()
-                    log("plans: %s обрезан с %d до %d символов"
-                        % (field, len(item), len(short)))
-                    clean.append(short)
-                    continue
-                raise ValueError("invalid plan field %s" % field)
-            clean.append(item)
-        out[field] = clean
-    return out
-
-
-def _plans_snapshot():
-    return dict((key, dict(value)) for key, value in SUBS_PLANS.items()
-                if isinstance(value, dict))
-
-
-def save_plans(plans=None, replace=False):
-    """Сохранить тарифы в data/plans.json (атомарно, шифрование AURORA2).
-
-    replace=True - каталог пришёл с мастера и ЗАМЕЩАЕТ локальный набор целиком.
-    Иначе сборка годами показывала бы тариф, которого мастер уже не продаёт
-    (A-945: триал и тариф free удалены приказом владельца).
-    """
-    with _SUBS_PLANS_LOCK:
-        source = SUBS_PLANS if plans is None else plans
-        if not isinstance(source, dict) or not source:
-            raise ValueError("no plans")
-        payload = {}
-        dropped = []
-        for key, value in source.items():
-            try:
-                payload[key] = normalize_plan(key, value, base=SUBS_PLANS.get(key))
-            except ValueError as e:
-                # Один плохой тариф не должен ронять весь каталог: мастер мог
-                # прислать длинный текст фичи. Итог честно пишем в лог.
-                dropped.append("%s (%s)" % (key, e))
-        if not payload:
-            raise ValueError("no valid plans")
-        for entry in dropped:
-            log("plans: тариф отброшен: %s" % entry)
-        if plans is not None:
-            if replace:
-                SUBS_PLANS.clear()
-            SUBS_PLANS.update(payload)
-            _sync_plan_default()
-        try:
-            import crypt
-            crypt.save_json(SUBS_PLANS_FILE, payload)
-        except Exception as e:
-            log("plans: не удалось сохранить: %s" % e)
-            return False
-        return True
-
-
-def _sync_plan_default():
-    """Тариф по умолчанию обязан существовать. Если мастер его убрал (free),
-    лучше честное «нет тарифа», чем показ несуществующего уровня."""
-    global SUBS_PLAN_DEFAULT
-    if SUBS_PLAN_DEFAULT not in SUBS_PLANS:
-        SUBS_PLAN_DEFAULT = ""
-
-
-def _validate_plans(raw):
-    if not isinstance(raw, dict):
-        raise ValueError("root is not an object")
-    valid = {}
-    for key, value in raw.items():
-        valid[key] = normalize_plan(key, value, base=SUBS_PLANS.get(key))
-    return valid
-
-
-def _load_plans_override():
-    """Переопределение тарифов из data/plans.json (валидные планы перезаписывают)."""
-    global _PLANS_GOOD, SUBS_PLAN_DEFAULT
-    try:
-        import crypt
-        raw = crypt.load_bytes(SUBS_PLANS_FILE)
-    except (OSError, TypeError, ValueError) as e:
-        _storage_failure(SUBS_PLANS_FILE, str(e))
-        raw = None
-    if raw is None:
-        return
-    try:
-        valid = _validate_plans(json.loads(raw.decode("utf-8")))
-    except (TypeError, ValueError, UnicodeDecodeError) as e:
-        _storage_failure(SUBS_PLANS_FILE, str(e))
-        valid = None
-    with _SUBS_PLANS_LOCK:
-        if valid:
-            SUBS_PLANS.update(valid)
-            _PLANS_GOOD = _plans_snapshot()
-            log("plans: тарифы переопределены из data/plans.json (%d)" % len(valid))
-        elif _PLANS_GOOD:
-            SUBS_PLANS.clear()
-            SUBS_PLANS.update(_PLANS_GOOD)
-            log("plans: восстановлены последние корректные тарифы")
-    if SUBS_PLANS.pop("free", None) is not None:
-        # A-945: устаревший локальный тариф free не должен вернуться после
-        # обновления - триала больше нет по приказу владельца.
-        log("plans: устаревший локальный тариф free убран")
-    if SUBS_PLAN_DEFAULT and SUBS_PLAN_DEFAULT not in SUBS_PLANS:
-        # A-945: дефолтного тарифа может не быть - мастер его не продаёт
-        # (триал и free удалены приказом владельца). Это НЕ поломка хранилища:
-        # молча уводим дефолт в «нет тарифа» и живём дальше.
-        SUBS_PLAN_DEFAULT = ""
-
-
-# --- меш: общий ключ подписи приглашений/политики с головным сервером ---
-MESH_POLICY_TTL_S = 120
-
-
-def _read_mesh_policy_key():
-    value = (os.environ.get("AURORA_MESH_POLICY_KEY") or "").strip()
-    return value if len(value.encode("utf-8")) >= 32 else ""
-
-
-def _read_mesh_master_id():
-    value = (os.environ.get("AURORA_MESH_MASTER_ID") or "").strip()
-    if not value or len(value) > 64:
-        return ""
-    for ch in value:
-        if not (ch.isalnum() or ch in "._-"):
-            return ""
-    return value
-
-
-MESH_POLICY_KEY = _read_mesh_policy_key()
-MESH_MASTER_ID = _read_mesh_master_id()
-
-MASTER_PUBLIC_URL = "https://5.141.235.56.sslip.io:8445"
-MASTER_POLICY_URL = "http://5.141.235.56:8891"
-MESH_POLICY_PORT = 8891
-
-
-def mesh_policy_key():
-    return MESH_POLICY_KEY
-
-
-def mesh_master_id():
-    return MESH_MASTER_ID
 
 
 def get(key, default=None):
@@ -1508,7 +1085,6 @@ def state_fields():
     return get_state()
 
 
-# Переопределение тарифов из data/plans.json — в конце модуля (после log()).
 
 # --- A-151: релей-туннель между узлами меш (роль/адреса - из env) ---
 # По умолчанию выключен: включается только приказом владельца.
@@ -1522,9 +1098,6 @@ MESH_TUNNEL_ENV = _read_mesh_flag("AURORA_MESH_TUNNEL")
 GAME_TUN_ENV = _read_mesh_flag("AURORA_MESH_GAME_TUN")
 MESH_SECRET = (os.environ.get("AURORA_MESH_SECRET", "") or "").strip()
 MESH_PUBLIC_ADDR = (os.environ.get("AURORA_MESH_PUBLIC_ADDR", "") or "").strip()
-MESH_MASTER_ADDR = (os.environ.get("AURORA_MESH_MASTER_ADDR", "") or "").strip()
 # A-275: флаг НЕ применяется на уровне модуля (стирал бы settings целиком).
 # Его применяет load_settings() -> _apply_mesh_env(), уже после чтения файла.
 
-_load_plans_override()
-load_extras()

@@ -2,15 +2,14 @@
 
 # 🐱 Aurora — тёплый котик с VLESS Reality и общей меш-сетью
 
-**Свой прокси, своя панель, до 5 игровых mesh-клиентов, чат и голос — бесплатно и без квот.**
+**Свой прокси, своя панель, локальная меш-сеть — без подписок, оплаты и квот.**
 
-![Version](https://img.shields.io/badge/version-1.10.28-blue)
-![Release](https://img.shields.io/badge/release-1.10.28%20%22%D0%9A%D0%BE%D1%82-%D0%B4%D0%B8%D1%81%D0%BF%D0%B5%D1%82%D1%87%D0%B5%D1%80%22-blue)
+![Version](https://img.shields.io/badge/version-2.0.0-blue)
+![Release](https://img.shields.io/badge/release-2.0.0%20%22%D0%9A%D0%BE%D1%82-%D1%85%D0%BE%D0%B7%D1%8F%D0%B8%D0%BD%22-blue)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 ![Platform](https://img.shields.io/badge/platform-linux%20%7C%20windows-lightgrey)
 ![Python](https://img.shields.io/badge/Python-3.12%20stdlib-3776AB?logo=python)
 ![Xray](https://img.shields.io/badge/xray-v26.9.9-blue)
-![Policy](https://img.shields.io/badge/policy-rev%202-yellow)
 
 [Загрузка](#-загрузка) · [Что я умею](#-что-я-умею-бесплатно) · [Запуск](#-как-меня-запустить) · [ENV](#-мои-настройки-через-env)
 
@@ -25,14 +24,13 @@
 - [⚡ Быстрый старт](QUICKSTART.md)
 - [📦 Загрузка](#-загрузка)
 - [✨ Что я умею бесплатно](#-что-я-умею-бесплатно)
-- [🧩 Дополнительные услуги](#-дополнительные-услуги-aurora)
 - [🔮 Как я работаю](#-как-я-работаю)
 - [🗂 Мои внутренности](#-мои-внутренности)
 - [🚀 Как меня запустить](#-как-меня-запустить)
 - [⚙️ Мои настройки через ENV](#-мои-настройки-через-env)
 - [🔌 Мой API](#-мой-api)
 - [🧪 Мои проверки](#-мои-проверки)
-- [🛡 Безопасность и политика](#-моя-безопасность)
+- [🛡 Безопасность](#-моя-безопасность)
 - [📝 Замечания и честные грабли](#-замечания-и-честные-грабли)
 - [🧭 Решения и дорожная карта](#-решения-и-дорожная-карта)
 - [💬 Сообщество](#-сообщество)
@@ -50,15 +48,13 @@
 - 🐾 **общая меш-сеть** — я умею ждать друзей, играть с ними в общей группе, переписываться и
   разговаривать.
 
-**Версия:** `VERSION=1.10.28`, `VERSION_NAME=Кот-диспетчер`
-**Политика:** ревизия 2 (принимается при первом запуске)
+**Версия:** `VERSION=2.0.0`, `VERSION_NAME=Кот-хозяин`
 
 ### 🐾 Честно сразу
 
 Aurora — **не VPN-сервис**, **не анонимайзер** и **не обход белых списков**.
-Ядро — свой прокси, панель, общая меш-сеть, чат и голос — **бесплатно**. Дополнительные
-**услуги самой Aurora** можно купить: это расширения и режимы для **твоей** Aurora, а не VPN и не
-обход белых списков. Туннель, ключи и панель — твои. Никаких продаж VPN в этой сборке нет.
+Все возможности доступны сразу, без подписок и оплаты; мастер не используется, меш работает
+локально. Туннель, ключи и панель — твои. Никаких продаж VPN в этой сборке нет.
 
 ---
 
@@ -91,16 +87,16 @@ Aurora — **не VPN-сервис**, **не анонимайзер** и **не 
 
 ## 📦 Загрузка
 
-Мяу! Всё лежит в [Release v1.10.28 «Кот-диспетчер»](https://github.com/efremov-aa/aurora-proxy/releases).
+Мяу! Всё лежит в [Release v2.0.0 «Кот-хозяин»](https://github.com/efremov-aa/aurora-proxy/releases).
 
 <details>
 <summary>📋 Ассеты релиза</summary>
 
 | Ассет | Что внутри |
 |---|---|
-| `Aurora-v1.10.28-linux.zip` | Linux-версия: модули, `ui/`, `proxy/`, `Dockerfile`, `docker-compose.yml`, systemd-юниты |
-| `Aurora-v1.10.28-windows.zip` | Windows-версия (папка `windows/`): те же модули + `bin/`, `nssm/`, `installer/`, `download_xray.ps1` |
-| `Aurora-Setup-1.10.28.exe` 🪟 | **Установщик для Windows**: ставит Aurora как службу **NSSM «Aurora»**, xray и TG-WS внутри, авто-обновление |
+| `Aurora-v2.0.0-linux.zip` | Linux-версия: модули, `ui/`, `proxy/`, `Dockerfile`, `docker-compose.yml`, systemd-юниты |
+| `Aurora-v2.0.0-windows.zip` | Windows-версия (папка `windows/`): те же модули + `bin/`, `nssm/`, `installer/`, `download_xray.ps1` |
+| `Aurora-Setup-2.0.0.exe` 🪟 | **Установщик для Windows**: ставит Aurora как службу **NSSM «Aurora»**, xray и TG-WS внутри, авто-обновление |
 | `*.sig` | Подпись Ed25519 каждого ассета: авто-обновление не примет неподписанный файл 🐾 |
 
 Подпись релизов проверена: Ed25519, fingerprint `ca4f87c9999e0282…`. Скачанный архив побайтно
@@ -118,7 +114,7 @@ Aurora — **не VPN-сервис**, **не анонимайзер** и **не 
 | 🐾 Своя Aurora | панель `:8890`, стабильные ключи и ссылка для своих устройств |
 | 🐾 Общая меш-сеть | узлы в ролях `hub`/`node`, подписанный одноразовый invite (proof вместо токена) |
 | 🐾 До 5 mesh-клиентов для игр | групповая L3-подсеть `10.<группа>.<узел>.1`, прямой UDP-канал и рель с честной плашкой «через рель, +N мс» |
-| 🐾 Чат и голос | внутри общей сети, без отдельной подписки и без счётчиков |
+| 🐾 Чат и голос | внутри общей сети, без подписок и счётчиков |
 | 🐾 Сервис | диагностика канала, замер скорости, автопроверка ключей по расписанию, бэкап с паролем |
 | 🐾 Резерв WARP/MASQUE | конфиг создаётся прямо в панели (`➕ Создать`), ключ и регистрация Cloudflare — локально, сайт-генератор остался запасным; канал поднимается через mihomo, выход проверяется автоматически |
 | 🐾 Диспетчер канала | следит за VLESS-пулом, MASQUE и WARP: умер основной — сам уходит на живой резерв, ожил — возвращается; ручной выбор ставит паузу, переключения видны в журнале |
@@ -133,30 +129,6 @@ Aurora — **не VPN-сервис**, **не анонимайзер** и **не 
      ![Веб-панель](docs/assets/panel.png)
      ![Меш-сеть](docs/assets/mesh.png)
      ![Чат и голос](docs/assets/chat.gif) -->
-
----
-
-## 🧩 Дополнительные услуги Aurora
-
-Да, некоторые дополнительные штуки для Aurora продаются. Но это **не VPN**, **не подписка на прокси**
-и **не обход белых списков**. Я не продаю VPN, не продаю доступ к чужим сетям и не даю возможности
-обхода белых списков. Платно — только то, что умеет **сама Aurora**: расширения и режимы для твоей
-панели, твоего прокси и твоей меш-сети.
-
-- 🧩 **Плагины и расширение для браузера** — блокируют рекламу и трекеры, включают RU-режим прямо
-  в браузере и дают режимы «только этот сайт / глобально / выкл».
-- 📺 **Трансляция экрана и видео** — между твоими устройствами, без чужих серверов.
-- 👥 **Друзья без ограничения** — бесплатно у Aurora пять игровых mesh-клиентов, а платно лимита нет:
-  сколько друзей подключишь, столько и играешь. Работает **только для твоих друзей** и **только через
-  наши клиенты**, чужие сети и чужие устройства эта услуга не открывает.
-- 🏠 **NAT-доступ только к своей Aurora** — если ты за серым IP/NAT, клиент доходит до **твоего** узла
-  и никуда больше. Чужие Aurora эта штука не открывает.
-- 🌍 **«Сайты, которые не любят прокси»** — список доменов, которые открываются напрямую, вместо
-  старых «белых списков». Это **не обход белых списков**, а переключение режима для сайтов,
-  которые не любят прокси.
-
-> Мяу. Ещё раз: покупка доп. услуг не делает Aurora VPN и не даёт обхода белых списков.
-> Она просто расширяет то, что уже есть у тебя.
 
 ---
 
@@ -205,15 +177,12 @@ Aurora — **не VPN-сервис**, **не анонимайзер** и **не 
 
 - 🕸 **Узлы и invite** — роли `hub`/`node`, подписанный одноразовый **invite** (proof вместо токена,
   защита от повторного использования). Здесь можно играть с друзьями.
-- 🔗 **Релей-туннель** — соединение узел↔мастер строится поверх внешнего VLESS Reality `:8443`
-  (голый WireGuard режется ТСПУ); мастер слушает туннель и обменивается с узлами
-  **VLESS-профилями** (8-е поле HELLO), поэтому узел видит, кого он зовёт.
+- 🔗 **Локальная сеть** — узлы и invite живут на твоих серверах, без головного мастера и запросов к нему.
 - 🧲 **BitTorrent → direct** — торрент-трафик эта сборка никогда не гонит через прокси (sniffing включён).
-- 🚫 **Тарифов и лимитов на сам прокси нет.**
+- 🚫 **Тарифов, подписок и лимитов на сам прокси нет.**
 
-### 📜 Политика и защита
+### 🛡 Защита
 
-- 📜 **Политика первого запуска** — ревизия 2, показывается до входа в панель, принятие фиксируется.
 - 🔏 **Шифрование AURORA2** (ChaCha20-Poly1305) для настроек, статусов, блеклиста, меша, админ-токена
   и TG-WS-секрета; ключ — `data/.aurora_key`, права 0600/0700, старый формат AURORA1 мигрируется.
 - ✍️ **Подпись обновлений** — релиз подписывается Ed25519, авто-обновление fail-closed.
@@ -232,7 +201,7 @@ Aurora — **не VPN-сервис**, **не анонимайзер** и **не 
 ```
 aurora/
 ├── run.py            # точка входа: треды, фоновые циклы, HTTP-сервер
-├── config.py         # настройки, state, env, порты, политика, RU-домены
+├── config.py         # настройки, state, env, порты, RU-домены
 ├── api.py            # HTTP API и веб-панель
 ├── core.py           # сборка xray.json, рестарт xray, ротация, circuit-breaker, egress
 ├── pool.py           # пул ключей + блеклист
@@ -245,9 +214,8 @@ aurora/
 ├── diag.py           # A-1040: самопроверка канала + замер скорости
 ├── autocheck.py      # A-1040: автопроверка пула ключей по расписанию
 ├── backup.py         # A-1040: бэкап/восстановление (ZIP по паролю)
-├── meshtunnel.py     # релей-туннель узел↔мастер (поверх внешнего VLESS)
 ├── meshsignal.py     # сигналинг mesh для клиентов: offer/answer/ICE, чат и голос
-├── mesh.py           # меш-сеть: узлы, invite, политика
+├── mesh.py           # локальная меш-сеть: узлы и invite
 ├── telemetry.py      # устройства и трафик (ss/netstat)
 ├── tgws.py           # Telegram WS-прокси
 ├── rusegment.py      # проверка доступности российских ресурсов
@@ -298,7 +266,7 @@ docker compose up -d --build
 1. Нужен **Python 3.12+** (только стандартная библиотека) и **xray v26.9.9**.
 2. Скопируйте папку в `/home/youruser/aurora/`.
 3. `systemctl --user enable --now aurora`; `xray.service` и `tg-ws-proxy.service` — из репозитория.
-4. Откройте `http://<host>:8890/` — при первом запуске появится мастер настройки и политика.
+4. Откройте `http://<host>:8890/` — при первом запуске появится мастер настройки.
 
 > Управление xray на сервере — `XRAY_MANAGE=systemctl`, в Docker — `proc`.
 
@@ -307,7 +275,7 @@ docker compose up -d --build
 <details>
 <summary>🪟 Вариант 3 — Windows</summary>
 
-Скачайте `Aurora-Setup-1.10.28.exe` и запустите: ставится служба **NSSM «Aurora»**.
+Скачайте `Aurora-Setup-2.0.0.exe` и запустите: ставится служба **NSSM «Aurora»**.
 Данные — в `%LOCALAPPDATA%\Aurora`. Альтернатива — ручная установка из [`windows/README-windows.md`](windows/README-windows.md).
 
 </details>
@@ -342,13 +310,11 @@ docker compose up -d --build
 | `AURORA_VLESS_FLOW` | `xtls-rprx-vision` | flow для VLESS |
 | `AURORA_SETUP_TOKEN` | пусто | токен LAN-привязки при первом запуске |
 | `AURORA_ALLOW_PRIVATE_LINK` | `0` | разрешить приватные адреса в mesh-ссылках |
-| `AURORA_MESH_MASTER_ID` | пусто | идентификатор узла-главного в меше |
-| `AURORA_MESH_POLICY_KEY` | пусто | ключ подписи mesh-политики |
 | `AURORA_TLS_CERT` / `AURORA_TLS_KEY` | пусто | сертификат/ключ HTTPS и HSTS |
 | `AURORA_UPDATE_REPO` | `efremov-aa/aurora-proxy` | репозиторий авто-обновления |
 | `XRAY_MANAGE` | `systemctl` | `systemctl` или `proc` (Docker) |
 
-> ⚠️ Меш требует `AURORA_MESH_POLICY_KEY` и `AURORA_MESH_MASTER_ID`; без них invite не выдаётся (503).
+> 🐾 Меш работает локально: отдельный мастер и его ключи не нужны.
 
 </details>
 
@@ -360,7 +326,6 @@ docker compose up -d --build
 <summary>📋 Основные маршруты</summary>
 
 - `GET /api/state` — полное состояние.
-- `GET /api/policy` — текст политики и ревизия; `POST /api/policy/accept {rev}` — принять.
 - `POST /api/setup {…}` — завершение первого запуска (только loopback).
 - `POST /api/keys/refresh` — обновить ключи с GitHub.
 - `POST /api/keys/check` — проверить все ключи (TCP + egress), мёртвые в блеклист.
@@ -369,7 +334,8 @@ docker compose up -d --build
 - `GET /api/masque`, `POST /api/masque/create`, `POST /api/masque/fetch`, `POST /api/masque/upload`,
   `POST /api/masque/select`, `POST /api/masque/apply`, `POST /api/masque/probe`,
   `POST /api/masque/enable` — резерв MASQUE через mihomo; `create` делает ключ и регистрацию локально.
-- `GET /api/mesh/policy`, `POST /api/mesh/node/add`, `POST /api/mesh/regenerate` — меш-сеть.
+- `GET /api/nodes`, `GET /api/routes`, `POST /api/mesh/invite`, `POST /api/mesh/regenerate`,
+  `POST /api/mesh/join`, `POST /api/mesh/ping` — локальная меш-сеть (без мастера).
 - `POST /api/tgws/restart`, `POST /api/rusegment/check` — обслуживание каналов.
 - `GET /api/diag`, `POST /api/diag/run`; `GET /api/speed`, `POST /api/speed/run`;
   `GET /api/autocheck`, `POST /api/autocheck/save`, `POST /api/autocheck/run`;
@@ -400,12 +366,12 @@ docker compose up -d --build
 - хранилище и шифрование: `test_a031_storage.py`, `test_a029_storage_validation.py`,
   `test_a030_crypt_storage.py`;
 - подпись релизов и авто-обновление: `test_a062_update_signature.py`;
+- публичная модель: подписок, оплаты, лицензий и политики нет — соответствующие проверки удалены;
 - контракт Docker-варианта: `test_a035_docker_contract.py`;
 - версия и названия релизов: `test_a042_version.py`;
 - границы доступа, CSRF, TLS: `test_a058_boundary.py`, `test_a061_transport.py`,
   `test_a063_public_host.py`, `test_a073_read_scope.py`;
 - панель без inline-JS: `test_a068_ui_csp.py`;
-- устройство = ключ и инструкции подключения: `test_a110_mykeys.py`;
 - релей-туннель между узлами: `test_a160_relay_tunnel.py`;
 - меш-реестр, ключи, recovery, телеметрия, RU-сегмент: `test_a064_mesh_invite.py`,
   `test_a041_vless.py`, `test_a032_recovery.py`, `test_a034_telemetry.py`,
@@ -429,7 +395,7 @@ python tests/test_a160_relay_tunnel.py # A160_RELAY_TUNNEL_OK
 И быстрая проверка синтаксиса:
 
 ```bash
-python -m py_compile api.py autocheck.py backup.py config.py core.py crypt.py diag.py extgate.py mesh.py     meshtunnel.py pool.py recovery.py run.py subs.py telemetry.py tgws.py updater.py warp.py
+python -m py_compile api.py autocheck.py backup.py config.py core.py crypt.py diag.py mesh.py meshtunnel.py pool.py recovery.py run.py telemetry.py tgws.py updater.py warp.py
 node --check ui/app.js && node --check ui/qr.js
 ```
 
@@ -442,7 +408,6 @@ node --check ui/app.js && node --check ui/qr.js
 - Ключи, настройки, статусы, блеклист, меш и TG-WS-секрет лежат в зашифрованных хранилищах AURORA2.
 - Панель: admin-токен + 2FA (PIN), rate-limit неудачных попыток, защита от чужих `Host`/`Origin`,
   раздельные проекции для LAN и внешних клиентов.
-- Политика (ревизия 2) принимается до первого входа.
 - Aurora — **не VPN-сервис**, не анонимайзер и не обход законов. Соблюдайте законы своей страны
   и правила провайдеров.
 
@@ -450,8 +415,8 @@ node --check ui/app.js && node --check ui/qr.js
 
 ## 📝 Замечания и честные грабли
 
-- 🐾 **В 1.10.0 никаких подписок на VPN.** Вкладка тарифов удалена, покупка закрыта гейтом (403).
-  Ядро (свой прокси, своя Aurora, общая меш-сеть, чат и голос) осталось бесплатным — без квот и счётчиков.
+- 🐾 **Никаких подписок и оплаты.** Все возможности доступны сразу; вкладки тарифов, платежей и гейтов удалены.
+  Свой прокси, своя Aurora, локальная меш-сеть, чат и голос — без квот и счётчиков.
 - 🪟 **Каталог данных установщика.** При установленном приложении каталог данных по умолчанию —
   `%LOCALAPPDATA%\Aurora`. Если у вас стоял 1.9.3 — перенесите старый каталог
   `Aurora\_internal\data` в `%LOCALAPPDATA%\Aurora` один раз руками.
@@ -468,8 +433,8 @@ node --check ui/app.js && node --check ui/qr.js
 Подробный документ — **[ROADMAP.md](ROADMAP.md)**. В 1.10.28 закрыты первые четыре пункта
 (авто-failover, TG-уведомления, экспорт клиентских конфигов, плановый бэкап). Коротко:
 
-- **Три независимых контура:** прокси (VLESS Reality + панель) и игровой mesh-контур. Туннель
-  головного сервера слушает только свой адрес и наружу не выходит.
+- **Независимые контуры:** прокси (VLESS Reality + панель) и локальный игровой mesh-контур.
+  Запросов и подключений к мастеру нет.
 - **Игровой контур** — групповая L3-подсеть `10.<группа>.<узел>.1`. Группы изолированы, маршрут `/16`
   внутри группы обязателен, рель отправляет кадр только пиру с совпадающим адресом назначения.
 - **Диагностика не пишет каждые 5 секунд.** Строка пишется при смене состояния или по таймеру:
@@ -517,9 +482,8 @@ node --check ui/app.js && node --check ui/qr.js
 >   chat, and talk.
 >
 > 🐾 **Honestly:** Aurora is **not a VPN service**, **not an anonymizer**, and **not a whitelist
-> bypass**. The core — your proxy, panel, shared mesh, chat, and voice — is free. Additional
-> **Aurora services** can be purchased: they are extensions and modes for **your** Aurora, not a VPN
-> and not a whitelist bypass. The keys, panel, and tunnel are yours. There are no VPN sales in this build.
+> bypass**. Everything is available immediately — no subscriptions, no payment; no master server is
+> used and the mesh works locally. The keys, panel, and tunnel are yours. There are no VPN sales in this build.
 
 ## 🐾 What I can do for free
 
@@ -529,32 +493,11 @@ node --check ui/app.js && node --check ui/qr.js
 | 🐾 Own Aurora | panel `:8890`, stable keys, and a link for your devices |
 | 🐾 Shared mesh network | nodes in `hub`/`node` roles, signed one-time invite (proof instead of token) |
 | 🐾 Up to 5 mesh clients for games | group L3 subnet `10.<group>.<node>.1`, direct UDP channel, and relay with an honest “via relay, +N ms” badge |
-| 🐾 Chat and voice | inside the shared network, with no separate subscription and no counters |
+| 🐾 Chat and voice | inside the shared network, with no subscriptions or counters |
 | 🐾 Service tab | channel diagnostics, speed test, scheduled key checks, password-protected backup |
 
 No traffic quotas, no device limits, no expiry dates. The keys and xray are yours, the panel is yours,
 and the tail does not stick out.
-
-## 🐾 Additional Aurora services
-
-Yes, some extra Aurora features are sold. But this is **not a VPN**, **not a proxy subscription**,
-and **not a whitelist bypass**. I don’t sell VPN, I don’t sell access to foreign networks, and I don’t
-provide whitelist bypass. Paid features are only what **Aurora itself** can do: extensions and modes
-for your panel, your proxy, and your mesh.
-
-- 🧩 **Plugins and browser extension** — block ads and trackers, enable RU mode inside the browser,
-  and switch modes “this site only / global / off.”
-- 📺 **Screen and video streaming** — between your devices, without third-party servers.
-- 👥 **Friends without limits** — Aurora gives you five game mesh clients for free, and paid there is no
-  limit: connect as many friends as you like. It works **only for your friends** and **only through our
-  clients**; it does not open foreign networks or other people’s devices.
-- 🏠 **NAT access only to your own Aurora** — if you’re behind a gray IP/NAT, the client reaches
-  **your** node and nowhere else. It does not open other people’s Auroras.
-- 🌍 **“Sites that don’t like proxies”** — a list of domains opened directly, instead of the old
-  “whitelists.” This is **not whitelist bypass**; it’s mode switching for sites that dislike proxies.
-
-> Meow. Once again: buying extra services does not make Aurora a VPN and does not provide whitelist
-> bypass. It only extends what you already have.
 
 ## 🔮 How I work
 
@@ -597,9 +540,8 @@ for your panel, your proxy, and your mesh.
 - 🧲 **BitTorrent → direct** — this build never routes torrent traffic through the proxy (sniffing is on).
 - 🚫 **No plans or limits for the proxy itself.**
 
-**Policy and protection**
+**Protection**
 
-- 📜 **First-run policy** — revision 2, shown before entering the panel, acceptance is recorded.
 - 🔏 **AURORA2 encryption** (ChaCha20-Poly1305) for settings, statuses, blacklist, mesh, admin token,
   and TG-WS secret; key — `data/.aurora_key`, permissions 0600/0700, old AURORA1 format is migrated.
 - ✍️ **Update signature** — the release is signed with Ed25519, auto-update is fail-closed.
@@ -619,13 +561,13 @@ Meow. I’m a kitty, not a lawyer, and this is not legal advice.
 - **Laws are yours.** Aurora doesn’t help you look for anything forbidden and doesn’t trade in
   someone else’s traffic; follow the laws of your country.
 
-> 🐾 One simple rule: you don’t pay anyone for using your own keys and your own panel.
-> You only ever pay Aurora for extra features — and only for yourself.
+> 🐾 One simple rule: everything is available immediately, with no subscriptions and no payment.
+> You use your own keys, your own panel, and your own local mesh.
 
 ## 📝 Notes and honest gotchas
 
-- 🐾 **In 1.10.0 there are no VPN subscriptions.** The pricing tab is removed, purchase is closed
-  by a gate (403). The core (own proxy, own Aurora, shared mesh network, chat, and voice) remains free —
+- 🐾 **No subscriptions and no payment.** Everything is available immediately; the pricing, billing,
+  license and policy tabs and gates are removed. Your own proxy, panel, local mesh, chat and voice work
   without quotas or counters.
 - 🪟 **Installer data directory (1.10.0).** When the app is installed, the default data directory is
   `%LOCALAPPDATA%\Aurora`. If you had 1.9.3 — move the old
@@ -640,8 +582,8 @@ Meow. I’m a kitty, not a lawyer, and this is not legal advice.
 
 Detailed document — **ROADMAP.md**. Briefly:
 
-- **Three independent contours:** proxy (VLESS Reality + panel) and game mesh contour. The head server
-  tunnel listens **only on loopback** (`51821`/`51822`/`51823`) and does not go outside.
+- **Independent contours:** proxy (VLESS Reality + panel) and local game mesh contour. No master
+  server is queried or contacted.
 - **Game contour** — group L3 subnet `10.<group>.<node>.1`. Groups are isolated, the `/16` route inside
   the group is mandatory, the relay sends a frame only to a peer with a matching destination address.
 - **Diagnostics do not write every 5 seconds.** A line is written on state change or by timer:

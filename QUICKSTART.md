@@ -3,7 +3,8 @@
 Мяу! Это короткая дорожка от «скачал» до «прокси работает». Подробности — в [README](README.md).
 
 > Нужен свой сервер/ПК с белым IP. Aurora не продаёт VPN и не обходит белые списки —
-> она просто управляет **твоим** xray и резервным каналом.
+> она просто управляет **твоим** xray и резервным каналом. Все возможности доступны сразу,
+> без подписок и оплаты; мастер не используется, меш работает локально.
 
 ---
 
@@ -11,9 +12,9 @@
 
 | Вариант | Когда брать | Файл |
 | --- | --- | --- |
-| 🪟 Windows | домашний ПК / ноутбук | `Aurora-Setup-1.10.28.exe` |
-| 🐧 Linux + systemd | VPS / выделенный сервер | `Aurora-v1.10.28-linux.zip` |
-| 🐳 Docker | контейнерный хост | `Aurora-v1.10.28-linux.zip` |
+| 🪟 Windows | домашний ПК / ноутбук | `Aurora-Setup-2.0.0.exe` |
+| 🐧 Linux + systemd | VPS / выделенный сервер | `Aurora-v2.0.0-linux.zip` |
+| 🐳 Docker | контейнерный хост | `Aurora-v2.0.0-linux.zip` |
 
 Все файлы — в [Releases](https://github.com/efremov-aa/aurora-proxy/releases). Подписи `.sig` проверяются автоматически.
 
@@ -23,7 +24,7 @@
 
 ### 🪟 Windows
 
-1. Запусти `Aurora-Setup-1.10.28.exe` от администратора.
+1. Запусти `Aurora-Setup-2.0.0.exe` от администратора.
 2. Служба **NSSM «Aurora»** встанет сама, xray и TG-WS внутри.
 3. Открой `http://127.0.0.1:8890/`.
 
@@ -31,7 +32,7 @@
 
 ```bash
 # Python 3.12+ и xray v26.9.9 уже должны быть на хосте
-unzip Aurora-v1.10.28-linux.zip -d ~/aurora
+unzip Aurora-v2.0.0-linux.zip -d ~/aurora
 cd ~/aurora
 systemctl --user enable --now aurora
 ```
@@ -45,7 +46,7 @@ AURORA_EXTRA_HOSTS="10.0.0.5;myhost.lan"
 ### 🐳 Docker
 
 ```bash
-unzip Aurora-v1.10.28-linux.zip -d aurora && cd aurora
+unzip Aurora-v2.0.0-linux.zip -d aurora && cd aurora
 cp .env.example .env
 docker compose up -d --build
 ```
@@ -56,8 +57,7 @@ docker compose up -d --build
 
 ## 3. Первый запуск
 
-1. Прими политику (ревизия 2) — она показывается до входа.
-2. Заверши мастер настройки: имя сервера, белый IP, порты.
+1. Заверши мастер настройки: имя сервера, белый IP, порты.
 3. Нажми **🔑 Обновить ключи** — пул подтянется с GitHub и проверится.
 4. Включи резерв: вкладка **🛡️ MASQUE → ➕ Создать конфиг**.
    Ключ и регистрация Cloudflare делаются локально, сайт-генератор не нужен.

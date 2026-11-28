@@ -1,7 +1,7 @@
 (function () {
   'use strict';
-  var V = { S: null, SUBS: null, STATS: null, MESH: null, RU: null, UPD: null, ROUTES: null, SET: null, SEC: null, TG: null, EXP: null };
-  var CFG = { tab: 'dashboard', ruFailOnly: false, _rid: 0, policyOnce: false };
+  var V = { S: null, MESH: null, RU: null, UPD: null, ROUTES: null, SET: null, SEC: null, TG: null, EXP: null };
+  var CFG = { tab: 'dashboard', ruFailOnly: false };
   var LS = { theme: 'aurora_theme', sec: 'aurora_sec_tok', tfa: 'aurora_2fa', lang: 'aurora_lang' };
 
   /* ================= I18N ================= */
@@ -12,13 +12,11 @@
   ];
   var I18N = {  
     ru: {
-      'check.left': 'Проверено', 'check.idle': 'проверка не запускалась',
-      'pol.head': 'Политика сервиса', 'pol.readOnly': 'Просмотр', 'pol.accept': 'Принимаю условия', 'ru.regions': 'Сегменты', 'ru.custom-ph': 'Свои домены через запятую (необязательно)',
+      'check.left': 'Проверено', 'check.idle': 'проверка не запускалась', 'ru.regions': 'Сегменты', 'ru.custom-ph': 'Свои домены через запятую (необязательно)',
       'dash.manage': 'Управление', 'pool.refresh-btn': 'Обновить ключи', 'pool.check-btn': 'Проверить ключи', 'mesh.ping-btn': 'Пинг меш',
       'nav.warp': 'WARP', 'warp.head': 'Резервный канал Cloudflare WARP',       'nav.dash': 'Обзор', 'nav.keys': 'Ключи', 'nav.devices': 'Устройства',
       'nav.connect': 'Внешний доступ', 'nav.rusegment': 'Ру-сегмент', 'nav.tgws': 'TG-WS',
       'nav.mesh': 'Меш-сеть', 'nav.mesh-join': 'Подключение', 'nav.mesh-topo': 'Топология', 'nav.mesh-routes': 'Маршруты',
-      'nav.shop': 'Магазин', 'nav.shop-plans': 'Тарифы VPN', 'nav.shop-features': 'Дополнительные возможности Aurora', 'nav.shop-billing': 'Платежи',
       'nav.update': 'Обновление', 'nav.versions': 'Версии', 'nav.service': 'Сервис', 'nav.settings': 'Сервер', 'nav.security': 'Безопасность', 'nav.logs': 'Логи',
       // A-1040 «Кот-смотритель»: вкладка «Сервис»
       'svc.diag.head': 'Диагностика',
@@ -72,7 +70,7 @@
       'status.online': 'работает', 'status.stopped': 'остановлен', 'status.active': 'активен', 'status.dead': 'мёртв',
       'status.bad': 'плохой', 'status.slow': 'медлен.', 'status.noip': 'noip', 'status.ok': 'ок', 'status.final': 'финал',
       'status.direct': 'direct', 'status.enabled': 'включено', 'status.disabled': 'выключено',
-      'btn.vpn-off': '🌀 Включить VPN', 'btn.vpn-on': '🌀 VPN вкл', 'btn.rotate': '🎲 Сменить ключ', 'btn.choose': '💎 Выбрать',
+      'btn.vpn-off': '🌀 Включить VPN', 'btn.vpn-on': '🌀 VPN вкл', 'btn.rotate': '🎲 Сменить ключ',
       'btn.copy': '📋 Копировать', 'btn.save': 'Сохранить', 'btn.login': '🔑 Войти', 'btn.logout': 'Выйти',
       'k.keys': 'ключей: ', 'k.empty': 'ключей пока нет', 'k.mine': 'свой', 'k.github': 'github',
       'k.add-ok': 'Ключ добавлен 🐾', 'k.add-err': 'Ошибка добавления', 'k.need-vless': 'Нужна vless:// ссылка',
@@ -84,17 +82,13 @@
       'ru.empty': 'проверка ещё не выполнялась', 'ru.avail': 'доступен', 'ru.unavail': 'недоступен', 'ru.all': 'все домены доступны ✅',
       'upd.avail': 'доступно', 'upd.cur': 'актуально', 'upd.msg-avail': 'Доступно обновление', 'upd.msg-cur': 'Установлена актуальная версия',
       'upd.checked': 'Проверено: ', 'upd.err': 'ошибка', 'upd.err-hint': 'Обновление не удалось — подробности видны администратору',
-      'w.mesh-nodes': 'Узлов в сети:', 'w.mesh-exit': 'выход через', 'w.hub': 'хаб', 'w.mesh-none': 'Меш не подключён. Приглашение — во вкладке «Подключение».',
-      'w.plan': 'Активный план:', 'w.ru': 'RU-доменов:', 'w.ru-ok': 'доступно',
+      'w.mesh-nodes': 'Узлов в сети:', 'w.mesh-exit': 'выход через', 'w.hub': 'хаб', 'w.mesh-none': 'Меш не подключён. Приглашение — во вкладке «Подключение».', 'w.ru': 'RU-доменов:', 'w.ru-ok': 'доступно',
       'mesh.connected': 'подключён', 'mesh.not': 'не подключён', 'mesh.member': 'участник', 'mesh.hub': 'хаб',
+      'mesh.id-local': 'Invite выдаёт этот узел; пока его нет — идентификатор узла.',
+      'routes.local': 'Маршруты меша применяются локально, без головного сервера.',
       'mesh.no-nodes': 'узлов нет — добавьте первый', 'mesh.node': 'узел',
       'routes.empty': 'маршрутов пока нет', 'routes.active': 'активен', 'routes.off': 'выкл',
-      'plans.na': 'тарифы недоступны в этой сборке', 'plans.traffic': 'Трафик:', 'plans.devices': 'Устройств:', 'plans.keys': 'Ключей:',
-      'plans.free': 'Бесплатно', 'plans.per-mo': '/мес', 'plans.current': 'текущий',
-      // A-945: срок задаёт мастер (days=0 = бессрочно). Остальные языки
-      // наследуют русский через _t().
-      'plans.forever': 'бессрочно',
-      'bill.empty': 'платежей пока нет',
+
       'sec.on': 'включён', 'sec.off': 'выключен', 'sec.access': 'LAN-only: ', 'sec.da': 'да', 'sec.no': 'нет', 'sec.blk': 'блок',
       'sec.rat': 'вкл', 'sec.rat-off': 'выкл',
       'log.empty': 'лог пуст', 'rec.empty': 'восстановлений не было',
@@ -111,17 +105,14 @@
       'sec.logout': 'Выход выполнен', 'sec.rotate-ok': 'Reality-ключи ротированы 🔄', 'sec.rotate-na': 'Ротация недоступна в этой сборке',
       'upd.run-ok': 'Проверка запущена (фоново)', 'upd.check-err': 'Ошибка проверки', 'upd.apply-ok': 'Обновление запущено ⬆️',
       'upd.apply-err': 'Не удалось запустить', 'upd.admin': 'Управление каналом обновлений — в админ-панели 🐾',
-      'plans.admin': 'Управление тарифами — в админ-панели 🐾', 'plans.buy': 'Тариф «', 'plans.buy2': '» — покупка в админ-панели 🐾',
-      'feat.admin': 'Магазин недоступен в этой сборке 🐾', 'feat.buy': 'Функция «', 'feat.buy2': '» — витрина в публичной сборке 🐾',
       'vpn.on': 'VPN включён 🌀', 'vpn.off': 'VPN выключен', 'vpn.err': 'Ошибка', 'rot.ok': 'Ключ ротирован 🎲', 'rot.err': 'Не удалось ротировать',
       'pool.refresh': 'Пул обновлён 🔄', 'pool.check': 'Проверка ключей запущена в фоне 🧪', 'mesh.ping': 'Пинг меш запущен 📡',
-      'mesh.policy-saved': 'Политика хаба сохранена 🎛',
       'copy.link-ok': 'Ссылка скопирована 📋', 'copy.link-na': 'Ссылка пока недоступна', 'ru.done': 'Проверка завершена 🇷🇺',
       'ru.run': 'Проверка запущена', 'ru.failonly': '💀 Только проблемы', 'ru.failonly-on': '💀 Только проблемы ✓',
       'tg.restarted': 'TG-WS перезапущен ✈️', 'tg.restart-err': 'Ошибка рестарта',
-      'fmt.kb': 'КБ', 'fmt.mb': 'МБ', 'fmt.gb': 'ГБ', 'fmt.ul': 'Безлимит', 'fmt.per-mo': '/мес',
+      'fmt.kb': 'КБ', 'fmt.mb': 'МБ', 'fmt.gb': 'ГБ', 'fmt.ul': 'Безлимит',
       'fmt.s': ' с', 'fmt.min': ' мин', 'fmt.h': ' ч', 'fmt.d': ' д',
-      'dash.mode': 'Режим', 'dash.ip': 'Выходной IP', 'dash.conns': 'Соединения', 'dash.traffic': 'Трафик ↓ / ↑', 'dash.mesh-nodes': 'Меш-узлов', 'dash.plan': 'Тариф',
+      'dash.mode': 'Режим', 'dash.ip': 'Выходной IP', 'dash.conns': 'Соединения', 'dash.traffic': 'Трафик ↓ / ↑', 'dash.mesh-nodes': 'Меш-узлов',
       'upd.details': 'Подробнее', 'upd.now': 'Обновить', 'w.proxy': 'Состояние прокси', 'w.check-ru': 'Проверить',
       'keys.uri-ph': 'vless://… вставьте свою ссылку (Reality)', 'keys.add': 'Свой ключ', 'keys.clean': 'Очистить мёртвые', 'keys.src': 'github + свои',
       'th.tag': 'Тег', 'th.source': 'Источник', 'th.status': 'Статус', 'th.ping': 'Пинг', 'th.exit': 'Exit IP', 'th.sites': 'Sites',
@@ -135,67 +126,40 @@
       'mj.head': 'Подключение к меш-сети', 'mj.p': 'Ваш прокси может быть частью приватной меш-сети Aurora. Это даёт доступ к эксклюзивным локациям других участников, автоматический обход блокировок и резервные маршруты.',
       'mj.invite-ph': 'Вставьте invite-код меша (например: aurora-home-a1b2c3d4)', 'mj.join': 'Подключиться', 'mj.st': 'Статус меша', 'mj.name': 'Имя меша', 'mj.role': 'Роль',
       'mj.nodes': 'Узлов доступно', 'mj.ping': 'Пинг до хаба', 'mj.enc': 'Шифрование', 'mj.what': 'Что даёт меш',
-      'mj.leave': 'Покинуть меш', 'mj.regen': 'Обновить invite', 'mj.pol': 'Политика хаба', 'mj.pol-hint': 'Головной сервер управляет тем, какие вкладки видны у клиентов меша. Клиенты, подключённые по invite этого сервера, автоматически применяют политику (обновление каждые 15 сек).',
-      'mj.master': 'Cервер — головной, управляет видимостью у клиентов', 'mj.show-mesh': 'Показывать клиентам вкладку «Меш-сеть»', 'mj.show-subs': 'Показывать клиентам вкладку «Магазин»',
+      'mj.leave': 'Покинуть меш', 'mj.regen': 'Обновить invite',
       'mt.hint': 'Ваш прокси (в центре) и узлы других участников меша. Соединения активны, если трафик ходит через них.',
       'mrt.hint': 'Правила, какой трафик через какой узел выходит в интернет. Порядок — сверху вниз.', 'th.what': 'Что', 'th.via': 'Куда', 'th.proto': 'Протокол',
-      'sp.head': 'Тарифные планы VPN', 'sp.hint': 'Для тех, у кого серый IP: нужен обход блокировок. Оплата и продление — через Telegram-бота, тариф подключается сразу.', 'sp.loading': 'загрузка тарифов…', 'sp.comp': 'Состав тарифов', 'th.func': 'Функция', 'th.val': 'Значение',
-      'sf.instant': '+ оплата в Telegram-боте, активация мгновенно',
-      'sb.head': 'Оплата и продление', 'sb.hint': 'Активный план, срок действия и история платежей. Продление — в один клик.', 'sb.plan': 'Текущий план', 'sb.until': 'Активен до', 'sb.buy': 'Оплатить в Telegram', 'btn.buy-tg': '💬 Купить в Telegram', 'sb.hist': 'История платежей', 'sb.active': 'Активных', 'sb.income': 'Доход за месяц', 'sb.traffic-month': 'Трафик за месяц',
-      'th.date': 'Дата', 'th.desc': 'Описание', 'th.sum': 'Сумма',
+      'th.date': 'Дата',
       'upd.apply': 'Обновить сейчас', 'upd.auto': 'Автообновление', 'upd.auto-hint': 'Обновление производится из GitHub-релизов. Бинарник скачивается, проверяется, заменяется атомарно — прокси перезапускается за пару секунд.',
       'upd.src': 'Источник обновлений', 'th.param': 'Параметр', 'upd.repo': 'Репозиторий', 'upd.sig': 'Проверка подписи', 'upd.rollback': 'Откат при сбое',
       'upd.check-now': 'Проверить сейчас', 'upd.stable': 'stable — только стабильные', 'upd.rc': 'rc — кандидаты в релиз', 'upd.nightly': 'nightly — ночные сборки',
       'upd.mode-auto': 'Автообновление включено', 'upd.mode-notify': 'Только уведомлять', 'upd.mode-off': 'Не проверять',
       'ver.head': 'История версий',
       'set.head': 'Параметры сервера', 'set.host': 'Хост', 'set.port': 'Xray-порт', 'set.ver': 'Версия', 'set.uptime': 'Аптайм',
-      'set.common': 'Общие', 'set.vis': 'Видимость вкладок', 'set.show-mesh': 'Включить меш-сеть', 'set.show-subs': 'Включить магазин (подписки и тарифы)', 'set.mesh': 'Меш', 'set.name-ph': 'Название сервера', 'set.meshid-ph': 'ID меша', 'set.copy-invite': 'Копировать invite',
+      'set.common': 'Общие', 'set.vis': 'Видимость вкладок', 'set.show-mesh': 'Включить меш-сеть', 'set.mesh': 'Меш', 'set.name-ph': 'Название сервера', 'set.meshid-ph': 'ID меша', 'set.copy-invite': 'Копировать invite',
       'sec.hint': 'Admin-токен панели и Reality-ключи внешнего доступа. Меняется на живой конфиг.', 'sec.panel': 'Панель', 'sec.tok-ph': 'Admin-токен (Bearer) — нужен для POST /api/*', 'sec.acc-v': 'Access', 'sec.pbk-ph': 'public key', 'sec.rotate': 'Ротация ключей',
       'log.head': 'Системный лог', 'log.loading': 'загрузка…', 'log.refresh': 'Обновить', 'log.download': 'Скачать', 'rclog.head': 'Журнал recovery',
       'th.node': 'Узел', 'th.region': 'Регион', 'th.route': 'Маршрут', 'sec.tok': 'Admin-токен', 'sec.reality': 'Reality',
         'theme.sun': '🌙', 'theme.moon': '☀️',
-  'rec.hint': 'Recovery на связи: котик сам следит за ключами (лимит, регион, соединения) и переключит канал, если ключ отвалится. Здесь появятся записи о каждом переключении.', 'mesh.id-hint': 'Приглашение (invite) выдаёт головной сервер. Пока его нет — показан идентификатор вашего узла.', 'routes.master': 'Маршруты задаёт головной сервер: здесь видно, куда уходит трафик. Добавить или убрать правило в клиентской сборке нельзя — попросите хозяина сети 🐾', 'sec.tok-hint': 'Админ-токен — это ваш пароль панели. Он задаётся при первом запуске (мастер) и хранится в data/settings.json или переменной AURORA_UI_TOKEN. Введите его здесь один раз — и кнопки заработают.', 'sec.2fa-on': 'Включить 2FA', 'sec.2fa-off': 'Выключить 2FA',
-      'feat.master': 'Цены и описания товаров прислает головной сервер — этот узел получит его цены и описание по мешу',
-    'myk.head': 'Мои ключи',
-    'myk.hint': 'Устройство = купленный ключ 🐾 Тариф, срок и трафик — по каждому ключу.',
-    'myk.until': 'Срок',
-    'myk.traffic': 'Трафик',
-    'myk.devices': 'Ключи',
-    'myk.how': 'Инструкция',
-    'myk.copy': 'Скопировать ссылку',
-    'myk.copy-ok': 'Ссылка скопирована 🐾',
-    'myk.empty': 'Ключей пока нет — купите тариф в Telegram-боте',
-    'myk.unlim': 'безлимит',
+  'rec.hint': 'Recovery на связи: котик сам следит за ключами (лимит, регион, соединения) и переключит канал, если ключ отвалится. Здесь появятся записи о каждом переключении.', 'sec.tok-hint': 'Админ-токен — это ваш пароль панели. Он задаётся при первом запуске (мастер) и хранится в data/settings.json или переменной AURORA_UI_TOKEN. Введите его здесь один раз — и кнопки заработают.', 'sec.2fa-on': 'Включить 2FA', 'sec.2fa-off': 'Выключить 2FA',
     'dev.conn': 'Подключения к прокси',
     'nav.conn': 'Подключения',
-    'nav.keys-proxy': 'Ключи прокси',      'ext.head': 'PRO-функции Aurora',
-      'ext.locked': 'Пока подписка не активна, PRO-функции закрыты. VPN и прокси работают как обычно.',
-      'ext.pro': 'PRO открыт: котик доволен 🐾',
-      'ext.expired': 'Подписка не активна - купить можно в Telegram-боте',
-      'ext.na': 'Лицензия недоступна: сервер не ответил. Прокси работает 🐾',
-      'ext.buy': 'Купить PRO',
-      'ext.offline': 'Работаем на кэше лицензии',
-        'ext.trial': 'Триал активен: расширение и блок реклам уже открыты 🐱',
-        'ext.dl-chrome': 'Скачать для Chrome',
-        'ext.dl-edge': 'Скачать для Edge',
-        'ext.dl-master': 'Пакет выдаёт головной сервер 🐾',
+    'nav.keys-proxy': 'Ключи прокси',
 
     },  
     en: {
-      'check.left': 'Checked', 'check.idle': 'no check run yet',
-      'pol.head': 'Service policy', 'pol.readOnly': 'View', 'pol.accept': 'I accept the terms', 'ru.regions': 'Segments', 'ru.custom-ph': 'Custom domains, comma separated (optional)',
+      'check.left': 'Checked', 'check.idle': 'no check run yet', 'ru.regions': 'Segments', 'ru.custom-ph': 'Custom domains, comma separated (optional)',
       'dash.manage': 'Manage', 'pool.refresh-btn': 'Refresh keys', 'pool.check-btn': 'Check keys', 'mesh.ping-btn': 'Mesh ping',
       'nav.warp': 'WARP', 'warp.head': 'Cloudflare WARP reserve channel',       'nav.dash': 'Dashboard', 'nav.keys': 'Keys', 'nav.devices': 'Devices',
       'nav.connect': 'External access', 'nav.rusegment': 'RU segment', 'nav.tgws': 'TG-WS',
       'nav.mesh': 'Mesh', 'nav.mesh-join': 'Connect', 'nav.mesh-topo': 'Topology', 'nav.mesh-routes': 'Routes',
-      'nav.shop': 'Store', 'nav.shop-plans': 'VPN plans', 'nav.shop-features': 'Additional Aurora features', 'nav.shop-billing': 'Billing',
       'nav.update': 'Update', 'nav.versions': 'Versions', 'nav.settings': 'Server', 'nav.security': 'Security', 'nav.logs': 'Logs',
       'nav.group.home': 'Home proxy', 'nav.group.upd': 'Updates', 'nav.group.set': 'Settings',
       'g.you': 'You', 'g.yours': 'yours', 'status.on': 'online', 'status.off': 'offline', 'status.warn': 'unstable',
       'status.online': 'running', 'status.stopped': 'stopped', 'status.active': 'active', 'status.dead': 'dead',
       'status.bad': 'bad', 'status.slow': 'slow', 'status.noip': 'noip', 'status.ok': 'ok', 'status.final': 'final',
       'status.direct': 'direct', 'status.enabled': 'enabled', 'status.disabled': 'disabled',
-      'btn.vpn-off': '🌀 Enable VPN', 'btn.vpn-on': '🌀 VPN on', 'btn.rotate': '🎲 Rotate key', 'btn.choose': '💎 Choose',
+      'btn.vpn-off': '🌀 Enable VPN', 'btn.vpn-on': '🌀 VPN on', 'btn.rotate': '🎲 Rotate key',
       'btn.copy': '📋 Copy', 'btn.save': 'Save', 'btn.login': '🔑 Sign in', 'btn.logout': 'Sign out',
       'k.keys': 'keys: ', 'k.empty': 'no keys yet', 'k.mine': 'mine', 'k.github': 'github',
       'k.add-ok': 'Key added 🐾', 'k.add-err': 'Add failed', 'k.need-vless': 'A vless:// link is required',
@@ -207,14 +171,12 @@
       'ru.empty': 'check not run yet', 'ru.avail': 'available', 'ru.unavail': 'unavailable', 'ru.all': 'all domains available ✅',
       'upd.avail': 'available', 'upd.cur': 'up to date', 'upd.msg-avail': 'Update available', 'upd.msg-cur': 'Up to date',
       'upd.checked': 'Checked: ', 'upd.err': 'error', 'upd.err-hint': 'Update failed - details are visible to the administrator',
-      'w.mesh-nodes': 'Mesh nodes:', 'w.mesh-exit': 'exit via', 'w.hub': 'hub', 'w.mesh-none': 'Mesh not connected. Invite is in the "Connect" tab.',
-      'w.plan': 'Active plan:', 'w.ru': 'RU domains:', 'w.ru-ok': 'available',
+      'w.mesh-nodes': 'Mesh nodes:', 'w.mesh-exit': 'exit via', 'w.hub': 'hub', 'w.mesh-none': 'Mesh not connected. Invite is in the "Connect" tab.', 'w.ru': 'RU domains:', 'w.ru-ok': 'available',
       'mesh.connected': 'connected', 'mesh.not': 'not connected', 'mesh.member': 'member', 'mesh.hub': 'hub',
+      'mesh.id-local': 'This node issues the invite; until then, your node id is shown.',
+      'routes.local': 'Mesh routes are applied locally, without a head server.',
       'mesh.no-nodes': 'no nodes yet — add the first one', 'mesh.node': 'node',
       'routes.empty': 'no routes yet', 'routes.active': 'active', 'routes.off': 'off',
-      'plans.na': 'plans unavailable in this build', 'plans.traffic': 'Traffic:', 'plans.devices': 'Devices:', 'plans.keys': 'Keys:',
-      'plans.free': 'Free', 'plans.per-mo': '/mo', 'plans.current': 'current',
-      'bill.empty': 'no payments yet',
       'sec.on': 'enabled', 'sec.off': 'disabled', 'sec.access': 'LAN-only: ', 'sec.da': 'yes', 'sec.no': 'no', 'sec.blk': 'block',
       'sec.rat': 'on', 'sec.rat-off': 'off',
       'log.empty': 'log is empty', 'rec.empty': 'no recoveries',
@@ -231,17 +193,14 @@
       'sec.logout': 'Signed out', 'sec.rotate-ok': 'Reality keys rotated 🔄', 'sec.rotate-na': 'Rotation unavailable in this build',
       'upd.run-ok': 'Check started (background)', 'upd.check-err': 'Check error', 'upd.apply-ok': 'Update started ⬆️',
       'upd.apply-err': 'Could not start', 'upd.admin': 'Update channel is managed in the admin panel 🐾',
-      'plans.admin': 'Plans are managed in the admin panel 🐾', 'plans.buy': 'Plan "', 'plans.buy2': '" — purchase in the admin panel 🐾',
-      'feat.admin': 'Store unavailable in this build 🐾', 'feat.buy': 'Feature "', 'feat.buy2': '" — showcase in the public build 🐾',
       'vpn.on': 'VPN on 🌀', 'vpn.off': 'VPN off', 'vpn.err': 'Error', 'rot.ok': 'Key rotated 🎲', 'rot.err': 'Could not rotate',
       'pool.refresh': 'Pool refreshed 🔄', 'pool.check': 'Key check started in background 🧪', 'mesh.ping': 'Mesh ping started 📡',
-      'mesh.policy-saved': 'Hub policy saved 🎛',
       'copy.link-ok': 'Link copied 📋', 'copy.link-na': 'Link not available yet', 'ru.done': 'Check finished 🇷🇺',
       'ru.run': 'Check started', 'ru.failonly': '💀 Only issues', 'ru.failonly-on': '💀 Only issues ✓',
       'tg.restarted': 'TG-WS restarted ✈️', 'tg.restart-err': 'Restart error',
-      'fmt.kb': 'KB', 'fmt.mb': 'MB', 'fmt.gb': 'GB', 'fmt.ul': 'Unlimited', 'fmt.per-mo': '/mo',
+      'fmt.kb': 'KB', 'fmt.mb': 'MB', 'fmt.gb': 'GB', 'fmt.ul': 'Unlimited',
       'fmt.s': ' s', 'fmt.min': ' min', 'fmt.h': ' h', 'fmt.d': ' d',
-      'dash.mode': 'Mode', 'dash.ip': 'Exit IP', 'dash.conns': 'Connections', 'dash.traffic': 'Traffic ↓ / ↑', 'dash.mesh-nodes': 'Mesh nodes', 'dash.plan': 'Plan',
+      'dash.mode': 'Mode', 'dash.ip': 'Exit IP', 'dash.conns': 'Connections', 'dash.traffic': 'Traffic ↓ / ↑', 'dash.mesh-nodes': 'Mesh nodes',
       'upd.details': 'Details', 'upd.now': 'Update', 'w.proxy': 'Proxy status', 'w.check-ru': 'Check',
       'keys.uri-ph': 'vless://… paste your link (Reality)', 'keys.add': 'Add key', 'keys.clean': 'Remove dead', 'keys.src': 'github + mine',
       'th.tag': 'Tag', 'th.source': 'Source', 'th.status': 'Status', 'th.ping': 'Ping', 'th.exit': 'Exit IP', 'th.sites': 'Sites',
@@ -255,67 +214,40 @@
       'mj.head': 'Join mesh network', 'mj.p': 'Your proxy can be part of the private Aurora mesh network. It gives access to exclusive locations of other members, automatic blocking bypass and backup routes.',
       'mj.invite-ph': 'Paste mesh invite code (e.g.: aurora-home-a1b2c3d4)', 'mj.join': 'Connect', 'mj.st': 'Mesh status', 'mj.name': 'Mesh name', 'mj.role': 'Role',
       'mj.nodes': 'Nodes available', 'mj.ping': 'Ping to hub', 'mj.enc': 'Encryption', 'mj.what': 'What mesh gives',
-      'mj.leave': 'Leave mesh', 'mj.regen': 'Update invite', 'mj.pol': 'Hub policy', 'mj.pol-hint': 'The hub server controls which tabs clients of the mesh see. Clients connected by invite of this server automatically apply the policy (update every 15 sec).',
-      'mj.master': 'Server is hub, controls visibility for clients', 'mj.show-mesh': 'Show “Mesh network” tab to clients', 'mj.show-subs': 'Show “Store” tab to clients',
+      'mj.leave': 'Leave mesh', 'mj.regen': 'Update invite',
       'mt.hint': 'Your proxy (in the center) and nodes of other mesh members. Connections are active if traffic goes through them.',
       'mrt.hint': 'Rules for which traffic goes to the internet via which node. Order is top to bottom.', 'th.what': 'What', 'th.via': 'Where', 'th.proto': 'Protocol',
-      'sp.head': 'VPN plans', 'sp.hint': 'VPN plans for those with a grey IP who need to bypass blocking. Payment and renewal go through the Telegram bot, the plan is applied instantly.', 'sp.loading': 'loading plans…', 'sp.comp': 'Plan contents', 'th.func': 'Feature', 'th.val': 'Value',
-      'sf.instant': '+ paid via the Telegram bot, instant activation',
-      'sb.head': 'Billing and renewal', 'sb.hint': 'Active plan, validity and payment history. Renewal — in one click.', 'sb.plan': 'Current plan', 'sb.until': 'Active until', 'sb.buy': 'Pay via Telegram', 'btn.buy-tg': '💬 Buy via Telegram', 'sb.hist': 'Payment history',
-      'th.date': 'Date', 'th.desc': 'Description', 'th.sum': 'Amount',
+      'th.date': 'Date',
       'upd.apply': 'Update now', 'upd.auto': 'Auto-update', 'upd.auto-hint': 'Update is performed from GitHub releases. Binary is downloaded, verified, replaced atomically — proxy restarts in a couple of seconds.',
       'upd.src': 'Update source', 'th.param': 'Parameter', 'upd.repo': 'Repository', 'upd.sig': 'Signature check', 'upd.rollback': 'Rollback on failure',
       'upd.check-now': 'Check now', 'upd.stable': 'stable — stable only', 'upd.rc': 'rc — release candidates', 'upd.nightly': 'nightly — nightly builds',
       'upd.mode-auto': 'Auto-update enabled', 'upd.mode-notify': 'Notify only', 'upd.mode-off': 'Do not check',
       'ver.head': 'Version history',
       'set.head': 'Server parameters', 'set.host': 'Host', 'set.port': 'Xray port', 'set.ver': 'Version', 'set.uptime': 'Uptime',
-      'set.common': 'Common', 'set.vis': 'Tab visibility', 'set.show-mesh': 'Enable mesh network', 'set.show-subs': 'Enable store (subscriptions and plans)', 'set.mesh': 'Mesh', 'set.name-ph': 'Server name', 'set.meshid-ph': 'Mesh ID', 'set.copy-invite': 'Copy invite',
+      'set.common': 'Common', 'set.vis': 'Tab visibility', 'set.show-mesh': 'Enable mesh network', 'set.mesh': 'Mesh', 'set.name-ph': 'Server name', 'set.meshid-ph': 'Mesh ID', 'set.copy-invite': 'Copy invite',
       'sec.hint': 'Admin panel token and external Reality keys. Changes live config.', 'sec.panel': 'Panel', 'sec.tok-ph': 'Admin token (Bearer) — needed for POST /api/*', 'sec.acc-v': 'Access', 'sec.pbk-ph': 'public key', 'sec.rotate': 'Rotate keys',
       'log.head': 'System log', 'log.loading': 'loading…', 'log.refresh': 'Refresh', 'log.download': 'Download', 'rclog.head': 'Recovery journal',
       'th.node': 'Node', 'th.region': 'Region', 'th.route': 'Route', 'sec.tok': 'Admin token', 'sec.reality': 'Reality',
         'theme.sun': '🌙', 'theme.moon': '☀️',
-  'rec.hint': 'Recovery is on duty: the cat watches the keys (limit, region, connections) and switches the tunnel itself if a key drops. Every switch is logged here.', 'mesh.id-hint': 'The head server issues the invite. Until then your node id is shown.', 'routes.master': 'Routes are set by the head server: here you see where traffic goes. A client build cannot add or remove rules — ask the network owner 🐾', 'sec.tok-hint': 'The admin token is your panel password. It is set on first run (wizard) and stored in data/settings.json or the AURORA_UI_TOKEN env var. Enter it once here and the buttons will work.', 'sec.2fa-on': 'Enable 2FA', 'sec.2fa-off': 'Disable 2FA',
-      'feat.master': 'Prices and descriptions are set by the master server — this node picks them up after joining the mesh',
-    'myk.head': 'My keys',
-    'myk.hint': 'A device = a purchased key 🐾 Plan, expiry and traffic per key.',
-    'myk.until': 'Expiry',
-    'myk.traffic': 'Traffic',
-    'myk.devices': 'Keys',
-    'myk.how': 'Instructions',
-    'myk.copy': 'Copy link',
-    'myk.copy-ok': 'Link copied 🐾',
-    'myk.empty': 'No keys yet — buy a plan in the Telegram bot',
-    'myk.unlim': 'unlimited',
+  'rec.hint': 'Recovery is on duty: the cat watches the keys (limit, region, connections) and switches the tunnel itself if a key drops. Every switch is logged here.', 'sec.tok-hint': 'The admin token is your panel password. It is set on first run (wizard) and stored in data/settings.json or the AURORA_UI_TOKEN env var. Enter it once here and the buttons will work.', 'sec.2fa-on': 'Enable 2FA', 'sec.2fa-off': 'Disable 2FA',
     'dev.conn': 'Proxy connections',
     'nav.conn': 'Connections',
-    'nav.keys-proxy': 'Proxy keys',      'ext.head': 'Aurora PRO features',
-      'ext.locked': 'Until the subscription is active, PRO features are locked. VPN and proxy work as usual.',
-      'ext.pro': 'PRO is open: the cat is happy 🐾',
-      'ext.expired': 'Subscription is not active - buy it in the Telegram bot',
-      'ext.na': 'License unavailable: no answer from the master. Proxy works 🐾',
-      'ext.buy': 'Buy PRO',
-      'ext.offline': 'Running on the cached license',
-        'ext.trial': 'Trial active: the extension and ad blocking are already open 🐱',
-        'ext.dl-chrome': 'Download for Chrome',
-        'ext.dl-edge': 'Download for Edge',
-        'ext.dl-master': 'The package comes from the head server 🐾',
+    'nav.keys-proxy': 'Proxy keys',
 
     },  
     es: {
-      'check.left': 'Comprobado', 'check.idle': 'sin comprobación aún',
-      'pol.head': 'Política del servicio', 'pol.readOnly': 'Ver', 'pol.accept': 'Acepto los términos', 'ru.regions': 'Segmentos', 'ru.custom-ph': 'Dominios propios separados por comas (opcional)',
+      'check.left': 'Comprobado', 'check.idle': 'sin comprobación aún', 'ru.regions': 'Segmentos', 'ru.custom-ph': 'Dominios propios separados por comas (opcional)',
       'dash.manage': 'Gestión', 'pool.refresh-btn': 'Actualizar claves', 'pool.check-btn': 'Comprobar claves', 'mesh.ping-btn': 'Ping mesh',
       'nav.warp': 'WARP', 'warp.head': 'Canal de reserva Cloudflare WARP',       'nav.dash': 'Panel', 'nav.keys': 'Claves', 'nav.devices': 'Dispositivos',
       'nav.connect': 'Acceso externo', 'nav.rusegment': 'Segmento RU', 'nav.tgws': 'TG-WS',
       'nav.mesh': 'Red mesh', 'nav.mesh-join': 'Conexión', 'nav.mesh-topo': 'Topología', 'nav.mesh-routes': 'Rutas',
-      'nav.shop': 'Tienda', 'nav.shop-plans': 'Planes VPN', 'nav.shop-features': 'Funciones adicionales de Aurora', 'nav.shop-billing': 'Pagos',
       'nav.update': 'Actualización', 'nav.versions': 'Versiones', 'nav.settings': 'Servidor', 'nav.security': 'Seguridad', 'nav.logs': 'Registros',
       'nav.group.home': 'Proxy doméstico', 'nav.group.upd': 'Actualizaciones', 'nav.group.set': 'Ajustes',
       'g.you': 'Usted', 'g.yours': 'suyo', 'status.on': 'en línea', 'status.off': 'desconectado', 'status.warn': 'inestable',
       'status.online': 'activo', 'status.stopped': 'detenido', 'status.active': 'activo', 'status.dead': 'muerto',
       'status.bad': 'malo', 'status.slow': 'lento', 'status.noip': 'noip', 'status.ok': 'ok', 'status.final': 'final',
       'status.direct': 'directo', 'status.enabled': 'activado', 'status.disabled': 'desactivado',
-      'btn.vpn-off': '🌀 Activar VPN', 'btn.vpn-on': '🌀 VPN activa', 'btn.rotate': '🎲 Cambiar clave', 'btn.choose': '💎 Elegir',
+      'btn.vpn-off': '🌀 Activar VPN', 'btn.vpn-on': '🌀 VPN activa', 'btn.rotate': '🎲 Cambiar clave',
       'btn.copy': '📋 Copiar', 'btn.save': 'Guardar', 'btn.login': '🔑 Entrar', 'btn.logout': 'Salir',
       'k.keys': 'claves: ', 'k.empty': 'aún no hay claves', 'k.mine': 'propia', 'k.github': 'github',
       'k.add-ok': 'Clave añadida 🐾', 'k.add-err': 'Error al añadir', 'k.need-vless': 'Se necesita un enlace vless://',
@@ -327,14 +259,10 @@
       'ru.empty': 'verificación pendiente', 'ru.avail': 'disponible', 'ru.unavail': 'no disponible', 'ru.all': 'todos los dominios disponibles ✅',
       'upd.avail': 'disponible', 'upd.cur': 'actualizado', 'upd.msg-avail': 'Actualización disponible', 'upd.msg-cur': 'Versión actual',
       'upd.checked': 'Comprobado: ', 'upd.err': 'error', 'upd.err-hint': 'Actualizacion fallida - los detalles son visibles para el administrador',
-      'w.mesh-nodes': 'Nodos de mesh:', 'w.mesh-exit': 'salida por', 'w.hub': 'hub', 'w.mesh-none': 'Mesh no conectado. Invitación en la pestaña «Conexión».',
-      'w.plan': 'Plan activo:', 'w.ru': 'Dominios RU:', 'w.ru-ok': 'disponibles',
+      'w.mesh-nodes': 'Nodos de mesh:', 'w.mesh-exit': 'salida por', 'w.hub': 'hub', 'w.mesh-none': 'Mesh no conectado. Invitación en la pestaña «Conexión».', 'w.ru': 'Dominios RU:', 'w.ru-ok': 'disponibles',
       'mesh.connected': 'conectado', 'mesh.not': 'no conectado', 'mesh.member': 'miembro', 'mesh.hub': 'hub',
       'mesh.no-nodes': 'sin nodos — añada el primero', 'mesh.node': 'nodo',
       'routes.empty': 'aún no hay rutas', 'routes.active': 'activo', 'routes.off': 'apagado',
-      'plans.na': 'planes no disponibles en esta versión', 'plans.traffic': 'Tráfico:', 'plans.devices': 'Dispositivos:', 'plans.keys': 'Claves:',
-      'plans.free': 'Gratis', 'plans.per-mo': '/mes', 'plans.current': 'actual',
-      'bill.empty': 'aún no hay pagos',
       'sec.on': 'activado', 'sec.off': 'desactivado', 'sec.access': 'Solo LAN: ', 'sec.da': 'sí', 'sec.no': 'no', 'sec.blk': 'bloqueo',
       'sec.rat': 'on', 'sec.rat-off': 'off',
       'log.empty': 'registro vacío', 'rec.empty': 'no hubo recuperaciones',
@@ -351,17 +279,14 @@
       'sec.logout': 'Sesión cerrada', 'sec.rotate-ok': 'Claves Reality rotadas 🔄', 'sec.rotate-na': 'Rotación no disponible en esta versión',
       'upd.run-ok': 'Comprobación iniciada (fondo)', 'upd.check-err': 'Error de comprobación', 'upd.apply-ok': 'Actualización iniciada ⬆️',
       'upd.apply-err': 'No se pudo iniciar', 'upd.admin': 'El canal de actualizaciones se gestiona en el panel de administración 🐾',
-      'plans.admin': 'Los planes se gestionan en el panel de administración 🐾', 'plans.buy': 'Plan «', 'plans.buy2': '» — compra en el panel de administración 🐾',
-      'feat.admin': 'Tienda no disponible en esta versión 🐾', 'feat.buy': 'Función «', 'feat.buy2': '» — escaparate en la versión pública 🐾',
       'vpn.on': 'VPN activada 🌀', 'vpn.off': 'VPN desactivada', 'vpn.err': 'Error', 'rot.ok': 'Clave rotada 🎲', 'rot.err': 'No se pudo rotar',
       'pool.refresh': 'Pool actualizado 🔄', 'pool.check': 'Comprobación de claves en segundo plano 🧪', 'mesh.ping': 'Ping de mesh iniciado 📡',
-      'mesh.policy-saved': 'Política del hub guardada 🎛',
       'copy.link-ok': 'Enlace copiado 📋', 'copy.link-na': 'Enlace aún no disponible', 'ru.done': 'Verificación finalizada 🇷🇺',
       'ru.run': 'Verificación iniciada', 'ru.failonly': '💀 Solo problemas', 'ru.failonly-on': '💀 Solo problemas ✓',
       'tg.restarted': 'TG-WS reiniciado ✈️', 'tg.restart-err': 'Error de reinicio',
-      'fmt.kb': 'KB', 'fmt.mb': 'MB', 'fmt.gb': 'GB', 'fmt.ul': 'Ilimitado', 'fmt.per-mo': '/mes',
+      'fmt.kb': 'KB', 'fmt.mb': 'MB', 'fmt.gb': 'GB', 'fmt.ul': 'Ilimitado',
       'fmt.s': ' s', 'fmt.min': ' min', 'fmt.h': ' h', 'fmt.d': ' d',
-      'dash.mode': 'Modo', 'dash.ip': 'IP de salida', 'dash.conns': 'Conexiones', 'dash.traffic': 'Tráfico ↓ / ↑', 'dash.mesh-nodes': 'Nodos mesh', 'dash.plan': 'Plan',
+      'dash.mode': 'Modo', 'dash.ip': 'IP de salida', 'dash.conns': 'Conexiones', 'dash.traffic': 'Tráfico ↓ / ↑', 'dash.mesh-nodes': 'Nodos mesh',
       'upd.details': 'Detalles', 'upd.now': 'Actualizar', 'w.proxy': 'Estado del proxy', 'w.check-ru': 'Comprobar',
       'keys.uri-ph': 'vless://… pega tu enlace (Reality)', 'keys.add': 'Añadir clave', 'keys.clean': 'Limpiar muertas', 'keys.src': 'github + propias',
       'th.tag': 'Etiqueta', 'th.source': 'Fuente', 'th.status': 'Estado', 'th.ping': 'Ping', 'th.exit': 'IP de salida', 'th.sites': 'Sites',
@@ -375,67 +300,40 @@
       'mj.head': 'Conectar a la red mesh', 'mj.p': 'Tu proxy puede ser parte de la red mesh privada Aurora. Da acceso a ubicaciones exclusivas de otros miembros, bypass automático de bloqueos y rutas de respaldo.',
       'mj.invite-ph': 'Pega el código de invite del mesh (p. ej.: aurora-home-a1b2c3d4)', 'mj.join': 'Conectar', 'mj.st': 'Estado del mesh', 'mj.name': 'Nombre del mesh', 'mj.role': 'Rol',
       'mj.nodes': 'Nodos disponibles', 'mj.ping': 'Ping al hub', 'mj.enc': 'Cifrado', 'mj.what': 'Qué da el mesh',
-      'mj.leave': 'Salir del mesh', 'mj.regen': 'Actualizar invite', 'mj.pol': 'Política del hub', 'mj.pol-hint': 'El servidor hub controla qué pestañas ven los clientes del mesh. Los clientes conectados por invite de este servidor aplican la política automáticamente (actualización cada 15 s).',
-      'mj.master': 'El servidor es hub, controla la visibilidad de los clientes', 'mj.show-mesh': 'Mostrar la pestaña “Red mesh” a los clientes', 'mj.show-subs': 'Mostrar la pestaña “Tienda” a los clientes',
+      'mj.leave': 'Salir del mesh', 'mj.regen': 'Actualizar invite',
       'mt.hint': 'Tu proxy (en el centro) y los nodos de otros miembros del mesh. Las conexiones están activas si el tráfico pasa por ellos.',
       'mrt.hint': 'Reglas de qué tráfico sale a internet por cada nodo. Orden de arriba a abajo.', 'th.what': 'Qué', 'th.via': 'Dónde', 'th.proto': 'Protocolo',
-      'sp.head': 'Planes VPN', 'sp.hint': 'Para quien tiene IP gris y necesita saltar el bloqueo. El pago y la renovación se hacen en el bot de Telegram, el plan se activa al instante.', 'sp.loading': 'cargando planes…', 'sp.comp': 'Contenido del plan', 'th.func': 'Función', 'th.val': 'Valor',
-      'sf.instant': '+ pago en el bot de Telegram, activación inmediata',
-      'sb.head': 'Pago y renovación', 'sb.hint': 'Plan activo, vigencia e historial de pagos. Renovación con un clic.', 'sb.plan': 'Plan actual', 'sb.until': 'Válido hasta', 'sb.buy': 'Pagar por Telegram', 'btn.buy-tg': '💬 Comprar en Telegram', 'sb.hist': 'Historial de pagos',
-      'th.date': 'Fecha', 'th.desc': 'Descripción', 'th.sum': 'Importe',
+      'th.date': 'Fecha',
       'upd.apply': 'Actualizar ahora', 'upd.auto': 'Auto-actualización', 'upd.auto-hint': 'La actualización se realiza desde los lanzamientos de GitHub. El binario se descarga, verifica y reemplaza atómicamente — el proxy se reinicia en un par de segundos.',
       'upd.src': 'Fuente de actualización', 'th.param': 'Parámetro', 'upd.repo': 'Repositorio', 'upd.sig': 'Verificación de firma', 'upd.rollback': 'Reversión en fallo',
       'upd.check-now': 'Comprobar ahora', 'upd.stable': 'stable — solo estables', 'upd.rc': 'rc — candidatos de lanzamiento', 'upd.nightly': 'nightly — compilaciones nocturnas',
       'upd.mode-auto': 'Auto-actualización activada', 'upd.mode-notify': 'Solo notificar', 'upd.mode-off': 'No comprobar',
       'ver.head': 'Historial de versiones',
       'set.head': 'Parámetros del servidor', 'set.host': 'Host', 'set.port': 'Puerto Xray', 'set.ver': 'Versión', 'set.uptime': 'Uptime',
-      'set.common': 'General', 'set.vis': 'Visibilidad de pestañas', 'set.show-mesh': 'Activar red mesh', 'set.show-subs': 'Activar tienda (suscripciones y planes)', 'set.mesh': 'Mesh', 'set.name-ph': 'Nombre del servidor', 'set.meshid-ph': 'ID del mesh', 'set.copy-invite': 'Copiar invite',
+      'set.common': 'General', 'set.vis': 'Visibilidad de pestañas', 'set.show-mesh': 'Activar red mesh', 'set.mesh': 'Mesh', 'set.name-ph': 'Nombre del servidor', 'set.meshid-ph': 'ID del mesh', 'set.copy-invite': 'Copiar invite',
       'sec.hint': 'Token de administración y claves Reality externas. Cambia la configuración en vivo.', 'sec.panel': 'Panel', 'sec.tok-ph': 'Token admin (Bearer) — necesario para POST /api/*', 'sec.acc-v': 'Acceso', 'sec.pbk-ph': 'clave pública', 'sec.rotate': 'Rotar claves',
       'log.head': 'Registro del sistema', 'log.loading': 'cargando…', 'log.refresh': 'Actualizar', 'log.download': 'Descargar', 'rclog.head': 'Registro de recovery',
       'th.node': 'Nodo', 'th.region': 'Región', 'th.route': 'Ruta', 'sec.tok': 'Token admin', 'sec.reality': 'Reality',
         'theme.sun': '🌙', 'theme.moon': '☀️',
-  'rec.hint': 'Recovery en marcha: el gato vigila las claves (limite, region, conexiones) y cambia el tunel si una cae. Aqui veras cada cambio.', 'mesh.id-hint': 'El servidor principal emite la invitación. Mientras no exista, se muestra el id de tu nodo.', 'routes.master': 'Las rutas las define el servidor principal: aquí ves adónde va el tráfico. Una compilación de cliente no puede añadir ni quitar reglas — pide al dueño de la red 🐾', 'sec.tok-hint': 'El token de admin es tu contraseña del panel. Se define en el primer arranque (asistente) y se guarda en data/settings.json o en la variable AURORA_UI_TOKEN. Introdúcelo una vez aquí.', 'sec.2fa-on': 'Activar 2FA', 'sec.2fa-off': 'Desactivar 2FA',
-      'feat.master': 'Los precios y las descripciones los fija el servidor maestro: este nodo los recibe al unirse a la malla',
-    'myk.head': 'Mis claves',
-    'myk.hint': 'Un dispositivo = una clave comprada 🐾 Plan, caducidad y tráfico por clave.',
-    'myk.until': 'Caduca',
-    'myk.traffic': 'Tráfico',
-    'myk.devices': 'Claves',
-    'myk.how': 'Instrucciones',
-    'myk.copy': 'Copiar enlace',
-    'myk.copy-ok': 'Enlace copiado 🐾',
-    'myk.empty': 'Aún no hay claves — compra un plan en el bot de Telegram',
-    'myk.unlim': 'ilimitado',
+  'rec.hint': 'Recovery en marcha: el gato vigila las claves (limite, region, conexiones) y cambia el tunel si una cae. Aqui veras cada cambio.', 'sec.tok-hint': 'El token de admin es tu contraseña del panel. Se define en el primer arranque (asistente) y se guarda en data/settings.json o en la variable AURORA_UI_TOKEN. Introdúcelo una vez aquí.', 'sec.2fa-on': 'Activar 2FA', 'sec.2fa-off': 'Desactivar 2FA',
     'dev.conn': 'Conexiones al proxy',
     'nav.conn': 'Conexiones',
-    'nav.keys-proxy': 'Claves del proxy',      'ext.head': 'Funciones PRO de Aurora',
-      'ext.locked': 'Hasta que la suscripcion este activa, las funciones PRO estan bloqueadas. VPN y proxy funcionan igual.',
-      'ext.pro': 'PRO abierto: el gato esta contento 🐾',
-      'ext.expired': 'La suscripcion no esta activa - comprala en el bot de Telegram',
-      'ext.na': 'Licencia no disponible: el maestro no responde. El proxy funciona 🐾',
-      'ext.buy': 'Comprar PRO',
-      'ext.offline': 'Funcionando con la licencia en cache',
-        'ext.trial': 'Prueba activa: la extensión y el bloqueo de anuncios ya están abiertos 🐱',
-        'ext.dl-chrome': 'Descargar para Chrome',
-        'ext.dl-edge': 'Descargar para Edge',
-        'ext.dl-master': 'El paquete lo da el servidor principal 🐾',
+    'nav.keys-proxy': 'Claves del proxy',
 
     },  
     de: {
-      'check.left': 'Geprüft', 'check.idle': 'noch keine Prüfung',
-      'pol.head': 'Dienstrichtlinie', 'pol.readOnly': 'Ansehen', 'pol.accept': 'Ich akzeptiere die Bedingungen', 'ru.regions': 'Segmente', 'ru.custom-ph': 'Eigene Domains, durch Komma getrennt (optional)',
+      'check.left': 'Geprüft', 'check.idle': 'noch keine Prüfung', 'ru.regions': 'Segmente', 'ru.custom-ph': 'Eigene Domains, durch Komma getrennt (optional)',
       'dash.manage': 'Verwaltung', 'pool.refresh-btn': 'Schlüssel aktualisieren', 'pool.check-btn': 'Schlüssel prüfen', 'mesh.ping-btn': 'Mesh-Ping',
       'nav.warp': 'WARP', 'warp.head': 'Cloudflare-WARP-Reservekanal',       'nav.dash': 'Übersicht', 'nav.keys': 'Schlüssel', 'nav.devices': 'Geräte',
       'nav.connect': 'Externer Zugriff', 'nav.rusegment': 'RU-Segment', 'nav.tgws': 'TG-WS',
       'nav.mesh': 'Mesh', 'nav.mesh-join': 'Verbinden', 'nav.mesh-topo': 'Topologie', 'nav.mesh-routes': 'Routen',
-      'nav.shop': 'Shop', 'nav.shop-plans': 'VPN-Tarife', 'nav.shop-features': 'Zusätzliche Aurora-Funktionen', 'nav.shop-billing': 'Zahlungen',
       'nav.update': 'Update', 'nav.versions': 'Versionen', 'nav.settings': 'Server', 'nav.security': 'Sicherheit', 'nav.logs': 'Logs',
       'nav.group.home': 'Heim-Proxy', 'nav.group.upd': 'Updates', 'nav.group.set': 'Einstellungen',
       'g.you': 'Sie', 'g.yours': 'Ihres', 'status.on': 'online', 'status.off': 'offline', 'status.warn': 'instabil',
       'status.online': 'läuft', 'status.stopped': 'gestoppt', 'status.active': 'aktiv', 'status.dead': 'tot',
       'status.bad': 'schlecht', 'status.slow': 'langsam', 'status.noip': 'noip', 'status.ok': 'ok', 'status.final': 'final',
       'status.direct': 'direkt', 'status.enabled': 'aktiviert', 'status.disabled': 'deaktiviert',
-      'btn.vpn-off': '🌀 VPN aktivieren', 'btn.vpn-on': '🌀 VPN an', 'btn.rotate': '🎲 Schlüssel wechseln', 'btn.choose': '💎 Wählen',
+      'btn.vpn-off': '🌀 VPN aktivieren', 'btn.vpn-on': '🌀 VPN an', 'btn.rotate': '🎲 Schlüssel wechseln',
       'btn.copy': '📋 Kopieren', 'btn.save': 'Speichern', 'btn.login': '🔑 Anmelden', 'btn.logout': 'Abmelden',
       'k.keys': 'Schlüssel: ', 'k.empty': 'noch keine Schlüssel', 'k.mine': 'eigener', 'k.github': 'github',
       'k.add-ok': 'Schlüssel hinzugefügt 🐾', 'k.add-err': 'Hinzufügen fehlgeschlagen', 'k.need-vless': 'Ein vless://-Link ist erforderlich',
@@ -447,14 +345,10 @@
       'ru.empty': 'Prüfung noch nicht durchgeführt', 'ru.avail': 'verfügbar', 'ru.unavail': 'nicht verfügbar', 'ru.all': 'alle Domains verfügbar ✅',
       'upd.avail': 'verfügbar', 'upd.cur': 'aktuell', 'upd.msg-avail': 'Update verfügbar', 'upd.msg-cur': 'Aktuelle Version installiert',
       'upd.checked': 'Geprüft: ', 'upd.err': 'Fehler', 'upd.err-hint': 'Aktualisierung fehlgeschlagen - Details sieht der Administrator',
-      'w.mesh-nodes': 'Mesh-Knoten:', 'w.mesh-exit': 'Ausgang über', 'w.hub': 'Hub', 'w.mesh-none': 'Mesh nicht verbunden. Einladung im Tab „Verbinden“.',
-      'w.plan': 'Aktiver Tarif:', 'w.ru': 'RU-Domains:', 'w.ru-ok': 'verfügbar',
+      'w.mesh-nodes': 'Mesh-Knoten:', 'w.mesh-exit': 'Ausgang über', 'w.hub': 'Hub', 'w.mesh-none': 'Mesh nicht verbunden. Einladung im Tab „Verbinden“.', 'w.ru': 'RU-Domains:', 'w.ru-ok': 'verfügbar',
       'mesh.connected': 'verbunden', 'mesh.not': 'nicht verbunden', 'mesh.member': 'Mitglied', 'mesh.hub': 'Hub',
       'mesh.no-nodes': 'keine Knoten — fügen Sie den ersten hinzu', 'mesh.node': 'Knoten',
       'routes.empty': 'noch keine Routen', 'routes.active': 'aktiv', 'routes.off': 'aus',
-      'plans.na': 'Tarife in diesem Build nicht verfügbar', 'plans.traffic': 'Traffic:', 'plans.devices': 'Geräte:', 'plans.keys': 'Schlüssel:',
-      'plans.free': 'Kostenlos', 'plans.per-mo': '/Monat', 'plans.current': 'aktuell',
-      'bill.empty': 'noch keine Zahlungen',
       'sec.on': 'aktiviert', 'sec.off': 'deaktiviert', 'sec.access': 'Nur LAN: ', 'sec.da': 'ja', 'sec.no': 'nein', 'sec.blk': 'Block',
       'sec.rat': 'an', 'sec.rat-off': 'aus',
       'log.empty': 'Log ist leer', 'rec.empty': 'keine Wiederherstellungen',
@@ -471,17 +365,14 @@
       'sec.logout': 'Abgemeldet', 'sec.rotate-ok': 'Reality-Schlüssel rotiert 🔄', 'sec.rotate-na': 'Rotation in diesem Build nicht verfügbar',
       'upd.run-ok': 'Prüfung gestartet (Hintergrund)', 'upd.check-err': 'Prüffehler', 'upd.apply-ok': 'Update gestartet ⬆️',
       'upd.apply-err': 'Start fehlgeschlagen', 'upd.admin': 'Update-Kanal wird in der Admin-Panel verwaltet 🐾',
-      'plans.admin': 'Tarife werden in der Admin-Panel verwaltet 🐾', 'plans.buy': 'Tarif „', 'plans.buy2': '“ — Kauf in der Admin-Panel 🐾',
-      'feat.admin': 'Shop in diesem Build nicht verfügbar 🐾', 'feat.buy': 'Funktion „', 'feat.buy2': '“ — Schaufenster im öffentlichen Build 🐾',
       'vpn.on': 'VPN aktiviert 🌀', 'vpn.off': 'VPN deaktiviert', 'vpn.err': 'Fehler', 'rot.ok': 'Schlüssel rotiert 🎲', 'rot.err': 'Rotation fehlgeschlagen',
       'pool.refresh': 'Pool aktualisiert 🔄', 'pool.check': 'Schlüsselprüfung im Hintergrund 🧪', 'mesh.ping': 'Mesh-Ping gestartet 📡',
-      'mesh.policy-saved': 'Hub-Richtlinie gespeichert 🎛',
       'copy.link-ok': 'Link kopiert 📋', 'copy.link-na': 'Link noch nicht verfügbar', 'ru.done': 'Prüfung abgeschlossen 🇷🇺',
       'ru.run': 'Prüfung gestartet', 'ru.failonly': '💀 Nur Probleme', 'ru.failonly-on': '💀 Nur Probleme ✓',
       'tg.restarted': 'TG-WS neu gestartet ✈️', 'tg.restart-err': 'Neustart-Fehler',
-      'fmt.kb': 'KB', 'fmt.mb': 'MB', 'fmt.gb': 'GB', 'fmt.ul': 'Unbegrenzt', 'fmt.per-mo': '/Monat',
+      'fmt.kb': 'KB', 'fmt.mb': 'MB', 'fmt.gb': 'GB', 'fmt.ul': 'Unbegrenzt',
       'fmt.s': ' s', 'fmt.min': ' min', 'fmt.h': ' h', 'fmt.d': ' d',
-      'dash.mode': 'Modus', 'dash.ip': 'Exit-IP', 'dash.conns': 'Verbindungen', 'dash.traffic': 'Datenverkehr ↓ / ↑', 'dash.mesh-nodes': 'Mesh-Knoten', 'dash.plan': 'Tarif',
+      'dash.mode': 'Modus', 'dash.ip': 'Exit-IP', 'dash.conns': 'Verbindungen', 'dash.traffic': 'Datenverkehr ↓ / ↑', 'dash.mesh-nodes': 'Mesh-Knoten',
       'upd.details': 'Details', 'upd.now': 'Aktualisieren', 'w.proxy': 'Proxy-Status', 'w.check-ru': 'Prüfen',
       'keys.uri-ph': 'vless://… füge deinen Link ein (Reality)', 'keys.add': 'Eigener Schlüssel', 'keys.clean': 'Tote entfernen', 'keys.src': 'github + eigene',
       'th.tag': 'Tag', 'th.source': 'Quelle', 'th.status': 'Status', 'th.ping': 'Ping', 'th.exit': 'Exit-IP', 'th.sites': 'Sites',
@@ -495,67 +386,40 @@
       'mj.head': 'Mesh-Netzwerk beitreten', 'mj.p': 'Dein Proxy kann Teil des privaten Aurora-Mesh sein. Das gibt Zugang zu exklusiven Standorten anderer Teilnehmer, automatische Umgehung von Sperren und Backup-Routen.',
       'mj.invite-ph': 'Mesh-Invite-Code einfügen (z. B.: aurora-home-a1b2c3d4)', 'mj.join': 'Verbinden', 'mj.st': 'Mesh-Status', 'mj.name': 'Mesh-Name', 'mj.role': 'Rolle',
       'mj.nodes': 'Knoten verfügbar', 'mj.ping': 'Ping zum Hub', 'mj.enc': 'Verschlüsselung', 'mj.what': 'Was das Mesh bringt',
-      'mj.leave': 'Mesh verlassen', 'mj.regen': 'Invite aktualisieren', 'mj.pol': 'Hub-Richtlinie', 'mj.pol-hint': 'Der Hub-Server steuert, welche Tabs die Mesh-Clients sehen. Per Invite dieses Servers verbundene Clients wenden die Richtlinie automatisch an (Aktualisierung alle 15 s).',
-      'mj.master': 'Server ist Hub, steuert Sichtbarkeit der Clients', 'mj.show-mesh': 'Den Tabs „Mesh-Netzwerk“ für Clients zeigen', 'mj.show-subs': 'Den Tab „Shop“ für Clients zeigen',
+      'mj.leave': 'Mesh verlassen', 'mj.regen': 'Invite aktualisieren',
       'mt.hint': 'Dein Proxy (in der Mitte) und die Knoten anderer Teilnehmer. Verbindungen sind aktiv, wenn der Datenverkehr darüber läuft.',
       'mrt.hint': 'Regeln, welcher Datenverkehr über welchen Knoten ins Internet geht. Reihenfolge von oben nach unten.', 'th.what': 'Was', 'th.via': 'Wohin', 'th.proto': 'Protokoll',
-      'sp.head': 'VPN-Tarife', 'sp.hint': 'Für alle mit grauer IP, die Sperren umgehen müssen. Zahlung und Verlängerung laufen über den Telegram-Bot, der Tarif startet sofort.', 'sp.loading': 'Tarife laden…', 'sp.comp': 'Tarifinhalt', 'th.func': 'Funktion', 'th.val': 'Wert',
-      'sf.instant': '+ Bezahlung per Telegram-Bot, sofortige Aktivierung',
-      'sb.head': 'Zahlung und Verlängerung', 'sb.hint': 'Aktiver Tarif, Laufzeit und Zahlungshistorie. Verlängerung mit einem Klick.', 'sb.plan': 'Aktueller Tarif', 'sb.until': 'Gültig bis', 'sb.buy': 'Per Telegram bezahlen', 'btn.buy-tg': '💬 Per Telegram kaufen', 'sb.hist': 'Zahlungshistorie',
-      'th.date': 'Datum', 'th.desc': 'Beschreibung', 'th.sum': 'Betrag',
+      'th.date': 'Datum',
       'upd.apply': 'Jetzt aktualisieren', 'upd.auto': 'Auto-Update', 'upd.auto-hint': 'Das Update kommt aus den GitHub-Releases. Der Binär wird heruntergeladen, verifiziert, atomar ersetzt — der Proxy startet in wenigen Sekunden neu.',
       'upd.src': 'Update-Quelle', 'th.param': 'Parameter', 'upd.repo': 'Repository', 'upd.sig': 'Signaturprüfung', 'upd.rollback': 'Rollback bei Fehler',
       'upd.check-now': 'Jetzt prüfen', 'upd.stable': 'stable — nur stabile', 'upd.rc': 'rc — Release-Kandidaten', 'upd.nightly': 'nightly — Nachtbuilds',
       'upd.mode-auto': 'Auto-Update aktiviert', 'upd.mode-notify': 'Nur benachrichtigen', 'upd.mode-off': 'Nicht prüfen',
       'ver.head': 'Versionshistorie',
       'set.head': 'Serverparameter', 'set.host': 'Host', 'set.port': 'Xray-Port', 'set.ver': 'Version', 'set.uptime': 'Uptime',
-      'set.common': 'Allgemein', 'set.vis': 'Tab-Sichtbarkeit', 'set.show-mesh': 'Mesh-Netzwerk aktivieren', 'set.show-subs': 'Shop aktivieren (Abos und Tarife)', 'set.mesh': 'Mesh', 'set.name-ph': 'Servername', 'set.meshid-ph': 'Mesh-ID', 'set.copy-invite': 'Invite kopieren',
+      'set.common': 'Allgemein', 'set.vis': 'Tab-Sichtbarkeit', 'set.show-mesh': 'Mesh-Netzwerk aktivieren', 'set.mesh': 'Mesh', 'set.name-ph': 'Servername', 'set.meshid-ph': 'Mesh-ID', 'set.copy-invite': 'Invite kopieren',
       'sec.hint': 'Admin-Token des Panels und externe Reality-Schlüssel. Änderung am laufenden Konfig.', 'sec.panel': 'Panel', 'sec.tok-ph': 'Admin-Token (Bearer) — nötig für POST /api/*', 'sec.acc-v': 'Zugriff', 'sec.pbk-ph': 'öffentlicher Schlüssel', 'sec.rotate': 'Schlüssel rotieren',
       'log.head': 'Systemlog', 'log.loading': 'laden…', 'log.refresh': 'Aktualisieren', 'log.download': 'Herunterladen', 'rclog.head': 'Recovery-Journal',
       'th.node': 'Knoten', 'th.region': 'Region', 'th.route': 'Route', 'sec.tok': 'Admin-Token', 'sec.reality': 'Reality',
         'theme.sun': '🌙', 'theme.moon': '☀️',
-  'rec.hint': 'Recovery im Dienst: die Katze beobachtet die Keys (Limit, Region, Verbindungen) und schaltet selbst um. Jeder Wechsel steht hier.', 'mesh.id-hint': 'Das Hauptserver stellt die Einladung aus. Bis dahin wird die Knoten-ID gezeigt.', 'routes.master': 'Routen legt der Hauptserver fest: hier siehst du, wohin der Traffic geht. Ein Client-Build kann keine Regeln ändern — bitte den Netzbetreiber 🐾', 'sec.tok-hint': 'Das Admin-Token ist dein Panel-Passwort. Es wird beim ersten Start (Assistent) gesetzt und in data/settings.json bzw. AURORA_UI_TOKEN gespeichert. Einmal hier eintragen.', 'sec.2fa-on': '2FA aktivieren', 'sec.2fa-off': '2FA deaktivieren',
-      'feat.master': 'Preise und Beschreibungen setzt der Master-Server — dieser Knoten holt sie sich nach dem Beitritt zum Mesh',
-    'myk.head': 'Meine Schlüssel',
-    'myk.hint': 'Ein Gerät = ein gekaufter Schlüssel 🐾 Tarif, Ablauf und Traffic je Schlüssel.',
-    'myk.until': 'Gültig bis',
-    'myk.traffic': 'Traffic',
-    'myk.devices': 'Schlüssel',
-    'myk.how': 'Anleitung',
-    'myk.copy': 'Link kopieren',
-    'myk.copy-ok': 'Link kopiert 🐾',
-    'myk.empty': 'Noch keine Schlüssel — Tarif im Telegram-Bot kaufen',
-    'myk.unlim': 'unbegrenzt',
+  'rec.hint': 'Recovery im Dienst: die Katze beobachtet die Keys (Limit, Region, Verbindungen) und schaltet selbst um. Jeder Wechsel steht hier.', 'sec.tok-hint': 'Das Admin-Token ist dein Panel-Passwort. Es wird beim ersten Start (Assistent) gesetzt und in data/settings.json bzw. AURORA_UI_TOKEN gespeichert. Einmal hier eintragen.', 'sec.2fa-on': '2FA aktivieren', 'sec.2fa-off': '2FA deaktivieren',
     'dev.conn': 'Proxy-Verbindungen',
     'nav.conn': 'Verbindungen',
-    'nav.keys-proxy': 'Proxy-Schlüssel',      'ext.head': 'Aurora-PRO-Funktionen',
-      'ext.locked': 'Solange das Abo nicht aktiv ist, sind PRO-Funktionen gesperrt. VPN und Proxy laufen normal.',
-      'ext.pro': 'PRO offen: die Katze ist gluecklich 🐾',
-      'ext.expired': 'Abo ist nicht aktiv - im Telegram-Bot kaufen',
-      'ext.na': 'Lizenz nicht verfuegbar: keine Antwort. Proxy laeuft 🐾',
-      'ext.buy': 'PRO kaufen',
-      'ext.offline': 'Arbeitet mit zwischengespeicherter Lizenz',
-        'ext.trial': 'Testphase aktiv: Erweiterung und Werbeblocker sind schon offen 🐱',
-        'ext.dl-chrome': 'Für Chrome herunterladen',
-        'ext.dl-edge': 'Für Edge herunterladen',
-        'ext.dl-master': 'Paket liefert der Hauptserver 🐾',
+    'nav.keys-proxy': 'Proxy-Schlüssel',
 
     },  
     fr: {
-      'check.left': 'Vérifié', 'check.idle': 'aucune vérification',
-      'pol.head': 'Politique du service', 'pol.readOnly': 'Voir', 'pol.accept': 'J\'accepte les conditions', 'ru.regions': 'Segments', 'ru.custom-ph': 'Domaines personnalisés séparés par des virgules (optionnel)',
+      'check.left': 'Vérifié', 'check.idle': 'aucune vérification', 'ru.regions': 'Segments', 'ru.custom-ph': 'Domaines personnalisés séparés par des virgules (optionnel)',
       'dash.manage': 'Gestion', 'pool.refresh-btn': 'Actualiser les clés', 'pool.check-btn': 'Vérifier les clés', 'mesh.ping-btn': 'Ping mesh',
       'nav.warp': 'WARP', 'warp.head': 'Canal de secours Cloudflare WARP',       'nav.dash': 'Tableau de bord', 'nav.keys': 'Clés', 'nav.devices': 'Appareils',
       'nav.connect': 'Accès externe', 'nav.rusegment': 'Segment RU', 'nav.tgws': 'TG-WS',
       'nav.mesh': 'Réseau mesh', 'nav.mesh-join': 'Connexion', 'nav.mesh-topo': 'Topologie', 'nav.mesh-routes': 'Itinéraires',
-      'nav.shop': 'Boutique', 'nav.shop-plans': 'Forfaits VPN', 'nav.shop-features': 'Fonctions Aurora supplémentaires', 'nav.shop-billing': 'Paiements',
       'nav.update': 'Mise à jour', 'nav.versions': 'Versions', 'nav.settings': 'Serveur', 'nav.security': 'Sécurité', 'nav.logs': 'Journaux',
       'nav.group.home': 'Proxy domestique', 'nav.group.upd': 'Mises à jour', 'nav.group.set': 'Réglages',
       'g.you': 'Vous', 'g.yours': 'vôtre', 'status.on': 'en ligne', 'status.off': 'hors ligne', 'status.warn': 'instable',
       'status.online': 'actif', 'status.stopped': 'arrêté', 'status.active': 'actif', 'status.dead': 'mort',
       'status.bad': 'mauvais', 'status.slow': 'lent', 'status.noip': 'noip', 'status.ok': 'ok', 'status.final': 'final',
       'status.direct': 'direct', 'status.enabled': 'activé', 'status.disabled': 'désactivé',
-      'btn.vpn-off': '🌀 Activer VPN', 'btn.vpn-on': '🌀 VPN actif', 'btn.rotate': '🎲 Changer de clé', 'btn.choose': '💎 Choisir',
+      'btn.vpn-off': '🌀 Activer VPN', 'btn.vpn-on': '🌀 VPN actif', 'btn.rotate': '🎲 Changer de clé',
       'btn.copy': '📋 Copier', 'btn.save': 'Enregistrer', 'btn.login': '🔑 Se connecter', 'btn.logout': 'Se déconnecter',
       'k.keys': 'clés : ', 'k.empty': 'aucune clé', 'k.mine': 'personnelle', 'k.github': 'github',
       'k.add-ok': 'Clé ajoutée 🐾', 'k.add-err': 'Échec de l\'ajout', 'k.need-vless': 'Un lien vless:// est requis',
@@ -567,14 +431,10 @@
       'ru.empty': 'vérification pas encore effectuée', 'ru.avail': 'disponible', 'ru.unavail': 'indisponible', 'ru.all': 'tous les domaines disponibles ✅',
       'upd.avail': 'disponible', 'upd.cur': 'à jour', 'upd.msg-avail': 'Mise à jour disponible', 'upd.msg-cur': 'Version actuelle installée',
       'upd.checked': 'Vérifié : ', 'upd.err': 'erreur', 'upd.err-hint': 'Echec de la mise a jour - les details sont visibles au responsable',
-      'w.mesh-nodes': 'Nœuds mesh :', 'w.mesh-exit': 'sortie via', 'w.hub': 'hub', 'w.mesh-none': 'Mesh non connecté. Invitation dans l\'onglet « Connexion ».',
-      'w.plan': 'Forfait actif :', 'w.ru': 'Domaines RU :', 'w.ru-ok': 'disponibles',
+      'w.mesh-nodes': 'Nœuds mesh :', 'w.mesh-exit': 'sortie via', 'w.hub': 'hub', 'w.mesh-none': 'Mesh non connecté. Invitation dans l\'onglet « Connexion ».', 'w.ru': 'Domaines RU :', 'w.ru-ok': 'disponibles',
       'mesh.connected': 'connecté', 'mesh.not': 'non connecté', 'mesh.member': 'membre', 'mesh.hub': 'hub',
       'mesh.no-nodes': 'aucun nœud — ajoutez le premier', 'mesh.node': 'nœud',
       'routes.empty': 'aucun itinéraire', 'routes.active': 'actif', 'routes.off': 'désactivé',
-      'plans.na': 'forfaits indisponibles dans cette version', 'plans.traffic': 'Trafic :', 'plans.devices': 'Appareils :', 'plans.keys': 'Clés :',
-      'plans.free': 'Gratuit', 'plans.per-mo': '/mois', 'plans.current': 'actuel',
-      'bill.empty': 'aucun paiement',
       'sec.on': 'activé', 'sec.off': 'désactivé', 'sec.access': 'LAN uniquement : ', 'sec.da': 'oui', 'sec.no': 'non', 'sec.blk': 'blocage',
       'sec.rat': 'on', 'sec.rat-off': 'off',
       'log.empty': 'journal vide', 'rec.empty': 'aucune récupération',
@@ -591,17 +451,14 @@
       'sec.logout': 'Déconnexion effectuée', 'sec.rotate-ok': 'Clés Reality rotées 🔄', 'sec.rotate-na': 'Rotation indisponible dans cette version',
       'upd.run-ok': 'Vérification lancée (arrière-plan)', 'upd.check-err': 'Erreur de vérification', 'upd.apply-ok': 'Mise à jour lancée ⬆️',
       'upd.apply-err': 'Impossible de lancer', 'upd.admin': 'Le canal de mise à jour se gère dans le panneau d\'administration 🐾',
-      'plans.admin': 'Les forfaits se gèrent dans le panneau d\'administration 🐾', 'plans.buy': 'Forfait « ', 'plans.buy2': ' » — achat dans le panneau d\'administration 🐾',
-      'feat.admin': 'Boutique indisponible dans cette version 🐾', 'feat.buy': 'Fonction « ', 'feat.buy2': ' » — vitrine dans la version publique 🐾',
       'vpn.on': 'VPN activé 🌀', 'vpn.off': 'VPN désactivé', 'vpn.err': 'Erreur', 'rot.ok': 'Clé rotée 🎲', 'rot.err': 'Rotation impossible',
       'pool.refresh': 'Pool mis à jour 🔄', 'pool.check': 'Vérification des clés en arrière-plan 🧪', 'mesh.ping': 'Ping mesh lancé 📡',
-      'mesh.policy-saved': 'Politique du hub enregistrée 🎛',
       'copy.link-ok': 'Lien copié 📋', 'copy.link-na': 'Lien pas encore disponible', 'ru.done': 'Vérification terminée 🇷🇺',
       'ru.run': 'Vérification lancée', 'ru.failonly': '💀 Problèmes uniquement', 'ru.failonly-on': '💀 Problèmes uniquement ✓',
       'tg.restarted': 'TG-WS redémarré ✈️', 'tg.restart-err': 'Erreur de redémarrage',
-      'fmt.kb': 'Ko', 'fmt.mb': 'Mo', 'fmt.gb': 'Go', 'fmt.ul': 'Illimité', 'fmt.per-mo': '/mois',
+      'fmt.kb': 'Ko', 'fmt.mb': 'Mo', 'fmt.gb': 'Go', 'fmt.ul': 'Illimité',
       'fmt.s': ' s', 'fmt.min': ' min', 'fmt.h': ' h', 'fmt.d': ' j',
-      'dash.mode': 'Mode', 'dash.ip': 'IP de sortie', 'dash.conns': 'Connexions', 'dash.traffic': 'Trafic ↓ / ↑', 'dash.mesh-nodes': 'Nœuds mesh', 'dash.plan': 'Forfait',
+      'dash.mode': 'Mode', 'dash.ip': 'IP de sortie', 'dash.conns': 'Connexions', 'dash.traffic': 'Trafic ↓ / ↑', 'dash.mesh-nodes': 'Nœuds mesh',
       'upd.details': 'Détails', 'upd.now': 'Mettre à jour', 'w.proxy': 'État du proxy', 'w.check-ru': 'Vérifier',
       'keys.uri-ph': 'vless://… collez votre lien (Reality)', 'keys.add': 'Ajouter clé', 'keys.clean': 'Supprimer les mortes', 'keys.src': 'github + miennes',
       'th.tag': 'Tag', 'th.source': 'Source', 'th.status': 'Statut', 'th.ping': 'Ping', 'th.exit': 'IP de sortie', 'th.sites': 'Sites',
@@ -615,67 +472,40 @@
       'mj.head': 'Rejoindre le réseau mesh', 'mj.p': 'Votre proxy peut faire partie du réseau mesh privé Aurora. Cela donne accès à des localisations exclusives d\'autres membres, au contournement automatique des blocages et à des routes de secours.',
       'mj.invite-ph': 'Collez le code invite du mesh (ex. : aurora-home-a1b2c3d4)', 'mj.join': 'Connecter', 'mj.st': 'État du mesh', 'mj.name': 'Nom du mesh', 'mj.role': 'Rôle',
       'mj.nodes': 'Nœuds disponibles', 'mj.ping': 'Ping vers le hub', 'mj.enc': 'Chiffrement', 'mj.what': 'Ce que le mesh apporte',
-      'mj.leave': 'Quitter le mesh', 'mj.regen': 'Actualiser l\'invite', 'mj.pol': 'Politique du hub', 'mj.pol-hint': 'Le serveur hub contrôle les onglets visibles par les clients du mesh. Les clients connectés par l\'invite de ce serveur appliquent automatiquement la politique (mise à jour toutes les 15 s).',
-      'mj.master': 'Le serveur est hub, contrôle la visibilité des clients', 'mj.show-mesh': 'Afficher l\'onglet « Réseau mesh » aux clients', 'mj.show-subs': 'Afficher l\'onglet « Boutique » aux clients',
+      'mj.leave': 'Quitter le mesh', 'mj.regen': 'Actualiser l\'invite',
       'mt.hint': 'Votre proxy (au centre) et les nœuds d\'autres membres du mesh. Les connexions sont actives si le trafic passe par eux.',
       'mrt.hint': 'Règles de quel trafic sort vers internet via quel nœud. Ordre de haut en bas.', 'th.what': 'Quoi', 'th.via': 'Où', 'th.proto': 'Protocole',
-      'sp.head': 'Forfaits VPN', 'sp.hint': 'Pour les IP grises qui doivent contourner le blocage. Paiement et renouvellement passent par le bot Telegram, le forfait est actif aussitôt.', 'sp.loading': 'chargement des forfaits…', 'sp.comp': 'Contenu du forfait', 'th.func': 'Fonction', 'th.val': 'Valeur',
-      'sf.instant': '+ paiement dans le bot Telegram, activation immédiate',
-      'sb.head': 'Paiement et prolongation', 'sb.hint': 'Forfait actif, validité et historique des paiements. Prolongation en un clic.', 'sb.plan': 'Forfait actuel', 'sb.until': 'Valable jusqu\'au', 'sb.buy': 'Payer via Telegram', 'btn.buy-tg': '💬 Acheter via Telegram', 'sb.hist': 'Historique des paiements',
-      'th.date': 'Date', 'th.desc': 'Description', 'th.sum': 'Montant',
+      'th.date': 'Date',
       'upd.apply': 'Mettre à jour maintenant', 'upd.auto': 'Mise à jour auto', 'upd.auto-hint': 'La mise à jour provient des releases GitHub. Le binaire est téléchargé, vérifié, remplacé atomiquement — le proxy redémarre en quelques secondes.',
       'upd.src': 'Source de mise à jour', 'th.param': 'Paramètre', 'upd.repo': 'Dépôt', 'upd.sig': 'Vérification de signature', 'upd.rollback': 'Restauration en cas d\'échec',
       'upd.check-now': 'Vérifier maintenant', 'upd.stable': 'stable — uniquement stables', 'upd.rc': 'rc — candidats de release', 'upd.nightly': 'nightly — builds nocturnes',
       'upd.mode-auto': 'Mise à jour auto activée', 'upd.mode-notify': 'Notifier seulement', 'upd.mode-off': 'Ne pas vérifier',
       'ver.head': 'Historique des versions',
       'set.head': 'Paramètres du serveur', 'set.host': 'Hôte', 'set.port': 'Port Xray', 'set.ver': 'Version', 'set.uptime': 'Uptime',
-      'set.common': 'Général', 'set.vis': 'Visibilité des onglets', 'set.show-mesh': 'Activer le réseau mesh', 'set.show-subs': 'Activer la boutique (abonnements et offres)', 'set.mesh': 'Mesh', 'set.name-ph': 'Nom du serveur', 'set.meshid-ph': 'ID du mesh', 'set.copy-invite': 'Copier l\'invite',
+      'set.common': 'Général', 'set.vis': 'Visibilité des onglets', 'set.show-mesh': 'Activer le réseau mesh', 'set.mesh': 'Mesh', 'set.name-ph': 'Nom du serveur', 'set.meshid-ph': 'ID du mesh', 'set.copy-invite': 'Copier l\'invite',
       'sec.hint': 'Jeton du panneau admin et clés Reality externes. Change la config en direct.', 'sec.panel': 'Panneau', 'sec.tok-ph': 'Jeton admin (Bearer) — requis pour POST /api/*', 'sec.acc-v': 'Accès', 'sec.pbk-ph': 'clé publique', 'sec.rotate': 'Rotation des clés',
       'log.head': 'Journal système', 'log.loading': 'chargement…', 'log.refresh': 'Actualiser', 'log.download': 'Télécharger', 'rclog.head': 'Journal recovery',
       'th.node': 'Nœud', 'th.region': 'Région', 'th.route': 'Itinéraire', 'sec.tok': 'Jeton admin', 'sec.reality': 'Reality',
         'theme.sun': '🌙', 'theme.moon': '☀️',
-  'rec.hint': 'Recovery en service : le chat surveille les cles (limite, region, connexions) et bascule tout seul. Chaque bascule est notee ici.', 'mesh.id-hint': 'Le serveur principal délivre l\'invitation. D\'ici là, l\'identifiant du nœud est affiché.', 'routes.master': 'Les routes sont définies par le serveur principal : vous voyez ici où part le trafic. Un build client ne peut pas ajouter ni supprimer de règle — demandez au propriétaire du réseau 🐾', 'sec.tok-hint': 'Le jeton admin est votre mot de passe du panneau. Il est défini au premier démarrage (assistant) et stocké dans data/settings.json ou la variable AURORA_UI_TOKEN. Saisissez-le une fois ici.', 'sec.2fa-on': 'Activer la 2FA', 'sec.2fa-off': 'Désactiver la 2FA',
-      'feat.master': 'Les prix et les descriptions sont définis par le serveur maître — ce nœud les recupere en rejoignant le maillage',
-    'myk.head': 'Mes clés',
-    'myk.hint': 'Un appareil = une clé achetée 🐾 Forfait, expiration et trafic par clé.',
-    'myk.until': 'Expire le',
-    'myk.traffic': 'Trafic',
-    'myk.devices': 'Clés',
-    'myk.how': 'Instructions',
-    'myk.copy': 'Copier le lien',
-    'myk.copy-ok': 'Lien copié 🐾',
-    'myk.empty': 'Aucune clé — achetez un forfait dans le bot Telegram',
-    'myk.unlim': 'illimité',
+  'rec.hint': 'Recovery en service : le chat surveille les cles (limite, region, connexions) et bascule tout seul. Chaque bascule est notee ici.', 'sec.tok-hint': 'Le jeton admin est votre mot de passe du panneau. Il est défini au premier démarrage (assistant) et stocké dans data/settings.json ou la variable AURORA_UI_TOKEN. Saisissez-le une fois ici.', 'sec.2fa-on': 'Activer la 2FA', 'sec.2fa-off': 'Désactiver la 2FA',
     'dev.conn': 'Connexions au proxy',
     'nav.conn': 'Connexions',
-    'nav.keys-proxy': 'Clés du proxy',      'ext.head': 'Fonctions PRO Aurora',
-      'ext.locked': "Tant que l'abonnement n'est pas actif, les fonctions PRO sont bloquees. VPN et proxy fonctionnent normalement.",
-      'ext.pro': 'PRO ouvert : le chat est content 🐾',
-      'ext.expired': 'Abonnement inactif - achetez-le dans le bot Telegram',
-      'ext.na': 'Licence indisponible : pas de reponse. Le proxy fonctionne 🐾',
-      'ext.buy': 'Acheter PRO',
-      'ext.offline': 'Fonctionne avec la licence en cache',
-        'ext.trial': 'Essai actif : l’extension et le bloqueur de pubs sont déjà ouverts 🐱',
-        'ext.dl-chrome': 'Télécharger pour Chrome',
-        'ext.dl-edge': 'Télécharger pour Edge',
-        'ext.dl-master': 'Paquet fourni par le serveur principal 🐾',
+    'nav.keys-proxy': 'Clés du proxy',
 
     },  
     tr: {
-      'check.left': 'Kontrol edildi', 'check.idle': 'henüz kontrol yok',
-      'pol.head': 'Hizmet politikası', 'pol.readOnly': 'Görüntüle', 'pol.accept': 'Koşulları kabul ediyorum', 'ru.regions': 'Segmentler', 'ru.custom-ph': 'Virgülle ayrılmış özel alan adları (isteğe bağlı)',
+      'check.left': 'Kontrol edildi', 'check.idle': 'henüz kontrol yok', 'ru.regions': 'Segmentler', 'ru.custom-ph': 'Virgülle ayrılmış özel alan adları (isteğe bağlı)',
       'dash.manage': 'Yönetim', 'pool.refresh-btn': 'Anahtarları güncelle', 'pool.check-btn': 'Anahtarları kontrol et', 'mesh.ping-btn': 'Mesh ping',
       'nav.warp': 'WARP', 'warp.head': 'Cloudflare WARP yedek kanalı',       'nav.dash': 'Genel Bakış', 'nav.keys': 'Anahtarlar', 'nav.devices': 'Cihazlar',
       'nav.connect': 'Dış erişim', 'nav.rusegment': 'RU segmenti', 'nav.tgws': 'TG-WS',
       'nav.mesh': 'Mesh', 'nav.mesh-join': 'Bağlan', 'nav.mesh-topo': 'Topoloji', 'nav.mesh-routes': 'Rotalar',
-      'nav.shop': 'Mağaza', 'nav.shop-plans': 'VPN planları', 'nav.shop-features': 'Aurora ek özellikleri', 'nav.shop-billing': 'Ödemeler',
       'nav.update': 'Güncelleme', 'nav.versions': 'Sürümler', 'nav.settings': 'Sunucu', 'nav.security': 'Güvenlik', 'nav.logs': 'Günlükler',
       'nav.group.home': 'Ev proxy', 'nav.group.upd': 'Güncellemeler', 'nav.group.set': 'Ayarlar',
       'g.you': 'Siz', 'g.yours': 'sizin', 'status.on': 'çevrimiçi', 'status.off': 'çevrimdışı', 'status.warn': 'dengesiz',
       'status.online': 'çalışıyor', 'status.stopped': 'durdu', 'status.active': 'aktif', 'status.dead': 'ölü',
       'status.bad': 'kötü', 'status.slow': 'yavaş', 'status.noip': 'noip', 'status.ok': 'tamam', 'status.final': 'final',
       'status.direct': 'doğrudan', 'status.enabled': 'açık', 'status.disabled': 'kapalı',
-      'btn.vpn-off': '🌀 VPN\'i aç', 'btn.vpn-on': '🌀 VPN açık', 'btn.rotate': '🎲 Anahtarı değiştir', 'btn.choose': '💎 Seç',
+      'btn.vpn-off': '🌀 VPN\'i aç', 'btn.vpn-on': '🌀 VPN açık', 'btn.rotate': '🎲 Anahtarı değiştir',
       'btn.copy': '📋 Kopyala', 'btn.save': 'Kaydet', 'btn.login': '🔑 Giriş', 'btn.logout': 'Çıkış',
       'k.keys': 'anahtar: ', 'k.empty': 'henüz anahtar yok', 'k.mine': 'benim', 'k.github': 'github',
       'k.add-ok': 'Anahtar eklendi 🐾', 'k.add-err': 'Ekleme başarısız', 'k.need-vless': 'vless:// bağlantısı gerekli',
@@ -687,14 +517,10 @@
       'ru.empty': 'kontrol henüz yapılmadı', 'ru.avail': 'erişilebilir', 'ru.unavail': 'erişilemez', 'ru.all': 'tüm alan adları erişilebilir ✅',
       'upd.avail': 'mevcut', 'upd.cur': 'güncel', 'upd.msg-avail': 'Güncelleme mevcut', 'upd.msg-cur': 'Güncel sürüm kurulu',
       'upd.checked': 'Kontrol: ', 'upd.err': 'hata', 'upd.err-hint': 'Guncelleme basarisiz - ayrintilari yonetici gorur',
-      'w.mesh-nodes': 'Mesh düğümleri:', 'w.mesh-exit': 'çıkış', 'w.hub': 'hub', 'w.mesh-none': 'Mesh bağlı değil. Davet "Bağlan" sekmesinde.',
-      'w.plan': 'Aktif plan:', 'w.ru': 'RU alan adları:', 'w.ru-ok': 'erişilebilir',
+      'w.mesh-nodes': 'Mesh düğümleri:', 'w.mesh-exit': 'çıkış', 'w.hub': 'hub', 'w.mesh-none': 'Mesh bağlı değil. Davet "Bağlan" sekmesinde.', 'w.ru': 'RU alan adları:', 'w.ru-ok': 'erişilebilir',
       'mesh.connected': 'bağlı', 'mesh.not': 'bağlı değil', 'mesh.member': 'üye', 'mesh.hub': 'hub',
       'mesh.no-nodes': 'düğüm yok — ilkini ekleyin', 'mesh.node': 'düğüm',
       'routes.empty': 'henüz rota yok', 'routes.active': 'aktif', 'routes.off': 'kapalı',
-      'plans.na': 'planlar bu sürümde yok', 'plans.traffic': 'Trafik:', 'plans.devices': 'Cihazlar:', 'plans.keys': 'Anahtarlar:',
-      'plans.free': 'Ücretsiz', 'plans.per-mo': '/ay', 'plans.current': 'mevcut',
-      'bill.empty': 'henüz ödeme yok',
       'sec.on': 'açık', 'sec.off': 'kapalı', 'sec.access': 'Yalnızca LAN: ', 'sec.da': 'evet', 'sec.no': 'hayır', 'sec.blk': 'engelle',
       'sec.rat': 'açık', 'sec.rat-off': 'kapalı',
       'log.empty': 'günlük boş', 'rec.empty': 'kurtarma yok',
@@ -711,17 +537,14 @@
       'sec.logout': 'Çıkış yapıldı', 'sec.rotate-ok': 'Reality anahtarları değiştirildi 🔄', 'sec.rotate-na': 'Döndürme bu sürümde yok',
       'upd.run-ok': 'Kontrol başlatıldı (arka plan)', 'upd.check-err': 'Kontrol hatası', 'upd.apply-ok': 'Güncelleme başlatıldı ⬆️',
       'upd.apply-err': 'Başlatılamadı', 'upd.admin': 'Güncelleme kanalı yönetim panelinde yönetilir 🐾',
-      'plans.admin': 'Planlar yönetim panelinde yönetilir 🐾', 'plans.buy': 'Plan «', 'plans.buy2': '» — satın alma yönetim panelinde 🐾',
-      'feat.admin': 'Mağaza bu sürümde yok 🐾', 'feat.buy': 'Özellik «', 'feat.buy2': '» — vitrin herkese açık sürümde 🐾',
       'vpn.on': 'VPN açıldı 🌀', 'vpn.off': 'VPN kapatıldı', 'vpn.err': 'Hata', 'rot.ok': 'Anahtar değiştirildi 🎲', 'rot.err': 'Değiştirilemedi',
       'pool.refresh': 'Havuz güncellendi 🔄', 'pool.check': 'Anahtar kontrolü arka planda 🧪', 'mesh.ping': 'Mesh ping başlatıldı 📡',
-      'mesh.policy-saved': 'Hub politikası kaydedildi 🎛',
       'copy.link-ok': 'Bağlantı kopyalandı 📋', 'copy.link-na': 'Bağlantı henüz yok', 'ru.done': 'Kontrol bitti 🇷🇺',
       'ru.run': 'Kontrol başlatıldı', 'ru.failonly': '💀 Yalnızca sorunlar', 'ru.failonly-on': '💀 Yalnızca sorunlar ✓',
       'tg.restarted': 'TG-WS yeniden başlatıldı ✈️', 'tg.restart-err': 'Yeniden başlatma hatası',
-      'fmt.kb': 'KB', 'fmt.mb': 'MB', 'fmt.gb': 'GB', 'fmt.ul': 'Sınırsız', 'fmt.per-mo': '/ay',
+      'fmt.kb': 'KB', 'fmt.mb': 'MB', 'fmt.gb': 'GB', 'fmt.ul': 'Sınırsız',
       'fmt.s': ' sn', 'fmt.min': ' dk', 'fmt.h': ' sa', 'fmt.d': ' g',
-      'dash.mode': 'Mod', 'dash.ip': 'Çıkış IP', 'dash.conns': 'Bağlantılar', 'dash.traffic': 'Trafik ↓ / ↑', 'dash.mesh-nodes': 'Mesh düğümü', 'dash.plan': 'Tarife',
+      'dash.mode': 'Mod', 'dash.ip': 'Çıkış IP', 'dash.conns': 'Bağlantılar', 'dash.traffic': 'Trafik ↓ / ↑', 'dash.mesh-nodes': 'Mesh düğümü',
       'upd.details': 'Detaylar', 'upd.now': 'Güncelle', 'w.proxy': 'Proxy durumu', 'w.check-ru': 'Kontrol et',
       'keys.uri-ph': 'vless://… linkini yapıştır (Reality)', 'keys.add': 'Kendi anahtarın', 'keys.clean': 'Ölüleri temizle', 'keys.src': 'github + kendi',
       'th.tag': 'Etiket', 'th.source': 'Kaynak', 'th.status': 'Durum', 'th.ping': 'Ping', 'th.exit': 'Çıkış IP', 'th.sites': 'Sites',
@@ -735,67 +558,40 @@
       'mj.head': 'Mesh ağına bağlan', 'mj.p': 'Proxy\'nuz özel Aurora mesh ağının parçası olabilir. Bu, diğer katılımcıların özel konumlarına erişim, otomatik engel atlatma ve yedek rotalar sağlar.',
       'mj.invite-ph': 'Mesh invite kodunu yapıştır (örn.: aurora-home-a1b2c3d4)', 'mj.join': 'Bağlan', 'mj.st': 'Mesh durumu', 'mj.name': 'Mesh adı', 'mj.role': 'Rol',
       'mj.nodes': 'Erişilebilir düğüm', 'mj.ping': 'Hub pingi', 'mj.enc': 'Şifreleme', 'mj.what': 'Mesh ne sağlar',
-      'mj.leave': 'Mesh\'ten ayrıl', 'mj.regen': 'Invite\'i güncelle', 'mj.pol': 'Hub politikası', 'mj.pol-hint': 'Hub sunucusu, mesh istemcilerinin gördüğü sekmeleri kontrol eder. Bu sunucunun invite\'ıyla bağlanan istemciler politikayı otomatik uygular (15 sn\'de bir günceller).',
-      'mj.master': 'Sunucu hub\'dır, istemci görünürlüğünü kontrol eder', 'mj.show-mesh': 'İstemcilere «Mesh ağı» sekmesini göster', 'mj.show-subs': 'İstemcilere «Mağaza» sekmesini göster',
+      'mj.leave': 'Mesh\'ten ayrıl', 'mj.regen': 'Invite\'i güncelle',
       'mt.hint': 'Proxy\'nuz (merkezde) ve diğer mesh katılımcılarının düğümleri. Trafik onlardan geçiyorsa bağlantılar aktiftir.',
       'mrt.hint': 'Hangi trafiğin hangi düğümden internete çıktığı kuralları. Sıra yukarıdan aşağıya.', 'th.what': 'Ne', 'th.via': 'Nereye', 'th.proto': 'Protokol',
-      'sp.head': 'VPN planları', 'sp.hint': 'Gri IP nedeniyle engellenmeleri aşması gerekenler için. Ödeme ve yenileme Telegram botunda yapılır, plan anında açılır.', 'sp.loading': 'tarifeler yükleniyor…', 'sp.comp': 'Tarife içeriği', 'th.func': 'İşlev', 'th.val': 'Değer',
-      'sf.instant': '+ Telegram botunda ödeme, anında etkinleşir',
-      'sb.head': 'Ödeme ve uzatma', 'sb.hint': 'Aktif tarife, süre ve ödeme geçmişi. Tek tıkla uzatma.', 'sb.plan': 'Mevcut tarife', 'sb.until': 'Geçerlilik', 'sb.buy': 'Telegram ile öde', 'btn.buy-tg': '💬 Telegram\'dan satın al', 'sb.hist': 'Ödeme geçmişi',
-      'th.date': 'Tarih', 'th.desc': 'Açıklama', 'th.sum': 'Tutar',
+      'th.date': 'Tarih',
       'upd.apply': 'Şimdi güncelle', 'upd.auto': 'Otomatik güncelleme', 'upd.auto-hint': 'Güncelleme GitHub sürümlerinden yapılır. İkili indirilir, doğrulanır, atomik değiştirilir — proxy birkaç saniyede yeniden başlar.',
       'upd.src': 'Güncelleme kaynağı', 'th.param': 'Parametre', 'upd.repo': 'Depo', 'upd.sig': 'İmza kontrolü', 'upd.rollback': 'Hata durumunda geri dönüş',
       'upd.check-now': 'Şimdi kontrol et', 'upd.stable': 'stable — yalnız kararlılar', 'upd.rc': 'rc — sürüm adayları', 'upd.nightly': 'nightly — gece sürümleri',
       'upd.mode-auto': 'Otomatik güncelleme açık', 'upd.mode-notify': 'Yalnız bildir', 'upd.mode-off': 'Kontrol etme',
       'ver.head': 'Sürüm geçmişi',
       'set.head': 'Sunucu parametreleri', 'set.host': 'Host', 'set.port': 'Xray portu', 'set.ver': 'Sürüm', 'set.uptime': 'Çalışma süresi',
-      'set.common': 'Genel', 'set.vis': 'Sekme görünürlüğü', 'set.show-mesh': 'Mesh ağını etkinleştir', 'set.show-subs': 'Mağazayı etkinleştir (abonelikler ve planlar)', 'set.mesh': 'Mesh', 'set.name-ph': 'Sunucu adı', 'set.meshid-ph': 'Mesh ID', 'set.copy-invite': 'Invite kopyala',
+      'set.common': 'Genel', 'set.vis': 'Sekme görünürlüğü', 'set.show-mesh': 'Mesh ağını etkinleştir', 'set.mesh': 'Mesh', 'set.name-ph': 'Sunucu adı', 'set.meshid-ph': 'Mesh ID', 'set.copy-invite': 'Invite kopyala',
       'sec.hint': 'Panel admin tokeni ve harici Reality anahtarları. Canlı konfigürasyonu değiştirir.', 'sec.panel': 'Panel', 'sec.tok-ph': 'Admin tokeni (Bearer) — POST /api/* için gerekli', 'sec.acc-v': 'Erişim', 'sec.pbk-ph': 'genel anahtar', 'sec.rotate': 'Anahtar döndür',
       'log.head': 'Sistem günlüğü', 'log.loading': 'yükleniyor…', 'log.refresh': 'Yenile', 'log.download': 'İndir', 'rclog.head': 'Recovery günlüğü',
       'th.node': 'Düğüm', 'th.region': 'Bölge', 'th.route': 'Güzergâh', 'sec.tok': 'Admin tokeni', 'sec.reality': 'Reality',
         'theme.sun': '🌙', 'theme.moon': '☀️',
-  'rec.hint': 'Recovery görevde: kedi anahtarları izler (limit, bölge, bağlantı) ve bir anahtar düşerse tüneli kendisi değiştirir. Her değişim burada.', 'mesh.id-hint': 'Daveti ana sunucu verir. O ana kadar düğüm kimliğiniz gösterilir.', 'routes.master': 'Rotaları ana sunucu belirler: burada trafiğin nereye gittiğini görürsün. İstemci sürümü kural ekleyemez veya kaldıramaz — ağ sahibinden iste 🐾', 'sec.tok-hint': 'Yönetici jetonu panel parolanızdır. İlk çalıştırmada (sihirbaz) ayarlanır ve data/settings.json ya da AURORA_UI_TOKEN değişkeninde saklanır. Buraya bir kez girin.', 'sec.2fa-on': '2FA\'yı aç', 'sec.2fa-off': '2FA\'yı kapat',
-      'feat.master': 'Fiyat ve aciklamalari ana sunucu belirler — bu dugum mesh agina katilirca alir',
-    'myk.head': 'Anahtarlarım',
-    'myk.hint': 'Cihaz = satın alınan anahtar 🐾 Anahtar başına paket, bitiş ve trafik.',
-    'myk.until': 'Bitiş',
-    'myk.traffic': 'Trafik',
-    'myk.devices': 'Anahtarlar',
-    'myk.how': 'Talimat',
-    'myk.copy': 'Bağlantıyı kopyala',
-    'myk.copy-ok': 'Bağlantı kopyalandı 🐾',
-    'myk.empty': 'Henüz anahtar yok — Telegram botundan paket al',
-    'myk.unlim': 'sınırsız',
+  'rec.hint': 'Recovery görevde: kedi anahtarları izler (limit, bölge, bağlantı) ve bir anahtar düşerse tüneli kendisi değiştirir. Her değişim burada.', 'sec.tok-hint': 'Yönetici jetonu panel parolanızdır. İlk çalıştırmada (sihirbaz) ayarlanır ve data/settings.json ya da AURORA_UI_TOKEN değişkeninde saklanır. Buraya bir kez girin.', 'sec.2fa-on': '2FA\'yı aç', 'sec.2fa-off': '2FA\'yı kapat',
     'dev.conn': 'Proxy bağlantıları',
     'nav.conn': 'Bağlantılar',
-    'nav.keys-proxy': 'Proxy anahtarları',      'ext.head': 'Aurora PRO ozellikleri',
-      'ext.locked': 'Abonelik aktif olana kadar PRO ozellikleri kilitli. VPN ve proxy normal calisir.',
-      'ext.pro': 'PRO acik: kedi mutlu 🐾',
-      'ext.expired': 'Abonelik aktif degil - Telegram botunda satin alin',
-      'ext.na': 'Lisans yok: sunucu yanit vermedi. Proxy calisiyor 🐾',
-      'ext.buy': 'PRO satin al',
-      'ext.offline': 'Onbelleklenmis lisans ile calisiyor',
-        'ext.trial': 'Deneme aktif: eklenti ve reklam engelleme zaten açık 🐱',
-        'ext.dl-chrome': 'Chrome için indir',
-        'ext.dl-edge': 'Edge için indir',
-        'ext.dl-master': 'Paketi ana sunucu verir 🐾',
+    'nav.keys-proxy': 'Proxy anahtarları',
 
     },  
     pt: {
-      'check.left': 'Verificado', 'check.idle': 'sem verificação ainda',
-      'pol.head': 'Política do serviço', 'pol.readOnly': 'Ver', 'pol.accept': 'Aceito os termos', 'ru.regions': 'Segmentos', 'ru.custom-ph': 'Domínios personalizados separados por vírgulas (opcional)',
+      'check.left': 'Verificado', 'check.idle': 'sem verificação ainda', 'ru.regions': 'Segmentos', 'ru.custom-ph': 'Domínios personalizados separados por vírgulas (opcional)',
       'dash.manage': 'Gestão', 'pool.refresh-btn': 'Atualizar chaves', 'pool.check-btn': 'Verificar chaves', 'mesh.ping-btn': 'Ping mesh',
       'nav.warp': 'WARP', 'warp.head': 'Canal de reserva Cloudflare WARP',       'nav.dash': 'Painel', 'nav.keys': 'Chaves', 'nav.devices': 'Dispositivos',
       'nav.connect': 'Acesso externo', 'nav.rusegment': 'Segmento RU', 'nav.tgws': 'TG-WS',
       'nav.mesh': 'Rede mesh', 'nav.mesh-join': 'Conectar', 'nav.mesh-topo': 'Topologia', 'nav.mesh-routes': 'Rotas',
-      'nav.shop': 'Loja', 'nav.shop-plans': 'Planos VPN', 'nav.shop-features': 'Recursos adicionais do Aurora', 'nav.shop-billing': 'Pagamentos',
       'nav.update': 'Atualização', 'nav.versions': 'Versões', 'nav.settings': 'Servidor', 'nav.security': 'Segurança', 'nav.logs': 'Logs',
       'nav.group.home': 'Proxy doméstico', 'nav.group.upd': 'Atualizações', 'nav.group.set': 'Configurações',
       'g.you': 'Você', 'g.yours': 'seu', 'status.on': 'online', 'status.off': 'offline', 'status.warn': 'instável',
       'status.online': 'ativo', 'status.stopped': 'parado', 'status.active': 'ativo', 'status.dead': 'morto',
       'status.bad': 'ruim', 'status.slow': 'lento', 'status.noip': 'noip', 'status.ok': 'ok', 'status.final': 'final',
       'status.direct': 'direto', 'status.enabled': 'habilitado', 'status.disabled': 'desabilitado',
-      'btn.vpn-off': '🌀 Ativar VPN', 'btn.vpn-on': '🌀 VPN ativa', 'btn.rotate': '🎲 Trocar chave', 'btn.choose': '💎 Escolher',
+      'btn.vpn-off': '🌀 Ativar VPN', 'btn.vpn-on': '🌀 VPN ativa', 'btn.rotate': '🎲 Trocar chave',
       'btn.copy': '📋 Copiar', 'btn.save': 'Salvar', 'btn.login': '🔑 Entrar', 'btn.logout': 'Sair',
       'k.keys': 'chaves: ', 'k.empty': 'ainda sem chaves', 'k.mine': 'própria', 'k.github': 'github',
       'k.add-ok': 'Chave adicionada 🐾', 'k.add-err': 'Falha ao adicionar', 'k.need-vless': 'É necessário um link vless://',
@@ -807,14 +603,10 @@
       'ru.empty': 'verificação ainda não feita', 'ru.avail': 'disponível', 'ru.unavail': 'indisponível', 'ru.all': 'todos os domínios disponíveis ✅',
       'upd.avail': 'disponível', 'upd.cur': 'atual', 'upd.msg-avail': 'Atualização disponível', 'upd.msg-cur': 'Versão atual instalada',
       'upd.checked': 'Verificado: ', 'upd.err': 'erro', 'upd.err-hint': 'Atualizacao falhou - os detalhes sao visiveis ao administrador',
-      'w.mesh-nodes': 'Nós de mesh:', 'w.mesh-exit': 'saída por', 'w.hub': 'hub', 'w.mesh-none': 'Mesh não conectado. Convite na aba «Conectar».',
-      'w.plan': 'Plano ativo:', 'w.ru': 'Domínios RU:', 'w.ru-ok': 'disponíveis',
+      'w.mesh-nodes': 'Nós de mesh:', 'w.mesh-exit': 'saída por', 'w.hub': 'hub', 'w.mesh-none': 'Mesh não conectado. Convite na aba «Conectar».', 'w.ru': 'Domínios RU:', 'w.ru-ok': 'disponíveis',
       'mesh.connected': 'conectado', 'mesh.not': 'não conectado', 'mesh.member': 'membro', 'mesh.hub': 'hub',
       'mesh.no-nodes': 'sem nós — adicione o primeiro', 'mesh.node': 'nó',
       'routes.empty': 'ainda sem rotas', 'routes.active': 'ativo', 'routes.off': 'desligado',
-      'plans.na': 'planos indisponíveis nesta versão', 'plans.traffic': 'Tráfego:', 'plans.devices': 'Dispositivos:', 'plans.keys': 'Chaves:',
-      'plans.free': 'Grátis', 'plans.per-mo': '/mês', 'plans.current': 'atual',
-      'bill.empty': 'ainda sem pagamentos',
       'sec.on': 'habilitado', 'sec.off': 'desabilitado', 'sec.access': 'Somente LAN: ', 'sec.da': 'sim', 'sec.no': 'não', 'sec.blk': 'bloquear',
       'sec.rat': 'on', 'sec.rat-off': 'off',
       'log.empty': 'log vazio', 'rec.empty': 'sem recuperações',
@@ -831,17 +623,14 @@
       'sec.logout': 'Sessão encerrada', 'sec.rotate-ok': 'Chaves Reality rotacionadas 🔄', 'sec.rotate-na': 'Rotação indisponível nesta versão',
       'upd.run-ok': 'Verificação iniciada (fundo)', 'upd.check-err': 'Erro de verificação', 'upd.apply-ok': 'Atualização iniciada ⬆️',
       'upd.apply-err': 'Não foi possível iniciar', 'upd.admin': 'O canal de atualização é gerido no painel de administração 🐾',
-      'plans.admin': 'Os planos são geridos no painel de administração 🐾', 'plans.buy': 'Plano «', 'plans.buy2': '» — compra no painel de administração 🐾',
-      'feat.admin': 'Loja indisponível nesta versão 🐾', 'feat.buy': 'Recurso «', 'feat.buy2': '» — vitrine na versão pública 🐾',
       'vpn.on': 'VPN ativada 🌀', 'vpn.off': 'VPN desativada', 'vpn.err': 'Erro', 'rot.ok': 'Chave rotacionada 🎲', 'rot.err': 'Não foi possível rotacionar',
       'pool.refresh': 'Pool atualizado 🔄', 'pool.check': 'Verificação de chaves em segundo plano 🧪', 'mesh.ping': 'Ping de mesh iniciado 📡',
-      'mesh.policy-saved': 'Política do hub salva 🎛',
       'copy.link-ok': 'Link copiado 📋', 'copy.link-na': 'Link ainda indisponível', 'ru.done': 'Verificação concluída 🇷🇺',
       'ru.run': 'Verificação iniciada', 'ru.failonly': '💀 Somente problemas', 'ru.failonly-on': '💀 Somente problemas ✓',
       'tg.restarted': 'TG-WS reiniciado ✈️', 'tg.restart-err': 'Erro de reinicialização',
-      'fmt.kb': 'KB', 'fmt.mb': 'MB', 'fmt.gb': 'GB', 'fmt.ul': 'Ilimitado', 'fmt.per-mo': '/mês',
+      'fmt.kb': 'KB', 'fmt.mb': 'MB', 'fmt.gb': 'GB', 'fmt.ul': 'Ilimitado',
       'fmt.s': ' s', 'fmt.min': ' min', 'fmt.h': ' h', 'fmt.d': ' d',
-      'dash.mode': 'Modo', 'dash.ip': 'IP de saída', 'dash.conns': 'Conexões', 'dash.traffic': 'Tráfego ↓ / ↑', 'dash.mesh-nodes': 'Nós mesh', 'dash.plan': 'Plano',
+      'dash.mode': 'Modo', 'dash.ip': 'IP de saída', 'dash.conns': 'Conexões', 'dash.traffic': 'Tráfego ↓ / ↑', 'dash.mesh-nodes': 'Nós mesh',
       'upd.details': 'Detalhes', 'upd.now': 'Atualizar', 'w.proxy': 'Estado do proxy', 'w.check-ru': 'Verificar',
       'keys.uri-ph': 'vless://… cole seu link (Reality)', 'keys.add': 'Adicionar chave', 'keys.clean': 'Limpar mortas', 'keys.src': 'github + minhas',
       'th.tag': 'Tag', 'th.source': 'Origem', 'th.status': 'Status', 'th.ping': 'Ping', 'th.exit': 'IP de saída', 'th.sites': 'Sites',
@@ -855,67 +644,40 @@
       'mj.head': 'Entrar na rede mesh', 'mj.p': 'Seu proxy pode fazer parte da rede mesh privada Aurora. Isso dá acesso a localizações exclusivas de outros membros, desvio automático de bloqueios e rotas de reserva.',
       'mj.invite-ph': 'Cole o código invite do mesh (ex.: aurora-home-a1b2c3d4)', 'mj.join': 'Conectar', 'mj.st': 'Estado do mesh', 'mj.name': 'Nome do mesh', 'mj.role': 'Papel',
       'mj.nodes': 'Nós disponíveis', 'mj.ping': 'Ping ao hub', 'mj.enc': 'Criptografia', 'mj.what': 'O que o mesh dá',
-      'mj.leave': 'Sair do mesh', 'mj.regen': 'Atualizar invite', 'mj.pol': 'Política do hub', 'mj.pol-hint': 'O servidor hub controla quais abas os clientes do mesh veem. Clientes conectados por invite deste servidor aplicam a política automaticamente (atualização a cada 15 s).',
-      'mj.master': 'Servidor é hub, controla a visibilidade dos clientes', 'mj.show-mesh': 'Mostrar a aba “Rede mesh” aos clientes', 'mj.show-subs': 'Mostrar a aba “Loja” aos clientes',
+      'mj.leave': 'Sair do mesh', 'mj.regen': 'Atualizar invite',
       'mt.hint': 'Seu proxy (no centro) e os nós de outros membros do mesh. As conexões estão ativas se o tráfego passa por eles.',
       'mrt.hint': 'Regras de qual tráfego sai para a internet via qual nó. Ordem de cima para baixo.', 'th.what': 'O quê', 'th.via': 'Onde', 'th.proto': 'Protocolo',
-      'sp.head': 'Planos VPN', 'sp.hint': 'Para quem tem IP cinza e precisa contornar bloqueios. Pagamento e renovação são feitos no bot do Telegram, o plano é ativado na hora.', 'sp.loading': 'carregando planos…', 'sp.comp': 'Conteúdo do plano', 'th.func': 'Função', 'th.val': 'Valor',
-      'sf.instant': '+ pagamento no bot do Telegram, ativação na hora',
-      'sb.head': 'Pagamento e renovação', 'sb.hint': 'Plano ativo, validade e histórico de pagamentos. Renovação em um clique.', 'sb.plan': 'Plano atual', 'sb.until': 'Válido até', 'sb.buy': 'Pagar via Telegram', 'btn.buy-tg': '💬 Comprar via Telegram', 'sb.hist': 'Histórico de pagamentos',
-      'th.date': 'Data', 'th.desc': 'Descrição', 'th.sum': 'Valor',
+      'th.date': 'Data',
       'upd.apply': 'Atualizar agora', 'upd.auto': 'Auto-atualização', 'upd.auto-hint': 'A atualização vem dos releases do GitHub. O binário é baixado, verificado, substituído atomicamente — o proxy reinicia em alguns segundos.',
       'upd.src': 'Origem da atualização', 'th.param': 'Parâmetro', 'upd.repo': 'Repositório', 'upd.sig': 'Verificação de assinatura', 'upd.rollback': 'Reversão em falha',
       'upd.check-now': 'Verificar agora', 'upd.stable': 'stable — apenas estáveis', 'upd.rc': 'rc — candidatos a release', 'upd.nightly': 'nightly — builds noturnos',
       'upd.mode-auto': 'Auto-atualização ativada', 'upd.mode-notify': 'Apenas notificar', 'upd.mode-off': 'Não verificar',
       'ver.head': 'Histórico de versões',
       'set.head': 'Parâmetros do servidor', 'set.host': 'Host', 'set.port': 'Porta Xray', 'set.ver': 'Versão', 'set.uptime': 'Uptime',
-      'set.common': 'Geral', 'set.vis': 'Visibilidade das abas', 'set.show-mesh': 'Ativar rede mesh', 'set.show-subs': 'Ativar loja (assinaturas e planos)', 'set.mesh': 'Mesh', 'set.name-ph': 'Nome do servidor', 'set.meshid-ph': 'ID do mesh', 'set.copy-invite': 'Copiar invite',
+      'set.common': 'Geral', 'set.vis': 'Visibilidade das abas', 'set.show-mesh': 'Ativar rede mesh', 'set.mesh': 'Mesh', 'set.name-ph': 'Nome do servidor', 'set.meshid-ph': 'ID do mesh', 'set.copy-invite': 'Copiar invite',
       'sec.hint': 'Token do painel admin e chaves Reality externas. Muda a config ao vivo.', 'sec.panel': 'Painel', 'sec.tok-ph': 'Token admin (Bearer) — necessário para POST /api/*', 'sec.acc-v': 'Acesso', 'sec.pbk-ph': 'chave pública', 'sec.rotate': 'Rotacionar chaves',
       'log.head': 'Log do sistema', 'log.loading': 'carregando…', 'log.refresh': 'Atualizar', 'log.download': 'Baixar', 'rclog.head': 'Diário do recovery',
       'th.node': 'Nó', 'th.region': 'Região', 'th.route': 'Rota', 'sec.tok': 'Token admin', 'sec.reality': 'Reality',
         'theme.sun': '🌙', 'theme.moon': '☀️',
-  'rec.hint': 'Recovery em serviço: o gato vigia as chaves (limite, região, conexões) e troca o túnel sozinho. Cada troca fica registrada aqui.', 'mesh.id-hint': 'O servidor principal emite o convite. Até lá mostramos o id do seu nó.', 'routes.master': 'As rotas são definidas pelo servidor principal: aqui você vê para onde vai o tráfego. Um build cliente não adiciona nem remove regras — peça ao dono da rede 🐾', 'sec.tok-hint': 'O token de admin é a senha do painel. É definido na primeira execução (assistente) e guardado em data/settings.json ou na variável AURORA_UI_TOKEN. Digite-o aqui uma vez.', 'sec.2fa-on': 'Ativar 2FA', 'sec.2fa-off': 'Desativar 2FA',
-      'feat.master': 'Os precos e as descricoes sao definidos pelo servidor mestre — este no recebe ao entrar na malha',
-    'myk.head': 'Minhas chaves',
-    'myk.hint': 'Um dispositivo = uma chave comprada 🐾 Plano, validade e tráfego por chave.',
-    'myk.until': 'Válido até',
-    'myk.traffic': 'Tráfego',
-    'myk.devices': 'Chaves',
-    'myk.how': 'Instruções',
-    'myk.copy': 'Copiar link',
-    'myk.copy-ok': 'Link copiado 🐾',
-    'myk.empty': 'Ainda sem chaves — compre um plano no bot do Telegram',
-    'myk.unlim': 'ilimitado',
+  'rec.hint': 'Recovery em serviço: o gato vigia as chaves (limite, região, conexões) e troca o túnel sozinho. Cada troca fica registrada aqui.', 'sec.tok-hint': 'O token de admin é a senha do painel. É definido na primeira execução (assistente) e guardado em data/settings.json ou na variável AURORA_UI_TOKEN. Digite-o aqui uma vez.', 'sec.2fa-on': 'Ativar 2FA', 'sec.2fa-off': 'Desativar 2FA',
     'dev.conn': 'Conexões do proxy',
     'nav.conn': 'Conexões',
-    'nav.keys-proxy': 'Chaves do proxy',      'ext.head': 'Recursos PRO do Aurora',
-      'ext.locked': 'Enquanto a assinatura nao estiver ativa, os recursos PRO ficam bloqueados. VPN e proxy funcionam normal.',
-      'ext.pro': 'PRO aberto: o gato feliz 🐾',
-      'ext.expired': 'A assinatura nao esta ativa - compre no bot do Telegram',
-      'ext.na': 'Licenca indisponivel: sem resposta. O proxy funciona 🐾',
-      'ext.buy': 'Comprar PRO',
-      'ext.offline': 'Trabalhando com a licenca em cache',
-        'ext.trial': 'Teste ativo: a extensão e o bloqueador de anúncios já estão abertos 🐱',
-        'ext.dl-chrome': 'Baixar para o Chrome',
-        'ext.dl-edge': 'Baixar para o Edge',
-        'ext.dl-master': 'O pacote vem do servidor principal 🐾',
+    'nav.keys-proxy': 'Chaves do proxy',
 
     },  
     zh: {
-      'check.left': '已检查', 'check.idle': '尚未检查',
-      'pol.head': '服务政策', 'pol.readOnly': '查看', 'pol.accept': '我接受条款', 'ru.regions': '分段', 'ru.custom-ph': '自定义域名，逗号分隔（可选）',
+      'check.left': '已检查', 'check.idle': '尚未检查', 'ru.regions': '分段', 'ru.custom-ph': '自定义域名，逗号分隔（可选）',
       'dash.manage': '管理', 'pool.refresh-btn': '更新密钥', 'pool.check-btn': '检查密钥', 'mesh.ping-btn': '网格ping',
       'nav.warp': 'WARP', 'warp.head': 'Cloudflare WARP 备用通道',       'nav.dash': '概览', 'nav.keys': '密钥', 'nav.devices': '设备',
       'nav.connect': '外部访问', 'nav.rusegment': 'RU 段', 'nav.tgws': 'TG-WS',
       'nav.mesh': 'Mesh 网络', 'nav.mesh-join': '连接', 'nav.mesh-topo': '拓扑', 'nav.mesh-routes': '路由',
-      'nav.shop': '商店', 'nav.shop-plans': 'VPN 套餐', 'nav.shop-features': 'Aurora 附加功能', 'nav.shop-billing': '支付',
       'nav.update': '更新', 'nav.versions': '版本', 'nav.settings': '服务器', 'nav.security': '安全', 'nav.logs': '日志',
       'nav.group.home': '家用代理', 'nav.group.upd': '更新', 'nav.group.set': '设置',
       'g.you': '您', 'g.yours': '您的', 'status.on': '在线', 'status.off': '离线', 'status.warn': '不稳定',
       'status.online': '运行中', 'status.stopped': '已停止', 'status.active': '活动', 'status.dead': '已失效',
       'status.bad': '差', 'status.slow': '慢', 'status.noip': '无IP', 'status.ok': '正常', 'status.final': '最终',
       'status.direct': '直连', 'status.enabled': '已启用', 'status.disabled': '已禁用',
-      'btn.vpn-off': '🌀 开启VPN', 'btn.vpn-on': '🌀 VPN开启', 'btn.rotate': '🎲 更换密钥', 'btn.choose': '💎 选择',
+      'btn.vpn-off': '🌀 开启VPN', 'btn.vpn-on': '🌀 VPN开启', 'btn.rotate': '🎲 更换密钥',
       'btn.copy': '📋 复制', 'btn.save': '保存', 'btn.login': '🔑 登录', 'btn.logout': '退出',
       'k.keys': '密钥：', 'k.empty': '暂无密钥', 'k.mine': '自有', 'k.github': 'github',
       'k.add-ok': '密钥已添加 🐾', 'k.add-err': '添加失败', 'k.need-vless': '需要 vless:// 链接',
@@ -927,14 +689,10 @@
       'ru.empty': '尚未检查', 'ru.avail': '可用', 'ru.unavail': '不可用', 'ru.all': '所有域名均可访问 ✅',
       'upd.avail': '可用', 'upd.cur': '最新', 'upd.msg-avail': '有可用更新', 'upd.msg-cur': '已安装最新版本',
       'upd.checked': '已检查：', 'upd.err': '错误', 'upd.err-hint': '更新失败 - 详情仅管理员可见',
-      'w.mesh-nodes': 'Mesh节点：', 'w.mesh-exit': '出口', 'w.hub': '集线器', 'w.mesh-none': 'Mesh 未连接。邀请在「连接」选项卡中。',
-      'w.plan': '活动套餐：', 'w.ru': 'RU 域名：', 'w.ru-ok': '可用',
+      'w.mesh-nodes': 'Mesh节点：', 'w.mesh-exit': '出口', 'w.hub': '集线器', 'w.mesh-none': 'Mesh 未连接。邀请在「连接」选项卡中。', 'w.ru': 'RU 域名：', 'w.ru-ok': '可用',
       'mesh.connected': '已连接', 'mesh.not': '未连接', 'mesh.member': '成员', 'mesh.hub': '集线器',
       'mesh.no-nodes': '没有节点 — 请添加第一个', 'mesh.node': '节点',
       'routes.empty': '暂无路由', 'routes.active': '活动', 'routes.off': '关闭',
-      'plans.na': '此版本暂无套餐', 'plans.traffic': '流量：', 'plans.devices': '设备：', 'plans.keys': '密钥：',
-      'plans.free': '免费', 'plans.per-mo': '/月', 'plans.current': '当前',
-      'bill.empty': '暂无支付记录',
       'sec.on': '已启用', 'sec.off': '已禁用', 'sec.access': '仅局域网：', 'sec.da': '是', 'sec.no': '否', 'sec.blk': '阻止',
       'sec.rat': '开', 'sec.rat-off': '关',
       'log.empty': '日志为空', 'rec.empty': '无恢复记录',
@@ -951,17 +709,14 @@
       'sec.logout': '已退出', 'sec.rotate-ok': 'Reality 密钥已轮换 🔄', 'sec.rotate-na': '此版本不支持轮换',
       'upd.run-ok': '已开始检查（后台）', 'upd.check-err': '检查错误', 'upd.apply-ok': '更新已启动 ⬆️',
       'upd.apply-err': '无法启动', 'upd.admin': '更新渠道在管理面板中管理 🐾',
-      'plans.admin': '套餐在管理面板中管理 🐾', 'plans.buy': '套餐「', 'plans.buy2': '」— 在管理面板购买 🐾',
-      'feat.admin': '此版本商店不可用 🐾', 'feat.buy': '功能「', 'feat.buy2': '」— 公开版展示 🐾',
       'vpn.on': 'VPN已开启 🌀', 'vpn.off': 'VPN已关闭', 'vpn.err': '错误', 'rot.ok': '密钥已轮换 🎲', 'rot.err': '轮换失败',
       'pool.refresh': '密钥池已更新 🔄', 'pool.check': '后台密钥检查已启动 🧪', 'mesh.ping': 'Mesh 节点已发起 📡',
-      'mesh.policy-saved': '集线器策略已保存 🎛',
       'copy.link-ok': '链接已复制 📋', 'copy.link-na': '链接尚不可用', 'ru.done': '检查完成 🇷🇺',
       'ru.run': '检查已启动', 'ru.failonly': '💀 仅问题', 'ru.failonly-on': '💀 仅问题 ✓',
       'tg.restarted': 'TG-WS 已重启 ✈️', 'tg.restart-err': '重启错误',
-      'fmt.kb': 'KB', 'fmt.mb': 'MB', 'fmt.gb': 'GB', 'fmt.ul': '无限', 'fmt.per-mo': '/月',
+      'fmt.kb': 'KB', 'fmt.mb': 'MB', 'fmt.gb': 'GB', 'fmt.ul': '无限',
       'fmt.s': ' 秒', 'fmt.min': ' 分钟', 'fmt.h': ' 小时', 'fmt.d': ' 天',
-      'dash.mode': '模式', 'dash.ip': '出口 IP', 'dash.conns': '连接数', 'dash.traffic': '流量 ↓ / ↑', 'dash.mesh-nodes': 'Mesh 节点', 'dash.plan': '套餐',
+      'dash.mode': '模式', 'dash.ip': '出口 IP', 'dash.conns': '连接数', 'dash.traffic': '流量 ↓ / ↑', 'dash.mesh-nodes': 'Mesh 节点',
       'upd.details': '详情', 'upd.now': '更新', 'w.proxy': '代理状态', 'w.check-ru': '检查',
       'keys.uri-ph': 'vless://… 粘贴你的链接（Reality）', 'keys.add': '添加密钥', 'keys.clean': '清除失效', 'keys.src': 'github + 自有',
       'th.tag': '标签', 'th.source': '来源', 'th.status': '状态', 'th.ping': 'Ping', 'th.exit': '出口 IP', 'th.sites': 'Sites',
@@ -975,67 +730,40 @@
       'mj.head': '加入 Mesh 网络', 'mj.p': '你的代理可以成为私有 Aurora Mesh 网络的一部分。这提供其他成员专属位置、自动绕过封锁和备用路由。',
       'mj.invite-ph': '粘贴 Mesh 邀请码（例如：aurora-home-a1b2c3d4）', 'mj.join': '连接', 'mj.st': 'Mesh 状态', 'mj.name': 'Mesh 名称', 'mj.role': '角色',
       'mj.nodes': '可用节点', 'mj.ping': '到中心的延迟', 'mj.enc': '加密', 'mj.what': 'Mesh 带来什么',
-      'mj.leave': '退出 Mesh', 'mj.regen': '更新邀请', 'mj.pol': '中心策略', 'mj.pol-hint': '中心服务器控制客户端看到哪些标签页。通过此服务器邀请连接的客户端自动应用策略（每 15 秒更新一次）。',
-      'mj.master': '服务器是中心，控制客户端的可见性', 'mj.show-mesh': '向客户端显示“Mesh 网络”标签页', 'mj.show-subs': '向客户端显示“商店”标签页',
+      'mj.leave': '退出 Mesh', 'mj.regen': '更新邀请',
       'mt.hint': '你的代理（中心）和 Mesh 其他成员的节点。如果流量经过它们，连接就是活动的。',
       'mrt.hint': '哪些流量通过哪个节点出网的规则。从上到下的顺序。', 'th.what': '什么', 'th.via': '去向', 'th.proto': '协议',
-      'sp.head': 'VPN 套餐', 'sp.hint': '面向需要绕过封锁的灰 IP 用户。付款与续费在 Telegram 机器人中完成，套餐立即开通。', 'sp.loading': '加载中…', 'sp.comp': '套餐内容', 'th.func': '功能', 'th.val': '数值',
-      'sf.instant': '+ 通过 Telegram 机器人付款，即时开通',
-      'sb.head': '支付与续费', 'sb.hint': '当前套餐、有效期和支付记录。一键续费。', 'sb.plan': '当前套餐', 'sb.until': '有效至', 'sb.buy': '通过 Telegram 支付', 'btn.buy-tg': '💬 通过 Telegram 购买', 'sb.hist': '支付记录',
-      'th.date': '日期', 'th.desc': '描述', 'th.sum': '金额',
+      'th.date': '日期',
       'upd.apply': '立即更新', 'upd.auto': '自动更新', 'upd.auto-hint': '更新来自 GitHub 发布版。二进制下载、验证、原子替换 — 代理几秒后重启。',
       'upd.src': '更新来源', 'th.param': '参数', 'upd.repo': '仓库', 'upd.sig': '签名验证', 'upd.rollback': '失败时回滚',
       'upd.check-now': '立即检查', 'upd.stable': 'stable — 仅稳定版', 'upd.rc': 'rc — 候选版本', 'upd.nightly': 'nightly — 夜间构建',
       'upd.mode-auto': '自动更新已开启', 'upd.mode-notify': '仅通知', 'upd.mode-off': '不检查',
       'ver.head': '版本历史',
       'set.head': '服务器参数', 'set.host': '主机', 'set.port': 'Xray 端口', 'set.ver': '版本', 'set.uptime': '运行时间',
-      'set.common': '通用', 'set.vis': '标签可见性', 'set.show-mesh': '启用 Mesh 网络', 'set.show-subs': '启用商店（订阅和计划）', 'set.mesh': 'Mesh', 'set.name-ph': '服务器名称', 'set.meshid-ph': 'Mesh ID', 'set.copy-invite': '复制邀请',
+      'set.common': '通用', 'set.vis': '标签可见性', 'set.show-mesh': '启用 Mesh 网络', 'set.mesh': 'Mesh', 'set.name-ph': '服务器名称', 'set.meshid-ph': 'Mesh ID', 'set.copy-invite': '复制邀请',
       'sec.hint': '面板管理员令牌和外部 Reality 密钥。修改会作用于实时配置。', 'sec.panel': '面板', 'sec.tok-ph': '管理员令牌（Bearer）— POST /api/* 需要', 'sec.acc-v': '访问', 'sec.pbk-ph': '公钥', 'sec.rotate': '轮换密钥',
       'log.head': '系统日志', 'log.loading': '加载中…', 'log.refresh': '刷新', 'log.download': '下载', 'rclog.head': '恢复日志',
       'th.node': '节点', 'th.region': '地区', 'th.route': '路由', 'sec.tok': '管理员令牌', 'sec.reality': 'Reality',
         'theme.sun': '🌙', 'theme.moon': '☀️',
-  'rec.hint': 'Recovery 值班中：猫咪自己盯钥匙（限额、地区、连接），钥匙掉线会自动切换线路。每次切换都会记录在这里。', 'mesh.id-hint': '邀请码由主服务器发放。在此之前显示您的节点 ID。', 'routes.master': '路由由主服务器设定：这里能看到流量走向。客户端版不能增删规则——请找网络管理员 🐾', 'sec.tok-hint': '管理员令牌就是面板密码：首次启动向导中设置，保存在 data/settings.json 或环境变量 AURORA_UI_TOKEN。在此输入一次即可。', 'sec.2fa-on': '开启 2FA', 'sec.2fa-off': '关闭 2FA',
-      'feat.master': '价格和描述由主服务器设定 — 本节点加入网络后自动获取',
-    'myk.head': '我的密钥',
-    'myk.hint': '设备 = 已购买的密钥 🐾 每个密钥的套餐、到期时间和流量。',
-    'myk.until': '到期',
-    'myk.traffic': '流量',
-    'myk.devices': '密钥',
-    'myk.how': '使用说明',
-    'myk.copy': '复制链接',
-    'myk.copy-ok': '链接已复制 🐾',
-    'myk.empty': '还没有密钥 — 在 Telegram 机器人购买套餐',
-    'myk.unlim': '不限',
+  'rec.hint': 'Recovery 值班中：猫咪自己盯钥匙（限额、地区、连接），钥匙掉线会自动切换线路。每次切换都会记录在这里。', 'sec.tok-hint': '管理员令牌就是面板密码：首次启动向导中设置，保存在 data/settings.json 或环境变量 AURORA_UI_TOKEN。在此输入一次即可。', 'sec.2fa-on': '开启 2FA', 'sec.2fa-off': '关闭 2FA',
     'dev.conn': '代理连接',
     'nav.conn': '连接',
-    'nav.keys-proxy': '代理密钥',      'ext.head': 'Aurora PRO 功能',
-      'ext.locked': '订阅未激活前，PRO 功能锁定。VPN 和代理照常工作。',
-      'ext.pro': 'PRO 已开通：猫咪满意 🐾',
-      'ext.expired': '订阅未激活 — 可在 Telegram 机器人中购买',
-      'ext.na': '许可证不可用：服务器无响应。代理仍正常工作 🐾',
-      'ext.buy': '购买 PRO',
-      'ext.offline': '使用缓存的许可证运行',
-        'ext.trial': '试用中：扩展和广告拦截已开放 🐱',
-        'ext.dl-chrome': '下载 Chrome 版',
-        'ext.dl-edge': '下载 Edge 版',
-        'ext.dl-master': '包由主服务器提供 🐾',
+    'nav.keys-proxy': '代理密钥',
 
     },  
     ar: {
-      'check.left': 'تم التحقق', 'check.idle': 'لم يتم الفحص بعد',
-      'pol.head': 'سياسة الخدمة', 'pol.readOnly': 'عرض', 'pol.accept': 'أوافق على الشروط', 'ru.regions': 'القطاعات', 'ru.custom-ph': 'نطاقات مخصصة مفصولة بفواصل (اختياري)',
+      'check.left': 'تم التحقق', 'check.idle': 'لم يتم الفحص بعد', 'ru.regions': 'القطاعات', 'ru.custom-ph': 'نطاقات مخصصة مفصولة بفواصل (اختياري)',
       'dash.manage': 'إدارة', 'pool.refresh-btn': 'تحديث المفاتيح', 'pool.check-btn': 'فحص المفاتيح', 'mesh.ping-btn': 'بنج الشبكة',
       'nav.warp': 'WARP', 'warp.head': 'قناة Cloudflare WARP الاحتياطية',       'nav.dash': 'لوحة التحكم', 'nav.keys': 'المفاتيح', 'nav.devices': 'الأجهزة',
       'nav.connect': 'الوصول الخارجي', 'nav.rusegment': 'قطاع RU', 'nav.tgws': 'TG-WS',
       'nav.mesh': 'شبكة ميش', 'nav.mesh-join': 'الاتصال', 'nav.mesh-topo': 'الطوبولوجيا', 'nav.mesh-routes': 'المسارات',
-      'nav.shop': 'المتجر', 'nav.shop-plans': 'باقات VPN', 'nav.shop-features': 'ميزات Aurora الإضافية', 'nav.shop-billing': 'المدفوعات',
       'nav.update': 'التحديث', 'nav.versions': 'الإصدارات', 'nav.settings': 'الخادم', 'nav.security': 'الأمان', 'nav.logs': 'السجلات',
       'nav.group.home': 'بروكسي المنزلي', 'nav.group.upd': 'التحديثات', 'nav.group.set': 'الإعدادات',
       'g.you': 'أنت', 'g.yours': 'الخاص بك', 'status.on': 'متصل', 'status.off': 'غير متصل', 'status.warn': 'غير مستقر',
       'status.online': 'يعمل', 'status.stopped': 'متوقف', 'status.active': 'نشط', 'status.dead': 'ميت',
       'status.bad': 'سيء', 'status.slow': 'بطيء', 'status.noip': 'noip', 'status.ok': 'موافق', 'status.final': 'نهائي',
       'status.direct': 'مباشر', 'status.enabled': 'مفعّل', 'status.disabled': 'معطّل',
-      'btn.vpn-off': '🌀 تفعيل VPN', 'btn.vpn-on': '🌀 VPN مفعل', 'btn.rotate': '🎲 تبديل المفتاح', 'btn.choose': '💎 اختيار',
+      'btn.vpn-off': '🌀 تفعيل VPN', 'btn.vpn-on': '🌀 VPN مفعل', 'btn.rotate': '🎲 تبديل المفتاح',
       'btn.copy': '📋 نسخ', 'btn.save': 'حفظ', 'btn.login': '🔑 دخول', 'btn.logout': 'خروج',
       'k.keys': 'المفاتيح: ', 'k.empty': 'لا توجد مفاتيح بعد', 'k.mine': 'خاصة', 'k.github': 'github',
       'k.add-ok': 'تمت إضافة المفتاح 🐾', 'k.add-err': 'فشل الإضافة', 'k.need-vless': 'مطلوب رابط vless://',
@@ -1047,14 +775,10 @@
       'ru.empty': 'لم يتم الفحص بعد', 'ru.avail': 'متاح', 'ru.unavail': 'غير متاح', 'ru.all': 'جميع النطاقات متاحة ✅',
       'upd.avail': 'متاح', 'upd.cur': 'محدّث', 'upd.msg-avail': 'تحديث متاح', 'upd.msg-cur': 'تم تثبيت الإصدار الحالي',
       'upd.checked': 'تم الفحص: ', 'upd.err': 'خطأ', 'upd.err-hint': 'فشل التحديث - التفاصيل مرئية للمسؤول',
-      'w.mesh-nodes': 'عقد الشبكة:', 'w.mesh-exit': 'الخروج عبر', 'w.hub': 'المحور', 'w.mesh-none': 'الشبكة غير متصلة. الدعوة في تبويب «الاتصال».',
-      'w.plan': 'الباقة النشطة:', 'w.ru': 'نطاقات RU:', 'w.ru-ok': 'متاحة',
+      'w.mesh-nodes': 'عقد الشبكة:', 'w.mesh-exit': 'الخروج عبر', 'w.hub': 'المحور', 'w.mesh-none': 'الشبكة غير متصلة. الدعوة في تبويب «الاتصال».', 'w.ru': 'نطاقات RU:', 'w.ru-ok': 'متاحة',
       'mesh.connected': 'متصل', 'mesh.not': 'غير متصل', 'mesh.member': 'عضو', 'mesh.hub': 'محور',
       'mesh.no-nodes': 'لا توجد عقد — أضف الأولى', 'mesh.node': 'عقدة',
       'routes.empty': 'لا توجد مسارات بعد', 'routes.active': 'نشط', 'routes.off': 'معطل',
-      'plans.na': 'الباقات غير متاحة في هذا الإصدار', 'plans.traffic': 'المرور:', 'plans.devices': 'الأجهزة:', 'plans.keys': 'المفاتيح:',
-      'plans.free': 'مجاني', 'plans.per-mo': '/شهر', 'plans.current': 'الحالية',
-      'bill.empty': 'لا توجد مدفوعات بعد',
       'sec.on': 'مفعّل', 'sec.off': 'معطّل', 'sec.access': 'LAN فقط: ', 'sec.da': 'نعم', 'sec.no': 'لا', 'sec.blk': 'حظر',
       'sec.rat': 'تفعيل', 'sec.rat-off': 'تعطيل',
       'log.empty': 'السجل فارغ', 'rec.empty': 'لا توجد عمليات استعادة',
@@ -1071,17 +795,14 @@
       'sec.logout': 'تم تسجيل الخروج', 'sec.rotate-ok': 'تم تدوير مفاتيح Reality 🔄', 'sec.rotate-na': 'التدوير غير متاح في هذا الإصدار',
       'upd.run-ok': 'بدأ الفحص (في الخلفية)', 'upd.check-err': 'خطأ في الفحص', 'upd.apply-ok': 'بدأ التحديث ⬆️',
       'upd.apply-err': 'تعذر البدء', 'upd.admin': 'قناة التحديث تدار في لوحة الإدارة 🐾',
-      'plans.admin': 'الباقات تدار في لوحة الإدارة 🐾', 'plans.buy': 'الباقة «', 'plans.buy2': '» — الشراء في لوحة الإدارة 🐾',
-      'feat.admin': 'المتجر غير متاح في هذا الإصدار 🐾', 'feat.buy': 'الميزة «', 'feat.buy2': '» — واجهة في الإصدار العام 🐾',
       'vpn.on': 'تم تفعيل VPN 🌀', 'vpn.off': 'تم إيقاف VPN', 'vpn.err': 'خطأ', 'rot.ok': 'تم تدوير المفتاح 🎲', 'rot.err': 'تعذر التدوير',
       'pool.refresh': 'تم تحديث المجموعة 🔄', 'pool.check': 'فحص المفاتيح في الخلفية 🧪', 'mesh.ping': 'بدأ فحص الشبكة 📡',
-      'mesh.policy-saved': 'تم حفظ سياسة المحور 🎛',
       'copy.link-ok': 'تم نسخ الرابط 📋', 'copy.link-na': 'الرابط غير متاح بعد', 'ru.done': 'اكتمل الفحص 🇷🇺',
       'ru.run': 'بدأ الفحص', 'ru.failonly': '💀 المشاكل فقط', 'ru.failonly-on': '💀 المشاكل فقط ✓',
       'tg.restarted': 'تمت إعادة تشغيل TG-WS ✈️', 'tg.restart-err': 'خطأ في إعادة التشغيل',
-      'fmt.kb': 'كيلوبايت', 'fmt.mb': 'ميجابايت', 'fmt.gb': 'гигабайт', 'fmt.ul': 'غير محدود', 'fmt.per-mo': '/شهر',
+      'fmt.kb': 'كيلوبايت', 'fmt.mb': 'ميجابايت', 'fmt.gb': 'гигабайт', 'fmt.ul': 'غير محدود',
       'fmt.s': ' ث', 'fmt.min': ' د', 'fmt.h': ' س', 'fmt.d': ' يوم',
-      'dash.mode': 'الوضع', 'dash.ip': 'IP الخروج', 'dash.conns': 'الاتصالات', 'dash.traffic': 'الحركة ↓ / ↑', 'dash.mesh-nodes': 'عقد الشبكة', 'dash.plan': 'الخطة',
+      'dash.mode': 'الوضع', 'dash.ip': 'IP الخروج', 'dash.conns': 'الاتصالات', 'dash.traffic': 'الحركة ↓ / ↑', 'dash.mesh-nodes': 'عقد الشبكة',
       'upd.details': 'التفاصيل', 'upd.now': 'تحديث', 'w.proxy': 'حالة البروكسي', 'w.check-ru': 'تحقق',
       'keys.uri-ph': 'vless://… الصق رابطك (Reality)', 'keys.add': 'إضافة مفتاح', 'keys.clean': 'إزالة الميتة', 'keys.src': 'github + الخاصة',
       'th.tag': 'الوسم', 'th.source': 'المصدر', 'th.status': 'الحالة', 'th.ping': 'بينغ', 'th.exit': 'IP الخروج', 'th.sites': 'Sites',
@@ -1095,67 +816,40 @@
       'mj.head': 'الانضمام لشبكة mesh', 'mj.p': 'يمكن لبروكسيك أن يكون جزءاً من شبكة Aurora mesh الخاصة. يمنح ذلك الوصول إلى مواقع حصرية لأعضاء آخرين، وتجاوز الحجب تلقائياً وطرق احتياطية.',
       'mj.invite-ph': 'الصق رمز دعوة mesh (مثال: aurora-home-a1b2c3d4)', 'mj.join': 'اتصال', 'mj.st': 'حالة mesh', 'mj.name': 'اسم mesh', 'mj.role': 'الدور',
       'mj.nodes': 'العقد المتاحة', 'mj.ping': 'البنغ إلى المحور', 'mj.enc': 'التشفير', 'mj.what': 'ماذا يقدم mesh',
-      'mj.leave': 'مغادرة mesh', 'mj.regen': 'تحديث الدعوة', 'mj.pol': 'سياسة المحور', 'mj.pol-hint': 'يتحكم خادم المحور في التبويبات التي يراها عملاء mesh. العملاء المتصلون بدعوة هذا الخادم يطبقون السياسة تلقائياً (تحديث كل 15 ثانية).',
-      'mj.master': 'الخادم هو المحور ويتحكم في رؤية العملاء', 'mj.show-mesh': 'إظهار تبويب "شبكة mesh" للعملاء', 'mj.show-subs': 'إظهار تبويب "المتجر" للعملاء',
+      'mj.leave': 'مغادرة mesh', 'mj.regen': 'تحديث الدعوة',
       'mt.hint': 'بروكسيك (في المركز) وعقد أعضاء mesh الآخرين. الاتصالات نشطة إذا مرت الحركة عبرها.',
       'mrt.hint': 'قواعد أي حركة تخرج للإنترنت عبر أي عقدة. الترتيب من الأعلى للأسفل.', 'th.what': 'ماذا', 'th.via': 'إلى أين', 'th.proto': 'البروتوكول',
-      'sp.head': 'خطط VPN', 'sp.hint': 'لمن لديه IP رمادي ويحتاج إلى تجاوز الحظر. الدفع والتجديد عبر بوت تيليجرام، ويُفعّل الخطة فورًاً.', 'sp.loading': 'جارٍ تحميل الخطط…', 'sp.comp': 'محتوى الخطة', 'th.func': 'الوظيفة', 'th.val': 'القيمة',
-      'sf.instant': '+ الدفع عبر بوت تيليجرام، تفعيل فوري',
-      'sb.head': 'الدفع والتجديد', 'sb.hint': 'الخطة النشطة وصلاحيتها وسجل الدفعات. التجديد بنقرة واحدة.', 'sb.plan': 'الخطة الحالية', 'sb.until': 'صالحة حتى', 'sb.buy': 'الدفع عبر Telegram', 'btn.buy-tg': '💬 الشراء عبر Telegram', 'sb.hist': 'سجل الدفعات',
-      'th.date': 'التاريخ', 'th.desc': 'الوصف', 'th.sum': 'المبلغ',
+      'th.date': 'التاريخ',
       'upd.apply': 'تحديث الآن', 'upd.auto': 'تحديث تلقائي', 'upd.auto-hint': 'يتم التحديث من إصدارات GitHub. يُنزل الملف، يُتحقق منه، يُستبدل ذرياً — يعاد تشغيل البروكسي خلال ثوانٍ.',
       'upd.src': 'مصدر التحديث', 'th.param': 'المعامل', 'upd.repo': 'المستودع', 'upd.sig': 'التحقق من التوقيع', 'upd.rollback': 'تراجع عند الفشل',
       'upd.check-now': 'تحقق الآن', 'upd.stable': 'stable — المستقرة فقط', 'upd.rc': 'rc — مرشحو الإصدار', 'upd.nightly': 'nightly — بنى ليلية',
       'upd.mode-auto': 'التحديث التلقائي مفعل', 'upd.mode-notify': 'إشعار فقط', 'upd.mode-off': 'لا تتحقق',
       'ver.head': 'سجل الإصدارات',
       'set.head': 'معاملات الخادم', 'set.host': 'المضيف', 'set.port': 'منفذ Xray', 'set.ver': 'الإصدار', 'set.uptime': 'مدة التشغيل',
-      'set.common': 'عام', 'set.vis': 'رؤية الألسنة', 'set.show-mesh': 'تفعيل شبكة mesh', 'set.show-subs': 'تفعيل المتجر (الاشتراكات والخطط)', 'set.mesh': 'Mesh', 'set.name-ph': 'اسم الخادم', 'set.meshid-ph': 'معرّف mesh', 'set.copy-invite': 'نسخ الدعوة',
+      'set.common': 'عام', 'set.vis': 'رؤية الألسنة', 'set.show-mesh': 'تفعيل شبكة mesh', 'set.mesh': 'Mesh', 'set.name-ph': 'اسم الخادم', 'set.meshid-ph': 'معرّف mesh', 'set.copy-invite': 'نسخ الدعوة',
       'sec.hint': 'رمز لوحة الإدارة ومفاتيح Reality الخارجية. يغيّر الإعداد الحي.', 'sec.panel': 'اللوحة', 'sec.tok-ph': 'رمز المسؤول (Bearer) — مطلوب لـ POST /api/*', 'sec.acc-v': 'الوصول', 'sec.pbk-ph': 'المفتاح العام', 'sec.rotate': 'تدوير المفاتيح',
       'log.head': 'سجل النظام', 'log.loading': 'جارٍ التحميل…', 'log.refresh': 'تحديث', 'log.download': 'تنزيل', 'rclog.head': 'سجل الاسترداد',
       'th.node': 'العقدة', 'th.region': 'المنطقة', 'th.route': 'المسار', 'sec.tok': 'رمز المسؤول', 'sec.reality': 'Reality',
         'theme.sun': '🌙', 'theme.moon': '☀️',
-  'rec.hint': 'Recovery في الخدمة: القطة تراقب المفاتيح (الحدود، المنطقة، الاتصالات) وتبدّل النفق تلقائيا عند سقوط مفتاح. كل تبديل يسجل هنا.', 'mesh.id-hint': 'يصدر الخادم الرئيسي الدعوة. حتى ذلك الحين نعرض معرّف العقدة الخاصة بك.', 'routes.master': 'المسارات يحددها الخادم الرئيسي: هنا ترى إلى أين يذهب الاتصال. نسخة العميل لا تضيف ولا تحذف قواعد — اطلب من مالك الشبكة 🐾', 'sec.tok-hint': 'رمز المشرف هو كلمة مرور اللوحة: يضبط عند التشغيل الأول (المعالج) ويحفظ في data/settings.json أو المتغير AURORA_UI_TOKEN. أدخله هنا مرة واحدة.', 'sec.2fa-on': 'تفعيل 2FA', 'sec.2fa-off': 'تعطيل 2FA',
-      'feat.master': 'الأسعار والأوصاف يحددها الخادم — هذا العقدة ستأخذها عند الانضماف إلى الشبكة',
-    'myk.head': 'مفاتحي',
-    'myk.hint': 'جهاز = مفتاح مشترى 🐾 الخطة ونهاية المدة والبيانات لكل مفتاح.',
-    'myk.until': 'تنتهي في',
-    'myk.traffic': 'البيانات',
-    'myk.devices': 'المفاتيح',
-    'myk.how': 'تعليمات',
-    'myk.copy': 'نسخ الرابط',
-    'myk.copy-ok': 'تم نسخ الرابط 🐾',
-    'myk.empty': 'لا مفاتيح بعد — اشترِ خطة من بوت تيليجرام',
-    'myk.unlim': 'غير محدود',
+  'rec.hint': 'Recovery في الخدمة: القطة تراقب المفاتيح (الحدود، المنطقة، الاتصالات) وتبدّل النفق تلقائيا عند سقوط مفتاح. كل تبديل يسجل هنا.', 'sec.tok-hint': 'رمز المشرف هو كلمة مرور اللوحة: يضبط عند التشغيل الأول (المعالج) ويحفظ في data/settings.json أو المتغير AURORA_UI_TOKEN. أدخله هنا مرة واحدة.', 'sec.2fa-on': 'تفعيل 2FA', 'sec.2fa-off': 'تعطيل 2FA',
     'dev.conn': 'اتصالات البروكسي',
     'nav.conn': 'الاتصالات',
-    'nav.keys-proxy': 'مفاتيح البروكسي',      'ext.head': 'ميزات Aurora PRO',
-      'ext.locked': 'حتى تفعيل الاشتراك تبقى ميزات PRO مقفلة. يعمل الوكيل كالمعتاد.',
-      'ext.pro': 'PRO مفتوح: القطة سعيدة 🐾',
-      'ext.expired': 'الاشتراك غير نشط - اشتره من بوت تيليجرام',
-      'ext.na': 'الترخيص غير متاح: لا رد. الوكيل يعمل 🐾',
-      'ext.buy': 'شراء PRO',
-      'ext.offline': 'يعمل بذاكرة التخزين المؤقت',
-        'ext.trial': 'التجربة نشطة: الإمدادات وحظر الإعلانات مفتوحة 🐱',
-        'ext.dl-chrome': 'تنزيل للكروم',
-        'ext.dl-edge': 'تنزيل للإدج',
-        'ext.dl-master': 'الحزمة من الخادم الرئيسي 🐾',
+    'nav.keys-proxy': 'مفاتيح البروكسي',
 
     },  
     hi: {
-      'check.left': 'जाँचा गया', 'check.idle': 'अभी जाँच नहीं हुई',
-      'pol.head': 'सेवा नीति', 'pol.readOnly': 'देखें', 'pol.accept': 'मैं शर्तें स्वीकार करता हूँ', 'ru.regions': 'सेगमेंट', 'ru.custom-ph': 'कस्टम डोमेन, अल्पविराम से अलग (वैकल्पिक)',
+      'check.left': 'जाँचा गया', 'check.idle': 'अभी जाँच नहीं हुई', 'ru.regions': 'सेगमेंट', 'ru.custom-ph': 'कस्टम डोमेन, अल्पविराम से अलग (वैकल्पिक)',
       'dash.manage': 'प्रबंधन', 'pool.refresh-btn': 'कुंजियाँ अपडेट करें', 'pool.check-btn': 'कुंजियाँ जाँचें', 'mesh.ping-btn': 'मेश पिंग',
       'nav.warp': 'WARP', 'warp.head': 'Cloudflare WARP रिज़र्व चैनल',       'nav.dash': 'डैशबोर्ड', 'nav.keys': 'कुंजियाँ', 'nav.devices': 'डिवाइस',
       'nav.connect': 'बाहरी पहुँच', 'nav.rusegment': 'RU सेगमेंट', 'nav.tgws': 'TG-WS',
       'nav.mesh': 'मेश नेटवर्क', 'nav.mesh-join': 'कनेक्ट', 'nav.mesh-topo': 'टोपोलॉजी', 'nav.mesh-routes': 'रूट',
-      'nav.shop': 'दुकान', 'nav.shop-plans': 'VPN योजनाएँ', 'nav.shop-features': 'Aurora अतिरिक्त सुविधाएँ', 'nav.shop-billing': 'भुगतान',
       'nav.update': 'अपडेट', 'nav.versions': 'संस्करण', 'nav.settings': 'सर्वर', 'nav.security': 'सुरक्षा', 'nav.logs': 'लॉग',
       'nav.group.home': 'घरेलू प्रॉक्सी', 'nav.group.upd': 'अपडेट', 'nav.group.set': 'सेटिंग्स',
       'g.you': 'आप', 'g.yours': 'आपका', 'status.on': 'ऑनलाइन', 'status.off': 'ऑफ़लाइन', 'status.warn': 'अस्थिर',
       'status.online': 'चालू', 'status.stopped': 'रोका गया', 'status.active': 'सक्रिय', 'status.dead': 'मृत',
       'status.bad': 'खराब', 'status.slow': 'धीमा', 'status.noip': 'noip', 'status.ok': 'ठीक', 'status.final': 'अंतिम',
       'status.direct': 'सीधा', 'status.enabled': 'सक्षम', 'status.disabled': 'अक्षम',
-      'btn.vpn-off': '🌀 VPN चालू करें', 'btn.vpn-on': '🌀 VPN चालू', 'btn.rotate': '🎲 कुंजी बदलें', 'btn.choose': '💎 चुनें',
+      'btn.vpn-off': '🌀 VPN चालू करें', 'btn.vpn-on': '🌀 VPN चालू', 'btn.rotate': '🎲 कुंजी बदलें',
       'btn.copy': '📋 कॉपी', 'btn.save': 'सहेजें', 'btn.login': '🔑 लॉगिन', 'btn.logout': 'लॉगआउट',
       'k.keys': 'कुंजियाँ: ', 'k.empty': 'अभी कोई कुंजी नहीं', 'k.mine': 'मेरी', 'k.github': 'github',
       'k.add-ok': 'कुंजी जोड़ी गई 🐾', 'k.add-err': 'जोड़ना विफल', 'k.need-vless': 'vless:// लिंक आवश्यक है',
@@ -1167,14 +861,10 @@
       'ru.empty': 'जाँच अभी नहीं हुई', 'ru.avail': 'उपलब्ध', 'ru.unavail': 'अनुपलब्ध', 'ru.all': 'सभी डोमेन उपलब्ध ✅',
       'upd.avail': 'उपलब्ध', 'upd.cur': 'नवीनतम', 'upd.msg-avail': 'अपडेट उपलब्ध', 'upd.msg-cur': 'नवीनतम संस्करण स्थापित',
       'upd.checked': 'जाँचा गया: ', 'upd.err': 'त्रुटि', 'upd.err-hint': 'अपडेट विफल - विवरण केवल व्यवस्थापक को दिखते हैं',
-      'w.mesh-nodes': 'मेश नोड:', 'w.mesh-exit': 'निकास', 'w.hub': 'हब', 'w.mesh-none': 'मेश कनेक्ट नहीं। निमंत्रण «कनेक्ट» टैब में है।',
-      'w.plan': 'सक्रिय योजना:', 'w.ru': 'RU डोमेन:', 'w.ru-ok': 'उपलब्ध',
+      'w.mesh-nodes': 'मेश नोड:', 'w.mesh-exit': 'निकास', 'w.hub': 'हब', 'w.mesh-none': 'मेश कनेक्ट नहीं। निमंत्रण «कनेक्ट» टैब में है।', 'w.ru': 'RU डोमेन:', 'w.ru-ok': 'उपलब्ध',
       'mesh.connected': 'कनेक्टेड', 'mesh.not': 'कनेक्ट नहीं', 'mesh.member': 'सदस्य', 'mesh.hub': 'हब',
       'mesh.no-nodes': 'कोई नोड नहीं — पहला जोड़ें', 'mesh.node': 'नोड',
       'routes.empty': 'अभी कोई रूट नहीं', 'routes.active': 'सक्रिय', 'routes.off': 'बंद',
-      'plans.na': 'इस बिल्ड में योजनाएँ उपलब्ध नहीं', 'plans.traffic': 'ट्रैफ़िक:', 'plans.devices': 'डिवाइस:', 'plans.keys': 'कुंजियाँ:',
-      'plans.free': 'मुफ़्त', 'plans.per-mo': '/माह', 'plans.current': 'वर्तमान',
-      'bill.empty': 'अभी कोई भुगतान नहीं',
       'sec.on': 'सक्षम', 'sec.off': 'अक्षम', 'sec.access': 'केवल LAN: ', 'sec.da': 'हाँ', 'sec.no': 'नहीं', 'sec.blk': 'ब्लॉक',
       'sec.rat': 'चालू', 'sec.rat-off': 'बंद',
       'log.empty': 'लॉग खाली है', 'rec.empty': 'कोई पुनर्प्राप्ति नहीं',
@@ -1191,17 +881,14 @@
       'sec.logout': 'लॉगआउट हो गया', 'sec.rotate-ok': 'Reality कुंजियाँ रोटेट हुईं 🔄', 'sec.rotate-na': 'इस बिल्ड में रोटेशन उपलब्ध नहीं',
       'upd.run-ok': 'जाँच शुरू (पृष्ठभूमि)', 'upd.check-err': 'जाँच त्रुटि', 'upd.apply-ok': 'अपडेट शुरू ⬆️',
       'upd.apply-err': 'शुरू नहीं हो सका', 'upd.admin': 'अपडेट चैनल एडमिन पैनल में प्रबंधित होता है 🐾',
-      'plans.admin': 'योजनाएँ एडमिन पैनल में प्रबंधित होती हैं 🐾', 'plans.buy': 'योजना «', 'plans.buy2': '» — खरीद एडमिन पैनल में 🐾',
-      'feat.admin': 'इस बिल्ड में दुकान उपलब्ध नहीं 🐾', 'feat.buy': 'सुविधा «', 'feat.buy2': '» — सार्वजनिक बिल्ड में शोकेस 🐾',
       'vpn.on': 'VPN चालू 🌀', 'vpn.off': 'VPN बंद', 'vpn.err': 'त्रुटि', 'rot.ok': 'कुंजी रोटेट हुई 🎲', 'rot.err': 'रोटेट नहीं हो सकी',
       'pool.refresh': 'पूल अपडेट हुआ 🔄', 'pool.check': 'पृष्ठभूमि में कुंजी जाँच 🧪', 'mesh.ping': 'मेश पिंग शुरू 📡',
-      'mesh.policy-saved': 'हब नीति सहेजी गई 🎛',
       'copy.link-ok': 'लिंक कॉपी किया 📋', 'copy.link-na': 'लिंक अभी उपलब्ध नहीं', 'ru.done': 'जाँच पूर्ण 🇷🇺',
       'ru.run': 'जाँच शुरू', 'ru.failonly': '💀 केवल समस्याएँ', 'ru.failonly-on': '💀 केवल समस्याएँ ✓',
       'tg.restarted': 'TG-WS पुनः आरंभ ✈️', 'tg.restart-err': 'पुनः आरंभ त्रुटि',
-      'fmt.kb': 'KB', 'fmt.mb': 'MB', 'fmt.gb': 'GB', 'fmt.ul': 'असीमित', 'fmt.per-mo': '/माह',
+      'fmt.kb': 'KB', 'fmt.mb': 'MB', 'fmt.gb': 'GB', 'fmt.ul': 'असीमित',
       'fmt.s': ' से', 'fmt.min': ' मिनट', 'fmt.h': ' घंटे', 'fmt.d': ' दिन',
-      'dash.mode': 'मोड', 'dash.ip': 'एग्ज़िट IP', 'dash.conns': 'कनेक्शन', 'dash.traffic': 'ट्रैफ़िक ↓ / ↑', 'dash.mesh-nodes': 'Mesh नोड', 'dash.plan': 'प्लान',
+      'dash.mode': 'मोड', 'dash.ip': 'एग्ज़िट IP', 'dash.conns': 'कनेक्शन', 'dash.traffic': 'ट्रैफ़िक ↓ / ↑', 'dash.mesh-nodes': 'Mesh नोड',
       'upd.details': 'विवरण', 'upd.now': 'अपडेट', 'w.proxy': 'प्रॉक्सी स्थिति', 'w.check-ru': 'जाँचें',
       'keys.uri-ph': 'vless://… अपना लिंक पेस्ट करें (Reality)', 'keys.add': 'अपनी कुंजी', 'keys.clean': 'मृत हटाएँ', 'keys.src': 'github + अपनी',
       'th.tag': 'टैग', 'th.source': 'स्रोत', 'th.status': 'स्थिति', 'th.ping': 'Ping', 'th.exit': 'एग्ज़िट IP', 'th.sites': 'Sites',
@@ -1215,50 +902,25 @@
       'mj.head': 'Mesh नेटवर्क से जुड़ें', 'mj.p': 'आपका प्रॉक्सी निजी Aurora mesh नेटवर्क का हिस्सा हो सकता है। यह अन्य सदस्यों के विशेष स्थानों, स्वचालित ब्लॉक-बायपास और बैकअप रूट्स तक पहुँच देता है।',
       'mj.invite-ph': 'Mesh इन्वाइट कोड पेस्ट करें (जैसे: aurora-home-a1b2c3d4)', 'mj.join': 'कनेक्ट', 'mj.st': 'Mesh स्थिति', 'mj.name': 'Mesh नाम', 'mj.role': 'भूमिका',
       'mj.nodes': 'उपलब्ध नोड', 'mj.ping': 'हब तक ping', 'mj.enc': 'एन्क्रिप्शन', 'mj.what': 'Mesh क्या देता है',
-      'mj.leave': 'Mesh छोड़ें', 'mj.regen': 'इन्वाइट अपडेट', 'mj.pol': 'हब नीति', 'mj.pol-hint': 'हब सर्वर नियंत्रित करता है कि mesh क्लाइंट कौन-से टैब देखते हैं। इस सर्वर के इन्वाइट से जुड़े क्लाइंट स्वचालित रूप से नीति लागू करते हैं (हर 15 सेकंड अपडेट)।',
-      'mj.master': 'सर्वर हब है, क्लाइंट की दृश्यता नियंत्रित करता है', 'mj.show-mesh': 'क्लाइंट्स को “Mesh नेटवर्क” टैब दिखाएँ', 'mj.show-subs': 'क्लाइंट्स को “स्टोर” टैब दिखाएँ',
+      'mj.leave': 'Mesh छोड़ें', 'mj.regen': 'इन्वाइट अपडेट',
       'mt.hint': 'आपका प्रॉक्सी (केंद्र में) और अन्य mesh सदस्यों के नोड। कनेक्शन सक्रिय हैं यदि ट्रैफ़िक उनसे होकर जाता है।',
       'mrt.hint': 'नियम कि कौन-सा ट्रैफ़िक किस नोड से इंटरनेट जाता है। क्रम ऊपर से नीचे।', 'th.what': 'क्या', 'th.via': 'कहाँ', 'th.proto': 'प्रोटोकॉल',
-      'sp.head': 'VPN प्लान', 'sp.hint': 'ग्रे IP वालों के लिट — ब्लॉक हटाने के लिए। भुगतान और नवीनीकरण Telegram बॉट में, प्लान तुरंत सक्रिय।', 'sp.loading': 'प्लान लोड हो रहे…', 'sp.comp': 'प्लान सामग्री', 'th.func': 'सुविधा', 'th.val': 'मान',
-      'sf.instant': '+ टेलीग्राम बॉट में भुगतान, तुरंत सक्रिय',
-      'sb.head': 'भुगतान और नवीनीकरण', 'sb.hint': 'सक्रिय प्लान, अवधि और भुगतान इतिहास। एक क्लिक में नवीनीकरण।', 'sb.plan': 'वर्तमान प्लान', 'sb.until': 'मान्य तक', 'sb.buy': 'Telegram से भुगतान', 'btn.buy-tg': '💬 Telegram से खरीदें', 'sb.hist': 'भुगतान इतिहास',
-      'th.date': 'दिनांक', 'th.desc': 'विवरण', 'th.sum': 'राशि',
+      'th.date': 'दिनांक',
       'upd.apply': 'अभी अपडेट करें', 'upd.auto': 'ऑटो-अपडेट', 'upd.auto-hint': 'अपडेट GitHub रिलीज़ से होता है। बाइनरी डाउनलोड, सत्यापित, परमाणु रूप से बदली जाती है — प्रॉक्सी कुछ सेकंड में पुनः आरंभ हो जाता है।',
       'upd.src': 'अपडेट स्रोत', 'th.param': 'पैरामीटर', 'upd.repo': 'रिपॉज़िटरी', 'upd.sig': 'हस्ताक्षर जाँच', 'upd.rollback': 'विफलता पर रोलबैक',
       'upd.check-now': 'अभी जाँचें', 'upd.stable': 'stable — केवल स्थिर', 'upd.rc': 'rc — रिलीज़ उम्मीदवार', 'upd.nightly': 'nightly — रात्रि बिल्ड',
       'upd.mode-auto': 'ऑटो-अपडेट चालू', 'upd.mode-notify': 'केवल सूचित करें', 'upd.mode-off': 'जाँच न करें',
       'ver.head': 'संस्करण इतिहास',
       'set.head': 'सर्वर पैरामीटर', 'set.host': 'होस्ट', 'set.port': 'Xray पोर्ट', 'set.ver': 'संस्करण', 'set.uptime': 'अपटाइम',
-      'set.common': 'सामान्य', 'set.vis': 'टैब दृश्यता', 'set.show-mesh': 'मेश नेटवर्क सक्षम करें', 'set.show-subs': 'स्टोर सक्षम करें (सदस्यता और प्लान)', 'set.mesh': 'Mesh', 'set.name-ph': 'सर्वर नाम', 'set.meshid-ph': 'Mesh ID', 'set.copy-invite': 'इन्वाइट कॉपी',
+      'set.common': 'सामान्य', 'set.vis': 'टैब दृश्यता', 'set.show-mesh': 'मेश नेटवर्क सक्षम करें', 'set.mesh': 'Mesh', 'set.name-ph': 'सर्वर नाम', 'set.meshid-ph': 'Mesh ID', 'set.copy-invite': 'इन्वाइट कॉपी',
       'sec.hint': 'पैनल admin टोकन और बाहरी Reality कुंजियाँ। लाइव कॉन्फ़िग बदलता है।', 'sec.panel': 'पैनल', 'sec.tok-ph': 'Admin टोकन (Bearer) — POST /api/* के लिए आवश्यक', 'sec.acc-v': 'पहुँच', 'sec.pbk-ph': 'सार्वजनिक कुंजी', 'sec.rotate': 'कुंजी रोटेट',
       'log.head': 'सिस्टम लॉग', 'log.loading': 'लोड हो रहा…', 'log.refresh': 'रिफ़्रेश', 'log.download': 'डाउनलोड', 'rclog.head': 'रिकवरी जर्नल',
       'th.node': 'नोड', 'th.region': 'क्षेत्र', 'th.route': 'रूट', 'sec.tok': 'Admin टोकन', 'sec.reality': 'Reality',
         'theme.sun': '🌙', 'theme.moon': '☀️',
-  'rec.hint': 'Recovery कर्तव्य पर: बिल्ली खुद कुंजियाँ देखती है (सीमा, क्षेत्र, कनेक्शन) और कुंजी गिरने पर टनल बदल देती है। हर बदलाव यहाँ दर्ज होगा।', 'mesh.id-hint': 'निमंत्रण मुख्य सर्वर देता है। तब तक आपके नोड की आईडी दिखाई जाती है।', 'routes.master': 'मार्ग मुख्य सर्वर तय करता है: यहाँ आपको ट्रैफ़िक कहाँ जा रहा है दिखता है। क्लाइंट बिल्ड में नियम नहीं बदले जा सकते — नेटवर्क मालिक से कहें 🐾', 'sec.tok-hint': 'एडमिन टोकन आपका पैनल पासवर्ड है: पहली बार के विज़ार्ड में सेट होता है और data/settings.json या AURORA_UI_TOKEN में रहता है। इसे यहाँ एक बार डालें।', 'sec.2fa-on': '2FA चालू करें', 'sec.2fa-off': '2FA बंद करें',
-      'feat.master': 'कीमत और विवरण मास्टर सर्वर तैर करता है — यह नोड मेश मेश जुडिने के बाद लेलेगा',
-    'myk.head': 'मेरी कुंजियाँ',
-    'myk.hint': 'डिवाइस = खरीदी गई कुंजी 🐾 हर कुंजी के लिए प्लान, समय-सीमा और ट्रैफ़िक।',
-    'myk.until': 'समाप्त',
-    'myk.traffic': 'ट्रैफ़िक',
-    'myk.devices': 'कुंजियाँ',
-    'myk.how': 'निर्देश',
-    'myk.copy': 'लिंक कॉपी करें',
-    'myk.copy-ok': 'लिंक कॉपी हो गया 🐾',
-    'myk.empty': 'अभी कोई कुंजी नहीं — टेलीग्राम बॉट में प्लान लें',
-    'myk.unlim': 'असीमित',
+  'rec.hint': 'Recovery कर्तव्य पर: बिल्ली खुद कुंजियाँ देखती है (सीमा, क्षेत्र, कनेक्शन) और कुंजी गिरने पर टनल बदल देती है। हर बदलाव यहाँ दर्ज होगा।', 'sec.tok-hint': 'एडमिन टोकन आपका पैनल पासवर्ड है: पहली बार के विज़ार्ड में सेट होता है और data/settings.json या AURORA_UI_TOKEN में रहता है। इसे यहाँ एक बार डालें।', 'sec.2fa-on': '2FA चालू करें', 'sec.2fa-off': '2FA बंद करें',
     'dev.conn': 'प्रॉक्सी कनेक्शन',
     'nav.conn': 'कनेक्शन',
-    'nav.keys-proxy': 'प्रॉक्सी कुंजियाँ',      'ext.head': 'Aurora PRO सुविधाएँ',
-      'ext.locked': 'सदस्यता सक्रिय होने तक PRO सुविधाएँ बंद हैं। VPN और प्रॉक्सी सामान्य रूप से चलते हैं।',
-      'ext.pro': 'PRO खुला है: बिल्ली खुश है 🐾',
-      'ext.expired': 'सदस्यता सक्रिय नहीं — टेलीग्राम बॉट में खरीदें',
-      'ext.na': 'लाइसेंस उपलब्ध नहीं: सर्वर ने जवाब नहीं दिया। प्रॉक्सी चल रहा है 🐾',
-      'ext.buy': 'PRO खरीदें',
-      'ext.offline': 'कैश लाइसेंस के साथ चल रहा है',
-        'ext.trial': 'ट्राइल चालू: विस्तरण और बेलिंग ब्लॉकर दोनों के लेडा हैं 🐱',
-        'ext.dl-chrome': 'Chrome के लिए डाउनलोड',
-        'ext.dl-edge': 'Edge के लिए डाउनलोड',
-        'ext.dl-master': 'पॅकेज मुख्य सर्वर देटा 🐾',
+    'nav.keys-proxy': 'प्रॉक्सी कुंजियाँ',
 
     },
   
@@ -1326,7 +988,6 @@
     var d = new Date(+ts * 1000), p = function (x) { return x < 10 ? '0' + x : '' + x; };
     return d.getDate() + '.' + p(d.getMonth() + 1) + '.' + d.getFullYear() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
   }
-  function bytesPlan(n) { return (n == null || n <= 0) ? 'Безлимит' : fmtB(n) + '/мес'; }
   function median(arr) {
     var a = (arr || []).filter(function (x) { return x != null && x > 0; }).map(Number).sort(function (a, b) { return a - b; });
     if (!a.length) return null;
@@ -1738,7 +1399,7 @@ function warpRemoveOne(name) {
 
   // A-839: obrabotchik change s capture - KAK NA MASTERE. Delegaciya ACTS
   // ostanetsya, no osnovnoy put' idet cherez etot pryamoy slushatel, on
-  // proveden u vladeltsa na mastere.
+  // proveden lokalno, bez mastera.
   document.addEventListener('change', function (ev) {
     var t = ev.target;
     if (!t || (t.id !== 'warp-file' && t.id !== 'masque-file')) return;
@@ -1800,7 +1461,6 @@ function warpRemoveOne(name) {
     });
   }
   function renderAll(soft) {
-    try { applyExtGate(); } catch (e) { }  // A-111: гейт PRO
     var S = V.S || {};
     if (!Object.keys(S).length) return;
     applyFlags(S);
@@ -1814,10 +1474,8 @@ function warpRemoveOne(name) {
     renderConnect(S);
     renderRu(S);
     renderRegions(S);
-    renderPolicy(S);
     renderUpdateDash(S);
     renderWidgets(S);
-    renderMeshPolicy(S);
   }
 
   function renderHero(S) {
@@ -1844,10 +1502,6 @@ function warpRemoveOne(name) {
     vpn.className = 'pill ' + (S.vpn_mode ? 'on' : 'off') + ' hide-sm';
     $('pill-vpn-t').textContent = S.vpn_mode ? 'VPN' : 'DIRECT';
     $('pill-mesh').style.display = (S.show_mesh === false) ? 'none' : '';
-    $('pill-plan').style.display = (S.show_subs === false) ? 'none' : '';
-    if (V.SUBS && V.SUBS.plans && V.SUBS.default) {
-      $('pill-plan').textContent = '💎 ' + V.SUBS.default;
-    }
   }
 
   /* ================= KEYS ================= */
@@ -2011,25 +1665,7 @@ function warpRemoveOne(name) {
     rows.innerHTML = h || '<tr><td colspan="5"><div class="empty">' + _t('ru.all') + '</div></td></tr>';
   }
 
-  /* ================= POLICY + REGIONS ================= */
-  function renderPolicy(S) {
-    var t = $('policy-text');
-    if (t) t.textContent = S.policy_text || '';
-    var rev = $('policy-rev');
-    if (rev) rev.textContent = 'rev ' + (S.policy_rev || 0);
-    var need = !!(S.policy_rev && S.policy_rev > (S.policy_accepted_rev || 0));
-    if (!$('policy-screen')) return;
-    if (S.setup_complete === false) {
-      $('policy-screen').style.display = 'none';
-      return;
-    }
-    if (need && !CFG.policyOnce) {
-      CFG.policyOnce = true;
-      $('policy-screen').style.display = '';
-    }
-    var ab = $('policy-accept-btn');
-    if (ab) ab.style.display = need ? '' : 'none';
-  }
+  /* ================= REGIONS ================= */
   function renderRegions(S) {
     var sel = $('rg-sel');
     if (!sel) return;
@@ -2124,7 +1760,7 @@ function warpRemoveOne(name) {
           + '<div style="flex:1;min-width:0">'
           + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
           + '<b>' + esc(x.name || '') + '</b>'
-          + (x.v === cur ? '<span class="chip st-act">' + _t('plans.current') + '</span>' : '')
+          + (x.v === cur ? '<span class="chip st-act">' + _t('ver.current') + '</span>' : '')
           + (x.v === upd && x.v !== cur ? '<span class="badge gold">' + _t('upd.avail') + '</span>' : '')
           + '<span class="muted mono" style="font-size:12px">' + esc(x.date || '') + '</span>'
           + '</div>'
@@ -2142,12 +1778,6 @@ function warpRemoveOne(name) {
       $('w-mesh-st').textContent = s.nodes.length ? (on + '/' + s.nodes.length + ' ' + _t('status.online')) : '—';
       $('w-mesh-body').innerHTML = s.nodes.length ? (_t('w.mesh-nodes') + ' <b>' + s.nodes.length + '</b> · ' + _t('w.mesh-exit') + ' <b>' + esc(s.hub_name || (s.name || _t('w.hub'))) + '</b>') : _t('w.mesh-none');
       $('w-mesh-st').className = 'badge ' + (s.nodes.length ? 'on' : 'warn');
-    }
-    if (V.SUBS && V.SUBS.plans && V.SUBS.default) {
-      $('plan-st').textContent = V.SUBS.default;
-      $('plan-name').textContent = V.SUBS.default;
-      $('w-plan-body').innerHTML = _t('w.plan') + ' <b>' + esc(V.SUBS.default) + '</b>'
-        + (V.SUBS.expires ? ' · до ' + fmtDate(V.SUBS.expires) : '');
     }
     $('w-proxy-st').textContent = S.vpn_mode ? _t('status.online') : _t('status.direct');
     $('w-proxy-st').className = 'badge ' + (S.vpn_mode ? 'ok' : 'warn');
@@ -2183,8 +1813,8 @@ function warpRemoveOne(name) {
       var mi = $('meshid');
       if (mi) {
         if (inv) { mi.value = inv; mi.title = ''; }
-        else if (hub) { mi.value = (hub.id || '—') + ' · ' + (hub.name || hub.host || ''); mi.title = _t('mesh.id-hint'); }
-        else { mi.value = ''; mi.title = _t('mesh.id-hint'); }
+        else if (hub) { mi.value = (hub.id || '—') + ' · ' + (hub.name || hub.host || ''); mi.title = _t('mesh.id-local'); }
+        else { mi.value = ''; mi.title = _t('mesh.id-local'); }
       }
       $('mesh-topo-name').textContent = esc((hub && hub.name) || j.name || 'меш');
       renderMeshNodes(nodes, hub);
@@ -2249,7 +1879,7 @@ function warpRemoveOne(name) {
       var rows = $('mesh-routes');
       if (!rows) return;
       var rr = j.rows || [];
-      if (!rr.length) { rows.innerHTML = '<tr><td colspan="6"><div class="empty"><span class="ic">🧭</span>' + _t('routes.master') + '</div></td></tr>'; return; }
+      if (!rr.length) { rows.innerHTML = '<tr><td colspan="6"><div class="empty"><span class="ic">🧭</span>' + _t('routes.local') + '</div></td></tr>'; return; }
       var h = '';
       rr.forEach(function (r, i) {
         var stCls = r.status === 'final' ? 'st-act' : (r.status === 'active' ? 'st-ok' : 'st-dim');
@@ -2266,382 +1896,6 @@ function warpRemoveOne(name) {
       rows.innerHTML = h;
     });
   }
-
-  /* ================= SUBS / SHOP ================= */
-  function loadSubs() {
-    getJSON('/api/subs/list').then(function (j) {
-      j = j || {};
-      V.SUBS = j;
-      renderPlans(j);
-      renderPlanCompare(j);
-      renderExtras(j);
-      renderBilling(j);
-      renderPlanWidget(j);
-      renderMyKeys(j);
-      if (j.error) {
-        V.STATS = { error: j.error };
-        renderBilling(j);
-        return;
-      }
-      getJSON('/api/stats').then(function (s) {
-        V.STATS = s && !s.error ? s : { error: (s && s.error) || 'stats' };
-        renderBilling(j);
-        renderPlanWidget(j);
-      });
-      var d = document.querySelector('#subs-count');
-      if (d && j.total !== undefined) d.textContent = j.total;
-    });
-  }
-  function renderPlans(j) {
-    var grid = $('plans-grid');
-    var load = $('plans-loading');
-    if (!grid) return;
-    var pl = j.plans || {};
-    // A-945: дефолта может не быть вовсе (тариф free удалён приказом владельца,
-    // регистрация != лицензия). Тогда ни один тариф не помечается текущим -
-    // честнее, чем подставлять несуществующий.
-    var def = j.default || '';
-    load.style.display = 'none';
-    var ids = Object.keys(pl);
-    if (!ids.length) {
-      $('plans-loading').style.display = '';
-      $('plans-loading').innerHTML = '<span class="empty"><span class="ic">💎</span>' + _t('plans.na') + '</span>';
-      return;
-    }
-    // Порядок - по цене из политики мастера, не по захардкоженным именам:
-    // мастер может добавить или убрать тариф, и витрина не должна врать.
-    ids.sort(function (a, b) {
-      var pa = (pl[a] && pl[a].price) || 0, pb = (pl[b] && pl[b].price) || 0;
-      if (pa !== pb) return pa - pb;
-      return String(a).localeCompare(String(b));
-    });
-    var h = '';
-    ids.forEach(function (id) {
-      var p = pl[id] || {};
-      var hot = p.hot;
-      var cur = id === def;
-      var feats = [];
-      if (p.bytes !== undefined) feats.push({ t: _t('plans.traffic') + bytesPlan(p.bytes), no: false });
-      if (p.devices) feats.push({ t: _t('plans.devices') + p.devices, no: false });
-      if (p.keys) feats.push({ t: _t('plans.keys') + p.keys, no: false });
-      (p.features || []).forEach(function (f) { feats.push({ t: f, no: false }); });
-      (p.features_no || []).forEach(function (f) { feats.push({ t: f, no: true }); });
-      var priceTxt = p.price != null ? (p.price === 0 ? _t('plans.free') : +p.price + ' ₽') : '—';
-      // Срок задаёт мастер: days=0 = бессрочно. Не пишем "/мес" всем подряд.
-      var term = p.days ? _t('plans.per-mo') : _t('plans.forever');
-      h += '<div class="plan' + (hot ? ' hot' : '') + (cur ? ' current' : '') + '">'
-        + '<h3>' + esc(p.name || id) + (cur ? ' <span class="chip st-act">' + _t('plans.current') + '</span>' : '') + '</h3>'
-        + '<div class="price">' + priceTxt + '<small>' + term + '</small></div>'
-        + '<ul>' + feats.map(function (f) { return '<li' + (f.no ? ' class="no"' : '') + '>' + esc(f.t) + '</li>'; }).join('') + '</ul>'
-        + '<button class="btn' + (hot ? ' gold' : '') + '" data-act="plan-buy" data-plan-id="' + esc(id) + '">' + _t('btn.buy-tg') + '</button>'
-        + '</div>';
-    });
-    grid.innerHTML = h;
-  }
-  /* Состав тарифов: таблица «функция → значение по каждому тарифу» */
-  function renderPlanCompare(j) {
-    var body = $('cmp-rows');
-    if (!body) return;
-    var table = body.parentNode && body.parentNode.parentNode;
-    var head = table ? table.querySelector('thead tr') : null;
-    var pl = (j && j.plans) || {};
-    // A-945: дефолта может не быть (триал и free удалены приказом владельца).
-    var def = (j && j.default) || '';
-    var ids = Object.keys(pl);
-    var order = { free: 0, basic: 1, prem: 2, premium: 2 };
-    ids.sort(function (a, b) { return (order[a] != null ? order[a] : 9) - (order[b] != null ? order[b] : 9); });
-    if (!ids.length) {
-      body.innerHTML = '<tr><td colspan="2"><div class="empty"><span class="ic">💎</span>' + _t('plans.na') + '</div></td></tr>';
-      return;
-    }
-    var l1 = 'Функция';
-    if (head && head.children[0]) l1 = (head.children[0].textContent || '').trim() || l1;
-    if (head) {
-      head.innerHTML = '<th>' + esc(l1) + '</th>' + ids.map(function (id) {
-        var p = pl[id] || {};
-        return '<th>' + esc(p.name || id)
-          + (id === def ? ' <span class="chip st-act">' + _t('plans.current') + '</span>' : '') + '</th>';
-      }).join('');
-    }
-    var rows = [];
-    rows.push({ k: _t('plans.per-mo'), get: function (p) { return p.price != null ? (p.price === 0 ? _t('plans.free') : fmtNum(p.price) + ' ₽') : '—'; } });
-    rows.push({ k: _t('plans.traffic'), get: function (p) { return p.bytes !== undefined ? bytesPlan(p.bytes) : '—'; } });
-    rows.push({ k: _t('plans.devices'), get: function (p) { return p.devices != null ? String(p.devices) : '—'; } });
-    rows.push({ k: _t('plans.keys'), get: function (p) { return p.keys != null ? String(p.keys) : '—'; } });
-    var allFeat = [];
-    ids.forEach(function (id) { (pl[id].features || []).forEach(function (f) { if (allFeat.indexOf(f) < 0) allFeat.push(f); }); });
-    allFeat.forEach(function (f) { rows.push({ k: f, get: function (p) { return (p.features || []).indexOf(f) >= 0 ? '✓' : '✕'; } }); });
-    var allNo = [];
-    ids.forEach(function (id) { (pl[id].features_no || []).forEach(function (f) { if (allNo.indexOf(f) < 0) allNo.push(f); }); });
-    allNo.forEach(function (f) { rows.push({ k: f, get: function (p) { return (p.features_no || []).indexOf(f) >= 0 ? '✕' : '✓'; } }); });
-    body.innerHTML = rows.map(function (r) {
-      return '<tr><td class="muted">' + esc(r.k) + '</td>' + ids.map(function (id) {
-        var v = r.get(pl[id] || {});
-        if (v === '✓') return '<td class="mono"><span class="chip st-ok">✓</span></td>';
-        if (v === '✕') return '<td class="mono"><span class="muted">✕</span></td>';
-        return '<td class="mono">' + esc(v) + '</td>';
-      }).join('') + '</tr>';
-    }).join('');
-  }
-  /* Дополнительные возможности Aurora: витрина из config.SUBS_EXTRAS */
-  /* A-111: витрина помечает PRO-фичи, гейт их прячет честно */
-  var extFeature = { whitelist: 'whitelist', adblock: 'adblock', extension: 'extension', devices: 'unlimited', traffic: 'unlimited' };
-  function renderExtras(j) {
-  /* A-164: архивы расширения раздаёт только головной сервер, поэтому кнопки
-     «Скачать» рисуем лишь для сборок, что реально есть в этом сервере. */
-  function extDownloadBox() {
-    var pkgs = (extInfo() && extInfo().packages) || [];
-    var h = '<div class="ext-dl">';
-    if (pkgs.indexOf('chrome') >= 0) {
-      h += '<button class="btn small" data-ext-download data-act="ext-download" data-target="chrome" style="display:none">'
-        + '⬇️ ' + _t('ext.dl-chrome') + '</button>';
-    }
-    if (pkgs.indexOf('edge') >= 0) {
-      h += '<button class="btn small" data-ext-download data-act="ext-download" data-target="edge" style="display:none">'
-        + '⬇️ ' + _t('ext.dl-edge') + '</button>';
-    }
-    if (pkgs.indexOf('chrome') < 0 && pkgs.indexOf('edge') < 0) {
-      h += '<small class="muted">' + _t('ext.dl-master') + '</small>';
-    }
-    return h + '</div>';
-  }
-    var box = $('feat-list');
-    if (!box) return;
-    var ex = (j && j.extras) || {};
-    var ids = Object.keys(ex);
-    if (!ids.length) {
-      /* A-109: пустой прайс - это не поломка, его пришлёт головной сервер. */
-      box.innerHTML = '<div class="empty"><span class="ic">🐾</span>' + _t('feat.master') + '</div>';
-      return;
-    }
-    box.innerHTML = ids.map(function (id) {
-      var e = ex[id] || {};
-      var price = e.price != null ? (e.price === 0 ? _t('plans.free') : fmtNum(e.price) + ' ₽') : '—';
-      var feat = extFeature[id] ? ' data-ext-feature="' + extFeature[id] + '"' : '';
-      return '<div class="feature"' + feat + '>'
-        + '<div class="f-ic">✨</div>'
-        + '<div class="f-body">'
-        + '<div class="f-name">' + esc(e.name || id) + '</div>'
-        + (e.note ? '<div class="f-desc">' + esc(e.note) + '</div>' : '')
-        + '<button class="btn small" style="margin-top:8px" data-act="feature-buy" data-feature-id="' + esc(id) + '">' + _t('btn.buy-tg') + '</button>'
-        /* A-161: расширение отдаёт сервер по подписке (триал или PRO) */
-        + (id === 'extension' ? extDownloadBox() : '')
-        + '</div>'
-        + '<span class="pro-tag" style="display:none">' + _t('ext.head') + '</span>'
-        + '<div class="f-price">' + esc(price) + (e.unit ? '<br><small>' + esc(e.unit) + '</small>' : '') + '</div>'
-        + '</div>';
-    }).join('');
-  }
-  /* Оплата и продление: форма владельца (контракт мастер-панели) */
-  function renderPlanWidget(j) {
-    // A-945: тарифа по умолчанию может не быть - показываем честное «—».
-    var cur = j.default || '';
-    if (j.plans) { $('plan-st').textContent = cur || '—'; var pn = (j.plans[cur] || {}).name || cur || '—'; $('plan-name').textContent = pn; $('pill-plan').textContent = '💎 ' + (cur || '—'); }
-    var active = (j.subs || []).find(function (s) { return s.access_ok === true || s.access_status === 'ok'; });
-    $('w-plan-body').innerHTML = _t('w.plan') + ' <b>' + esc(active ? (active.plan || cur) : cur) + '</b>'
-      + (active && active.expires ? ' · до ' + fmtDate(active.expires) : '');
-  }
-  function renderBilling(j) {
-    // A-945: тарифа по умолчанию может не быть.
-    var cur = j.default || '';
-    var subs = j.subs || [];
-    var active = subs.find(function (s) { return s.access_ok === true || s.access_status === 'ok'; });
-    var stats = V.STATS && !V.STATS.error ? V.STATS : null;
-    var payments = (stats && (Array.isArray(stats.payments) ? stats.payments : (Array.isArray(stats.recent_payments) ? stats.recent_payments : []))) || [];
-    $('bill-plan').textContent = active ? (active.plan || cur) : cur;
-    $('bill-until').textContent = active && active.expires ? fmtDate(active.expires) : '—';
-    $('bill-traffic').textContent = (active && active.used_bytes != null)
-      ? fmtB(active.used_bytes) + (active.limit_bytes ? ' / ' + fmtB(active.limit_bytes) : '')
-      : (j.used_bytes != null ? fmtB(j.used_bytes) : '—');
-    $('bill-active').textContent = stats && stats.active != null ? String(stats.active) : String(subs.filter(function (s) { return s.access_ok === true || s.access_status === 'ok'; }).length);
-    $('bill-income').textContent = stats && stats.income_month != null ? fmtNum(stats.income_month) + ' ₽' : '—';
-    $('bill-traffic-month').textContent = stats && stats.traffic_month != null ? fmtB(stats.traffic_month) : '—';
-    var rows = $('bill-rows');
-    if (!rows) return;
-    if (!payments.length) { rows.innerHTML = '<tr><td colspan="4"><div class="empty"><span class="ic">💳</span>' + _t('bill.empty') + '</div></td></tr>'; return; }
-    rows.innerHTML = payments.map(function (p) {
-      var date = p.paid_at || p.created_at || 0;
-      var desc = p.plan_name || p.plan || p.name || '—';
-      if (p.name && p.plan_name) desc += ' · ' + p.name;
-      var amount = p.amount != null ? fmtNum(p.amount) + (p.currency ? ' ' + p.currency : '') : '—';
-      var status = p.operation || p.state || 'paid';
-      return '<tr>'
-        + '<td class="mono">' + (date ? fmtDate(date) : '—') + '</td>'
-        + '<td class="mono">' + esc(desc) + '</td>'
-        + '<td class="mono">' + esc(amount) + '</td>'
-        + '<td class="mono">' + esc(status) + '</td>'
-        + '</tr>';
-    }).join('');
-  }
-
-  /* ================= MY KEYS (A-110: устройство = купленный ключ) ========== */
-  function renderMyKeys(j) {
-    var box = $('mykeys-list');
-    if (!box) return;
-    var rows = (j && j.subs) || [];
-    var cnt = $('mykeys-count');
-    if (cnt) cnt.textContent = String(rows.length);
-    if (!rows.length) {
-      box.innerHTML = '<div class="empty"><span class="ic">🔑</span>' + _t('myk.empty') + '</div>';
-      return;
-    }
-    var plans = (j && j.plans) || {};
-    var h = '';
-    rows.forEach(function (s, idx) {
-      var keys = s.keys || [];
-      var lim = s.limit_devices || 0;
-      var planName = (plans[s.plan] || {}).name || s.plan || '—';
-      var ok = s.access_ok === true;
-      var traffic;
-      if (s.limit_bytes) traffic = fmtB(s.used_bytes) + ' / ' + fmtB(s.limit_bytes);
-      else if (s.used_bytes) traffic = fmtB(s.used_bytes) + ' · ' + _t('myk.unlim');
-      else traffic = _t('myk.unlim');
-      var why = ok ? '' : ' <span class="chip st-dim">' + esc(s.access_reason || s.access_state || '—') + '</span>';
-      h += '<div class="feature">'
-        + '<div class="f-ic">' + (ok ? '🔑' : '⏳') + '</div>'
-        + '<div class="f-body">'
-        + '<div class="f-name">' + esc(planName) + (s.name ? ' · ' + esc(s.name) : '') + why + '</div>'
-        + '<div class="f-desc">' + _t('myk.until') + ': <b>' + (s.expires ? fmtDate(s.expires) : '—') + '</b>'
-        + ' · ' + _t('myk.traffic') + ': <b>' + esc(traffic) + '</b>'
-        + ' · ' + _t('myk.devices') + ': <b>' + keys.length + (lim ? ' / ' + lim : '') + '</b></div>'
-        + '<div class="cmd-row" style="margin-top:8px">'
-        + '<select data-plat="' + idx + '" style="flex:1;min-width:150px">'
-        + '<option value="iphone">iPhone / iPad</option>'
-        + '<option value="android">Android</option>'
-        + '<option value="pc">ПК · v2rayN / Nekoray</option>'
-        + '<option value="router">Роутер</option></select>'
-        + '<button class="btn small" data-act="sub-how" data-sub-idx="' + idx + '">📋 <span data-i18n="myk.how">Инструкция</span></button>'
-        + '</div>'
-        + '<div class="how-box" id="how-' + idx + '" style="display:none;margin-top:8px"></div>'
-        + '</div>'
-        + '<div class="f-price">' + (s.expires ? esc(fmtDate(s.expires)) : '') + '</div>'
-        + '</div>';
-    });
-    box.innerHTML = h;
-  }
-  function subCopy(which) {
-    var el = which === 'sub' ? $('how-sub-' + CFG._howIdx) : $('how-link-' + CFG._howIdx);
-    var v = el ? (el.value || el.textContent || '') : '';
-    if (!v) { toast(_t('copy.link-na'), false); return; }
-    var done = function () { toast(_t('myk.copy-ok'), true); };
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(v).then(done).catch(function () { legacyCopy(v, done); });
-    } else { legacyCopy(v, done); }
-  }
-  window.subCopy = subCopy;
-  window.subHow = function (t) {
-    var idx = t.getAttribute('data-sub-idx') || '0';
-    CFG._howIdx = idx;
-    var j = V.SUBS || {};
-    var s = (j.subs || [])[Number(idx)];
-    var box = $('how-' + idx);
-    if (!s || !box) { toast(_t('myk.empty'), false); return; }
-    var sel = document.querySelector('[data-plat="' + idx + '"]');
-    var platform = sel ? sel.value : 'pc';
-    box.style.display = '';
-    box.innerHTML = '<span class="muted">' + _t('log.loading') + '</span>';
-    postJSON('/api/subs/device/instructions', {
-      uid: s.uid || '',
-      key_handle: (s.keys && s.keys[0] && s.keys[0].key_handle) || '',
-      platform: platform
-    }, authHdr()).then(function (r) {
-      if (!r || r.ok === false) {
-        box.innerHTML = '<span class="muted">' + esc((r && r.error) || _t('t.err-gen')) + '</span>';
-        return;
-      }
-      var link = r.vless || r.sub_url || '';
-      var html = '<pre class="logbox" style="white-space:pre-wrap;margin:0 0 8px">' + esc(r.text || '') + '</pre>';
-      if (link) {
-        html += '<div class="cmd-row">'
-          + '<input type="text" readonly class="mono" id="how-link-' + idx + '" value="' + esc(link) + '">'
-          + '<button class="btn small ghost" data-act="sub-copy" data-copy-what="link">📋 <span data-i18n="myk.copy">Скопировать ссылку</span></button>'
-          + '</div><div class="qr-box" id="how-qr-' + idx + '"></div>';
-      }
-      box.innerHTML = html;
-      if (link) qrRender($('how-qr-' + idx), r.qr || link, 2);
-    }).catch(function (e) {
-      box.innerHTML = '<span class="muted">' + esc(String((e && e.message) || e)) + '</span>';
-    });
-  };
-
-  /* ================= PRO-GATE (A-111) =================
-     Сервер и прокси открыты всегда. Гейт прячет только PRO-фичи:
-     обход «Белого списка», безлимитные устройства/трафик, блок рекламы. */
-  function extInfo() { return (V.S && V.S.ext) || {}; }
-  function extBuy() {
-    var e = extInfo();
-    var url = e.buy_url || (V.S && V.S.buy_url) || '';
-    if (!url) { toast(_t('ext.na'), false); return; }
-    if (url.indexOf('t.me/') < 0 && url.indexOf('http') !== 0) url = 'https://t.me/' + url.replace(/^[@\/]+/, '');
-    window.open(url, '_blank', 'noopener');
-  }
-  function applyExtGate() {
-    var e = extInfo();
-    var pro = !!e.is_pro;
-    /* A-161: триал (free, активная подписка) открывает расширение
-       и блок рекламы, но не «Белый список» и безлимиты. */
-    var trial = !pro && !!e.ok && (e.state === 'ok' || e.state === 'free');
-    Array.prototype.forEach.call(document.querySelectorAll('[data-ext-feature]'), function (el) {
-      var f = el.getAttribute('data-ext-feature') || '';
-      var open = pro || (trial && (f === 'extension' || f === 'adblock'));
-      var b = el.querySelector('.pro-tag');
-      if (open) {
-        el.classList.remove('pro-lock');
-        if (b) b.style.display = 'none';
-      } else {
-        el.classList.add('pro-lock');
-        if (b) b.style.display = '';
-        el.setAttribute('title', _t('ext.locked'));
-      }
-      /* A-161: кнопки «Скачать» — только при активной подписке */
-      Array.prototype.forEach.call(el.querySelectorAll('[data-ext-download]'), function (d) {
-        d.style.display = open ? '' : 'none';
-      });
-    });
-    /* A-161: карточка статуса лицензии — её было недало статья
-       вообще после A-112 (карточка осталась статичной). */
-    var card = $('ext-card');
-    if (!card) return;
-    card.style.display = '';
-    var badge = $('ext-badge'), text = $('ext-text'), buy = $('ext-buy');
-    var st = e.state || 'unknown';
-    if (badge) {
-      badge.textContent = pro ? '🐱' : (trial ? '🐈' : (st === 'expired' ? '😻' : '🐾'));
-      badge.className = 'f-ic' + (pro || trial ? '' : ' dim');
-    }
-    if (text) {
-      if (pro) text.textContent = _t('ext.pro');
-      else if (trial) text.textContent = _t('ext.trial');
-      else if (st === 'expired') text.textContent = _t('ext.expired');
-      else if (st === 'blocked' || st === 'unknown' || st === 'slow_down') text.textContent = _t('ext.locked');
-      else text.textContent = _t('ext.na');
-      if (e.offline) text.textContent += ' ' + _t('ext.offline');
-    }
-    if (buy) buy.style.display = (pro || trial) ? 'none' : '';
-  }
-  /* A-161: скачивание архива расширения по подписке (сервер сам проверяет гейт) */
-  function extDownload(target) {
-    var t = (target || 'chrome').toLowerCase();
-    if (t !== 'chrome' && t !== 'edge') { toast(_t('t.err-gen'), false); return; }
-    var a = document.createElement('a');
-    a.href = '/api/ext/download?target=' + encodeURIComponent(t);
-    a.rel = 'noopener';
-    a.download = '';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  }
-  window.extDownload = extDownload;
-  function loadExt() {
-    return getJSON('/api/ext/license').then(function (j) {
-      if (!j) return null;
-      if (V.S) V.S.ext = j;
-      applyExtGate();
-      return j;
-    }).catch(function () { return null; });
-  }
-  window.extBuy = extBuy;
-  window.loadExt = loadExt;
 
   /* ================= TGWS ================= */
   /* A-100: qr.js — это qrcode-generator, у него нет toCanvas().
@@ -2734,8 +1988,6 @@ function loadTG() {
       $('set-name').value = nm;
       var stMesh = $('set-st-mesh');
       if (stMesh) { stMesh.textContent = (s.show_mesh !== false) ? _t('sec.on') : _t('sec.off'); stMesh.className = 'chip ' + ((s.show_mesh !== false) ? 'st-ok' : 'st-dim'); }
-      var stSubs = $('set-st-subs');
-      if (stSubs) { stSubs.textContent = (s.show_subs !== false) ? _t('sec.on') : _t('sec.off'); stSubs.className = 'chip ' + ((s.show_subs !== false) ? 'st-ok' : 'st-dim'); }
     });
   }
 
@@ -3222,7 +2474,6 @@ function loadTG() {
     if (t === 'logs') loadLog();
     if (t === 'update' || t === 'versions') { loadUpdate(); if (t === 'versions') loadVersions(); }
     if (t.indexOf('mesh') === 0 || t === 'mesh-topo' || t === 'mesh-routes') { loadMesh(); if (t === 'mesh-routes') loadRoutes(); }
-    if (t === 'shop-plans' || t === 'shop-billing') loadSubs();
     if (t === 'settings') loadSettings();
     if (t === 'security') loadSecurity();
     if (t === 'tgws') loadTG();
@@ -3280,31 +2531,6 @@ function loadTG() {
     b.classList.toggle('primary', CFG.ruFailOnly);
     b.textContent = CFG.ruFailOnly ? _t('ru.failonly-on') : _t('ru.failonly');
     renderRu(V.S || {});
-  };
-  window.policyShow = function (ro) {
-    if (V.S && V.S.setup_complete === false) return;
-    var s = $('policy-screen');
-    if (!s) return;
-    s.style.display = '';
-    var ab = $('policy-accept-btn');
-    if (!V.S || !(V.S.policy_rev > (V.S.policy_accepted_rev || 0))) {
-      if (ab) ab.style.display = 'none';
-    } else if (ab) {
-      ab.style.display = '';
-    }
-  };
-  window.policyAccept = function () {
-    var S = V.S || {};
-    postJSON('/api/policy/accept', { rev: (S.policy_rev || 0) }).then(function (j) {
-      if (j && j.ok) {
-        CFG.policyOnce = true;
-        $('policy-screen').style.display = 'none';
-        toast('OK 🐾', true);
-        loadState(true);
-      } else {
-        toast((j && j.error) || _t('t.err-gen'), false);
-      }
-    });
   };
   window.regionsSave = function () {
     var sel = $('rg-sel');
@@ -3446,24 +2672,6 @@ function loadTG() {
   window.updSave = function () {
     toast(_t('upd.admin'), true);
   };
-  function tgBuy(start) {
-    var st = V.S || {};
-    var url = st.buy_url || st.buy_bot || '';
-    if (!url) return false;
-    if (url.indexOf('t.me/') < 0) url = 'https://t.me/' + url.replace(/^[@\/]+/, '');
-    if (start) url += (url.indexOf('?') < 0 ? '?' : '&') + 'start=' + encodeURIComponent(start);
-    window.open(url, '_blank', 'noopener');
-    return true;
-  }
-  window.buyPlan = function (id) {
-    if (tgBuy('buy' + (id ? '_' + id : ''))) return;
-    toast(id ? (_t('plans.buy') + id + _t('plans.buy2')) : _t('plans.admin'), true);
-  };
-  window.buyFeature = function (id) {
-    if (tgBuy('feature' + (id ? '_' + id : ''))) return;
-    toast(id ? (_t('feat.buy') + id + _t('feat.buy2')) : _t('feat.admin'), true);
-  };
-
   var SETUP = { step: 0, values: {}, shown: false };
   function setupError(message) {
     var el = $('setup-error');
@@ -3481,7 +2689,6 @@ function loadTG() {
     return {
       lang: $('setup-lang') ? $('setup-lang').value : 'ru',
       theme: $('setup-theme') ? $('setup-theme').value : '',
-      policy_accepted: !!($('setup-policy-ok') && $('setup-policy-ok').checked),
       name: $('setup-name') ? $('setup-name').value.trim() : '',
       password: $('setup-password') ? $('setup-password').value : '',
       pin: $('setup-pin') ? $('setup-pin').value.trim() : '',
@@ -3492,7 +2699,6 @@ function loadTG() {
       xray_port: $('setup-xray-port') ? $('setup-xray-port').value.trim() : '',
       xray_api_port: $('setup-xray-api-port') ? $('setup-xray-api-port').value.trim() : '',
       tgws_port: $('setup-tgws-port') ? $('setup-tgws-port').value.trim() : '',
-      mesh_invite: $('setup-mesh') ? $('setup-mesh').value.trim() : '',
       setup_token: $('setup-token') ? $('setup-token').value.trim() : '',
       warp_transport: (document.querySelector('input[name="setup-warp"]:checked') || {}).value || 'off'
     };
@@ -3502,7 +2708,6 @@ function loadTG() {
     var d = setupRead();
     if (all || SETUP.step === 0) {
       if (!$('setup-theme') || !d.theme) return 'Выберите тему';
-      if (!d.policy_accepted) return 'Примите условия использования';
     }
     if ((all || SETUP.step === 1) && (!d.name || d.name.length > 80)) return 'Имя сервера: 1–80 символов';
     if ((all || SETUP.step === 2) && (d.password.length < 12 || d.password.length > 256 || /\s/.test(d.password))) return 'Пароль: 12–256 символов без пробелов';
@@ -3522,21 +2727,18 @@ function loadTG() {
         used[n] = true;
       }
     }
-    if (d.mesh_invite && d.mesh_invite.indexOf('aurora://invite?') !== 0) {
-      return 'Invite: нужен формат aurora://invite?...';
-    }
     return '';
   }
 
   function setupRender() {
     var step = SETUP.step;
     var pr = $('setup-progress');
-    if (pr) pr.textContent = (step + 1) + '/8';
+    if (pr) pr.textContent = (step + 1) + '/7';
     Array.prototype.forEach.call(document.querySelectorAll('[data-setup-step]'), function (n) {
       n.style.display = Number(n.getAttribute('data-setup-step')) === step ? '' : 'none';
     });
     $('setup-back').style.display = step === 0 ? 'none' : '';
-    var last = step === 7;
+    var last = step === 6;
     $('setup-next').style.display = last ? 'none' : '';
     $('setup-finish').style.display = last ? '' : 'none';
   }
@@ -3548,9 +2750,6 @@ function loadTG() {
     SETUP.step = 0;
     var lang = $('setup-lang'); if (lang) lang.value = langNow();
     var th = $('setup-theme'); if (th) th.value = 'light';
-    var pol = $('setup-policy-text'); if (pol) pol.textContent = V.S.policy_text || '';
-    var pok = $('setup-policy-ok');
-    if (pok) pok.checked = !!(V.S.policy_rev && (V.S.policy_accepted_rev || 0) >= V.S.policy_rev);
     var nm = $('setup-name'); if (nm && !nm.value) nm.value = V.S.server_name || '';
     var lan = $('setup-lan'); if (lan) lan.checked = true;
     var sc = $('setup-scanners'); if (sc) sc.checked = true;
@@ -3579,7 +2778,6 @@ function loadTG() {
       server_name: d.name,
       password: d.password,
       pin: d.pin,
-      policy_rev: (V.S && V.S.policy_rev) || 0,
       ui_port: setupPort('ui_port', d.ui_port),
       xray_port: setupPort('xray_port', d.xray_port),
       xray_api_port: setupPort('xray_api_port', d.xray_api_port),
@@ -3587,7 +2785,6 @@ function loadTG() {
       lan_only: d.lan_only,
       block_scanners: d.block_scanners,
       rate_limit: d.rate_limit,
-      mesh_invite: d.mesh_invite,
       setup_token: d.setup_token,
       warp_transport: d.warp_transport
     }).then(function (r) {
@@ -3612,22 +2809,7 @@ function loadTG() {
     var err = setupValidate();
     if (err) { $('setup-error').textContent = err; return; }
     $('setup-error').textContent = '';
-    if (SETUP.step === 0 && V.S && V.S.policy_rev && (V.S.policy_accepted_rev || 0) < V.S.policy_rev) {
-      $('setup-next').disabled = true;
-      postJSON('/api/policy/accept', { rev: V.S.policy_rev }).then(function (r) {
-        if (!r || r.ok !== true) throw new Error((r && r.error) || 'Ошибка');
-        V.S.policy_accepted_rev = V.S.policy_rev;
-        V.S.policy_required = false;
-        SETUP.step = Math.min(7, SETUP.step + 1);
-        setupRender();
-      }).catch(function (e) {
-        $('setup-error').textContent = (e && e.message) || 'Ошибка';
-      }).then(function () {
-        $('setup-next').disabled = false;
-      });
-      return;
-    }
-    SETUP.step = Math.min(7, SETUP.step + 1);
+    SETUP.step = Math.min(6, SETUP.step + 1);
     setupRender();
   }
 
@@ -3668,9 +2850,6 @@ function loadTG() {
     toast: function (t) { toast(t.getAttribute('data-msg') || '', true); },
     lang: function (t, ev) { setLang(((ev && ev.target && ev.target.value) || t.value || 'ru')); },
     'key-activate': function (t) { window.setActive(t.getAttribute('data-tag') || ''); },
-    'plan-buy': function (t) { var id = t.getAttribute('data-plan-id'); if (id) window.buyPlan(id); else window.buyPlan(); },
-    'policy-open': function (t) { window.policyShow(t.getAttribute('data-force') === '1'); },
-    'policy-accept': function () { window.policyAccept(); },
     'update-start': function () { window.startUpdate(); },
     'update-save': function () { window.updSave(); },
     'update-check': function () { window.checkUpdate(); },
@@ -3686,7 +2865,6 @@ function loadTG() {
     'mesh-leave': function () { window.meshLeave(); },
     'mesh-regen': function () { window.meshRegen(); },
     'mesh-refresh': function () { window.meshRefresh(); },
-    'mesh-policy-save': function () { window.meshPolicySave(); },
     'settings-save': function () { window.settingsSave(); },
     'invite-copy': function () { window.inviteCopy(); },
     'sec-login': function () { window.secLogin(); },
@@ -3694,12 +2872,7 @@ function loadTG() {
     'sec-2fa-on': function () { window.secTwofaEnable(); },
     'sec-2fa-off': function () { window.secTwofaDisable(); },
     'sec-rotate': function () { window.secRotate(); },
-    'feature-buy': function (t) { window.buyFeature(t.getAttribute('data-feature-id') || ''); },
     'tg-copy': function (t) { window.tgCopy(t.getAttribute('data-copy') || 'link'); },
-    'sub-how': function (t) { window.subHow(t); },
-    'sub-copy': function (t) { subCopy(t.getAttribute('data-copy-what') || 'link'); },
-    'ext-buy': function () { window.extBuy(); },
-    'ext-download': function (t) { window.extDownload(t.getAttribute('data-target') || 'chrome'); },
     'log-load': function () { window.loadLog(); },
     // A-WARP-PUB: rezervnyj kanal WARP
     'warp-probe': function () { warpProbe(); },
@@ -3713,7 +2886,7 @@ function loadTG() {
     // A-828: vybor fayla. Bez etogo akta sobytie 'change' na #warp-file
     // ne dohodilo ni do odnogo obrabotchika: warpOnFile() byla napisana,
     // no ne vyzyvalasya, i knopka "Zagruzit" molchala posle vybora.
-    // A-839: kak na mastere - pryamoy vyzyov warpUpload(), kotoryy
+    // A-839: pryamoy vyzyov warpUpload(), kotoryy
     // otkryvaet dialog nativno. Label (A-837) u menya dialog ne
     // otkryval, vozvrayom button + inp.click().
     'warp-upload': function () { warpUpload(); },
@@ -3815,7 +2988,6 @@ function loadTG() {
   function setVis(el, on) { if (el) el.style.display = on ? '' : 'none'; }
   function applyFlags(S) {
     var meshOn = (S.show_mesh !== false);
-    var subsOn = (S.show_subs !== false);
     setVis($('g-mesh'), meshOn);
     setVis($('meshm'), meshOn);
     setVis($('dash-mesh-widget'), meshOn);
@@ -3823,33 +2995,7 @@ function loadTG() {
     setVis($('pill-mesh'), meshOn);
     var wm = $('w-mesh-st');
     if (wm) setVis(wm.parentElement, meshOn);
-    setVis($('g-shop'), subsOn);
-    setVis($('planm'), subsOn);
-    setVis($('dash-plan-widget'), subsOn);
-    setVis($('pill-plan'), subsOn);
   }
-  function renderMeshPolicy(S) {
-    var card = $('mesh-policy-card');
-    if (S.mesh_master) {
-      if (card) setVis(card, true);
-      if (!$('m-master') || !$('m-show-mesh') || !$('m-show-subs')) return;
-      $('m-master').checked = !!S.mesh_master;
-      $('m-show-mesh').checked = (S.show_mesh !== false);
-      $('m-show-subs').checked = (S.show_subs !== false);
-    } else if (card) {
-      setVis(card, false);
-    }
-  }
-  window.meshPolicySave = function () {
-    postJSON('/api/settings/save', {
-      mesh_master: $('m-master').checked,
-      show_mesh: $('m-show-mesh').checked,
-      show_subs: $('m-show-subs').checked
-    }).then(function (j) {
-      toast((j && j.ok) ? _t('mesh.policy-saved') : ((j && j.error) || _t('set.save-err')), !!(j && j.ok));
-    });
-  };
-
   function init() {
     try {
       var th = localStorage.getItem(LS.theme) || 'dark';
@@ -3863,18 +3009,11 @@ function loadTG() {
     navTo(CFG.tab || 'status', true);
     bindActions();
     loadState();
-    var subsTask = loadSubs();
-    if (subsTask && typeof subsTask.then === 'function') {
-      subsTask.then(function () { return 0; });
-    }
-    loadExt();  // A-111: лицензия PRO (не блокирует панель)
     loadUpdate();
     setInterval(function () { loadState(true); }, 5000);
-    setInterval(loadExt, 3600000);
     setInterval(function () { loadUpdate(); }, 30000);
     setInterval(function () { if (CFG.tab === 'logs') loadLog(); }, 10000);
     setInterval(function () { if (CFG.tab === 'service') loadService(); }, 6000);
-    setInterval(function () { if (CFG.tab === 'shop-plans' || CFG.tab === 'shop-billing') loadSubs(); }, 15000);
     var orig = loadState;
     loadState = function (soft) { orig(soft); };
   }

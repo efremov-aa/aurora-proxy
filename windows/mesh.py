@@ -25,6 +25,11 @@ _LOCK = threading.RLock()
 _NODES = []
 
 MAX_NODES = 256
+# A-827 (Ш8): галки прав узла. ВСЕ три по умолчанию ВЫКЛ — владелец сам
+# решает, можно ли через узел гнать чужой трафик и пускать ли к нему.
+#   allow_relay — «разрешить гнать мой трафик» (узел работает релем для других)
+#   allow_lan   — «разрешить доступ к моей Aurora» (трафик к своей локалке)
+#   no_relay   — узел вообще никогда не рель (hub/test помечены заранее)
 OPTIN_FLAGS = ("allow_relay", "allow_lan", "no_relay")
 OPTIN_DEFAULTS = {"allow_relay": False, "allow_lan": False, "no_relay": False}
 PING_WORKERS = 32
@@ -38,48 +43,28 @@ _PING_EVENT = None
 _PING_CACHE = []
 _PING_CACHE_AT = 0.0
 _PING_GENERATION = 0
-_POLICY_STARTED = False
 
 
 INVITE_TTL_S = 300
 MAX_INVITE_CHALLENGES = 1024
-MAX_POLICY_BYTES = 64 * 1024
-MAX_CATALOG_BYTES = 32 * 1024  # A-109: каталог цен и описаний от мастера
-_CATALOG_FIELDS = ("catalog", "buy_url", "master_id")
-_CATALOG_MARK = ""
-_POLICY_ENTITLEMENTS = []   # A-945/M16: UID узлов с правом на меш из подписанной политики
+_INVITE_FIELDS = ("invite_version", "issuer", "token", "challenge", "host",
+                  "port", "policy_port", "name", "issued_at", "expires_at")
 
 def policy_entitlements():
-    """Список UID узлов, которым мастер выдал право на меш (из mesh_entitlements
-    политики, подпись уже проверена в _policy_valid). Пусто — права ни у кого."""
-    return list(_POLICY_ENTITLEMENTS)
+    """Совместимость с панелью: отдельных прав больше нет, всё локальное."""
+    return []
 
 
 def has_mesh(uid):
-    """A-945/M18: право узла с данным uid на меш, по подписанной политике мастера.
+    """Все локальные пиры имеют право на меш."""
+    return bool(str(uid or "").strip())
 
-    М16 уже прочитала mesh_entitlements из политики (подпись Ed25519 проверена
-    в _policy_valid). Здесь только сверка uid — без угадываний, без сетевых
-    вызовов, без состояния вне политики."""
-    if not uid:
-        return False
-    return str(uid) in _POLICY_ENTITLEMENTS
-_POLICY_MAX_NONCES = 256
-_POLICY_NONCES = {}
-_POLICY_NONCES_LOCK = threading.Lock()
-_POLICY_FIELDS = ("policy_version", "master_id", "master", "show_mesh",
-                  "show_subs", "issued_at", "expires_at", "nonce")
-_INVITE_FIELDS = ("invite_version", "issuer", "token", "challenge", "host",
-                  "port", "policy_port", "name", "issued_at", "expires_at")
 INVITE_USED_FILE = os.path.join(config.DATA_DIR, "mesh_invite_used.json")
 
 
-# --- A-265 (вариант Б): корень своей подсети ---------------------------------
-# Публичная сборка НИКОГДА не бывает головным сервером меша: mesh_master жёстко
-# False, политику мастера она только читает. Но корень своей подсети ей можно:
-# приглашение подписывается ОТДЕЛЬНЫМ локальным ключом, а не мастерским ключом
-# политики, поэтому такой invite не принимает настоящий мастер и не выдаёт узлу
-# прав головного. Ключ и идентификатор лежат в data/mesh_local.json (0600).
+# --- корень своей локальной подсети -----------------------------------------
+# Приглашение подписывается локальным ключом подсети. Ключ и идентификатор
+# лежат в data/mesh_local.json (0600). Внешних серверов и ролей здесь нет.
 MESH_LOCAL_FILE = os.path.join(config.DATA_DIR, "mesh_local.json")
 _LOCAL_ID_RE = re.compile(r"[a-z0-9][a-z0-9-]{2,63}")
 
@@ -137,51 +122,13 @@ def _local_token():
     return ""
 
 
-def _is_master_build():
-    """A-266: в клиентской сборке роли "master" нет (она есть только у
-    мастера). Роль берём из env честно: пусто - узел, и приглашение выпускаем."""
-
-    if str(os.environ.get("AURORA_MESH_MASTER", "") or "").strip():
-        return True
-    return str(os.environ.get("AURORA_ROLE", "") or "").strip().lower() == "master"
-
-
 def _invite_expected_key(issuer):
-    """Ключ подписи по домену: мастерский - для приглашений мастера, локальный - для своих."""
+    """Принимаем только приглашения своей локальной подсети."""
     issuer = str(issuer or "").strip().lower()
-    if issuer:
-        master_id = _policy_master_id()
-        if master_id and issuer == master_id.strip().lower():
-            return _policy_key()
-        local_id, local_key = _local_issuer()
-        if local_id and issuer == local_id:
-            return local_key
+    local_id, local_key = _local_issuer()
+    if local_id and issuer == local_id:
+        return local_key
     return ""
-
-
-def _policy_key():
-    try:
-        key = str(config.mesh_policy_key() or "")
-    except Exception:
-        return ""
-    return key if len(key.encode("utf-8")) >= 32 else ""
-
-
-def _policy_master_id():
-    try:
-        value = str(config.mesh_master_id() or "")
-    except Exception:
-        value = ""
-    if not value:
-        # A-945: без env-ключа мастер узнаётся по закреплённому в сборке id.
-        # Это публичное значение, подделать подпись им нельзя.
-        value = str(getattr(config, "MASTER_ID", "") or "")
-    if not value or len(value) > 64:
-        return ""
-    for ch in value:
-        if not (ch.isalnum() or ch in "._-"):
-            return ""
-    return value
 
 
 def _canonical_bytes(core):
@@ -201,144 +148,9 @@ def _invite_bytes(core):
     return _signed_bytes(core, _INVITE_FIELDS)
 
 
-def _invite_signature(core, key=None):
-    secret = key or _policy_key()
-    return _hmac_hex(secret, _invite_bytes(core)) if secret else ""
-
-
-def _policy_signature(core, key=None):
-    secret = key or _policy_key()
-    if secret:
-        return _hmac_hex(secret, _signed_bytes(core, _POLICY_FIELDS))
-    return ""
-
-
-# --- A-945: проверка подписи мастера ключом, закреплённым в сборке ------------
-# Политика и каталог подписаны Ed25519-ключом мастера поверх тех же канонических
-# байт, что и HMAC. HMAC оставлен для совместимости со старым мастером, но узлу
-# с закреплённым ключом он не нужен: общий секрет в публичной сборке означал бы,
-# что поддельную политику составит кто угодно.
-_ED_PUBKEY_BYTES = None
-_ED_PUBKEY_LOCK = threading.Lock()
-
-
-def _ed_pubkey():
-    """Закреплённый открытый ключ мастера (32 байта) или пустой."""
-    global _ED_PUBKEY_BYTES
-    with _ED_PUBKEY_LOCK:
-        if _ED_PUBKEY_BYTES is None:
-            raw = str(getattr(config, "MASTER_ED_PUBKEY", "") or "").strip()
-            try:
-                value = base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4))
-            except Exception:
-                value = b""
-            _ED_PUBKEY_BYTES = value if len(value) == 32 else b""
-        return _ED_PUBKEY_BYTES
-
-
-def _ed_decode(value, size):
-    """base64url без padding -> bytes нужной длины, иначе None."""
-    raw = str(value or "").strip()
-    if not raw:
-        return None
-    try:
-        out = base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4))
-    except Exception:
-        return None
-    return out if len(out) == size else None
-
-
-def _ed_signed_core_ok(value, fields, signature):
-    """Подпись мастера над каноническими байтами value[fields]."""
-    pub = _ed_pubkey()
-    if not pub or not isinstance(value, dict):
-        return False
-    try:
-        import release_sign
-    except Exception:
-        return False
-    sig = _ed_decode(signature, 64)
-    if sig is None:
-        return False
-    try:
-        return bool(release_sign.verify(pub, _signed_bytes(value, fields), sig))
-    except Exception:
-        return False
-
-
-def _ed_policy_ok(value):
-    """Подпись политики Ed25519. Ключ из ответа - не доверие: сверяем с закреплённым,
-    иначе подмена ключа и подмена данных шли бы одной подписью."""
-    pub = _ed_pubkey()
-    if not pub:
-        return False
-    claimed = str(value.get("ed_pubkey") or "").strip()
-    pinned = str(getattr(config, "MASTER_ED_PUBKEY", "") or "").strip()
-    if not claimed or not hmac.compare_digest(claimed, pinned):
-        return False
-    return _ed_signed_core_ok(value, _POLICY_FIELDS, value.get("ed25519_signature"))
-
-
-def _ed_entitlements_ok(value):
-    """Проверяет подпись списка прав на mesh от закреплённого мастера."""
-    pub = _ed_pubkey()
-    if not pub or not isinstance(value, dict):
-        return False
-    pinned = str(getattr(config, "MASTER_ED_PUBKEY", "") or "").strip()
-    claimed = str(value.get("ed_pubkey") or "").strip()
-    if not claimed or not hmac.compare_digest(claimed, pinned):
-        return False
-    ents = value.get("mesh_entitlements")
-    if not isinstance(ents, list) or len(ents) > 4096:
-        return False
-    if any(not isinstance(uid, str) or not uid.strip() for uid in ents):
-        return False
-    signed = {"policy": {field: value.get(field) for field in _POLICY_FIELDS},
-              "mesh_entitlements": sorted(set(ents))}
-    sig = _ed_decode(value.get("mesh_entitlements_signature"), 64)
-    if sig is None:
-        return False
-    try:
-        import release_sign
-        payload = json.dumps(signed, sort_keys=True, separators=(",", ":"),
-                             ensure_ascii=True).encode("utf-8")
-        return bool(release_sign.verify(pub, payload, sig))
-    except Exception:
-        return False
-
-
-def _ed_catalog_ok(value):
-    """Подпись каталога (цены и описания) тем же ключом мастера."""
-    pub = _ed_pubkey()
-    if not pub or not isinstance(value.get("catalog"), dict):
-        return False
-    claimed = str(value.get("ed_pubkey") or "").strip()
-    pinned = str(getattr(config, "MASTER_ED_PUBKEY", "") or "").strip()
-    if not claimed or not hmac.compare_digest(claimed, pinned):
-        return False
-    core = {"catalog": value.get("catalog"), "buy_url": value.get("buy_url"),
-            "master_id": value.get("master_id")}
-    return _ed_signed_core_ok(core, _CATALOG_FIELDS, value.get("catalog_ed25519"))
-
-
-def _policy_trusted(value):
-    """Политика настоящая, если подпись мастера сошлась.
-
-    Мастер с ключом Ed25519 проверяется ТОЛЬКО им: если подпись есть, но не
-    сходится - отказ, а не откат на HMAC (иначе снятие ed-подписи было бы
-    обходом проверки). HMAC остаётся для старого мастера без ed-подписи.
-    """
-    if not isinstance(value, dict):
-        return False
-    if value.get("ed25519_signature"):
-        return _ed_policy_ok(value)
-    key = _policy_key()
-    if not key:
-        return False
-    signature = value.get("signature")
-    if not _is_hex(signature, 64):
-        return False
-    return hmac.compare_digest(signature, _policy_signature(value, key))
+def _invite_signature(core, key):
+    """Подпись локального invite: только локальный ключ подсети."""
+    return _hmac_hex(key, _invite_bytes(core)) if key else ""
 
 
 def _valid_port(value):
@@ -430,53 +242,8 @@ def _remember_challenge(challenge, expires_at):
     return True
 
 
-def _policy_valid(value):
-    """Проверяет подпись, срок и одноразовость политики головного сервера."""
-    if not isinstance(value, dict):
-        return None
-    master_id = _policy_master_id()
-    if not master_id:
-        return None
-    version = value.get("policy_version")
-    if isinstance(version, bool) or version != 1:
-        return None
-    if value.get("master_id") != master_id:
-        return None
-    if value.get("master") is not True:
-        return None
-    for flag in ("show_mesh", "show_subs"):
-        if not isinstance(value.get(flag), bool):
-            return None
-    issued = value.get("issued_at")
-    expires = value.get("expires_at")
-    for stamp in (issued, expires):
-        if isinstance(stamp, bool) or not isinstance(stamp, int):
-            return None
-    now = int(time.time())
-    if expires <= issued or (expires - issued) > 300:
-        return None
-    if issued > now + 30 or expires <= now:
-        return None
-    nonce = value.get("nonce")
-    if not _is_hex(nonce, 32):
-        return None
-    if not _policy_trusted(value):
-        return None
-    with _POLICY_NONCES_LOCK:
-        for known in [k for k, t in _POLICY_NONCES.items() if t <= now]:
-            _POLICY_NONCES.pop(known, None)
-        if nonce in _POLICY_NONCES:
-            return None
-        if len(_POLICY_NONCES) >= _POLICY_MAX_NONCES:
-            return None
-        _POLICY_NONCES[nonce] = now + (expires - now)
-    return {"master": True, "master_id": master_id,
-            "show_mesh": value.get("show_mesh"),
-            "show_subs": value.get("show_subs")}
-
-
 def _local_host():
-    """Собственный адрес узла для объявления головному серверу."""
+    """Собственный адрес узла для локального приглашения."""
     for name in ("VM_HOST", "HOST"):
         value = getattr(config, name, "")
         if isinstance(value, str) and _valid_peer_host(value):
@@ -584,7 +351,9 @@ def _validate_nodes(raw):
         # дальше по коду «нет галки» и «выключено» не расходились.
         for flag in OPTIN_FLAGS:
             rec.setdefault(flag, OPTIN_DEFAULTS[flag])
-        # Служебные узлы релью быть не могут НИКОГДА (дорожная карта §5).
+        # Служебные узлы релью быть не могут НИКОГДА (ДОРОЖНАЯ КАРТА §5).
+        # Ставим принудительно, даже если в файле было написано иначе:
+        # поднять флаг на служебном узле нельзя, это ограничение роли.
         if role in ("hub", "test"):
             rec["no_relay"] = True
             rec["allow_relay"] = False
@@ -917,7 +686,7 @@ def _vless_client_valid(value):
 
 
 def set_vless_client(node_id, value):
-    """Записать или снять профиль внешнего VLESS узла (мастер шлёт, узел читает)."""
+    """Записать или снять профиль внешнего VLESS узла (пир шлёт, узел читает)."""
     global _NODES
     if not _valid_node_id(node_id):
         return False
@@ -955,7 +724,7 @@ def set_vless_client(node_id, value):
 def ensure_peer_profile(node_id, name=None, value=None):
     """A-943/A-944: sozdaet ili obnovlyaet zapis uzla s ZADANNYM id + profilem.
 
-    Nuzhno A-940: profil pira prihodit s id iz kadra mastera, a `add()`
+    Nuzhno A-940: profil pira prihodit s id iz kadra pira, a `add()`
     generiruet SVOY id - posle `add()` zapis pira pisalsya pod chuzhim id i
     `set_vless_client` TIHO vozvrashchal False. Zdes id beretsya iz kadra.
 
@@ -1140,14 +909,7 @@ def ping_all(timeout=2.0):
 
 
 def invite():
-    """Приглашение для СВОЕЙ подсети (A-265).
-
-    Публичная сборка не бывает головным: если вдруг mesh_master стал True,
-    приглашение не выдаётся. Иначе подписывает его локальным ключом подсети -
-    настоящий мастер такое приглашение не примет, и узел не получит прав головного.
-    """
-    if _is_master_build():
-        return None
+    """Приглашение для своей локальной подсети, подписанное локальным ключом."""
     issuer, key = _local_issuer_ensure()
     if not issuer or not key:
         return None
@@ -1182,8 +944,6 @@ def invite():
 
 def regenerate():
     """Перевыпускает приглашение своей подсети: старый токен и локальный ключ сгорают."""
-    if _is_master_build():
-        return None
     issuer, _key = _local_issuer()
     if not issuer:
         return None
@@ -1297,7 +1057,7 @@ def join(data):
 
     Обратная сторона join_via_invite: узел шлёт нам свой invite+proof, мы проверяем
     подпись локальным ключом, токен этой подсети и антиреплей, затем добавляем узел.
-    Права головного не выдаются, политику мастера узел не получает.
+    Права головного не выдаются, внешних политик узел не получает.
     """
     local_issuer, _local_key = _local_issuer()
     if not local_issuer:
@@ -1353,29 +1113,8 @@ def ensure_unique_name():
     return name
 
 
-def _host_port_from_url(url):
-    """Парсит URL master_addr и возвращает scheme, host и port."""
-    if not url:
-        return None, None, None
-    from urllib.parse import urlparse
-    try:
-        u = urlparse(url if "://" in url else "http://" + url)
-        host = u.hostname
-        port = u.port or (443 if u.scheme == "https" else 80)
-    except (TypeError, ValueError):
-        return None, None, None
-    if u.scheme not in ("http", "https") or not host:
-        return None, None, None
-    return u.scheme, host, port
-
-
 def _openers():
-    """A-289: сначала напрямую, потом через собственный прокси Aurora.
-
-    Mixed-инбаунд xray (http+socks) на 127.0.0.1:XRAY_PORT - единственный
-    маршрут узла к мастеру, если прямой доступ закрыт (NAT, чужой провайдер).
-    Без второй попытки узел вообще не может вступить в меш и не видит
-    show_mesh/show_subs от головного сервера."""
+    """Запрос к локальному пиру: напрямую, при необходимости через свой xray."""
     from urllib.request import ProxyHandler, build_opener
     out = [build_opener(ProxyHandler({}))]
     try:
@@ -1413,66 +1152,8 @@ def _fetch_post(scheme, host, port, path, data, timeout=5.0, headers=None):
 
 
 def auto_join():
-    if not config.get("auto_join"):
-        return
-    scheme, host, port = _host_port_from_url(config.get("master_addr") or "")
-    tok = (config.get("master_token") or "").strip()
-    if not host or not port:
-        config.log("mesh: auto_join включён, но master_addr не задан — пропуск")
-        return
-    role = "test" if config.get("master_only", False) else "node"
-    # A-761: объявляем СВОЁ устойчивое имя. Раньше здесь всегда уходило
-    # auto_name=True с пустым именем, и мастер при каждой регистрации выдавал
-    # новое случайное («Тёплый-Кот/Пушистый-Кот»). ensure_unique_name() уже
-    # отработал в run.py ДО старта этой нити, так что имя к этому моменту есть.
-    own = str(config.get("server_name") or "").strip()[:40]
-    if not own or own in ("Home", "-"):
-        own = ensure_unique_name()
-    payload = {
-        "name": own,
-        "auto_name": not bool(own),
-        "role": role,
-        "host": config.VM_HOST,
-        "port": config.XRAY_PORT,
-        "policy_port": config.UI_PORT,
-        "region": "RU",
-    }
-    reg = None
-    for attempt in range(3):
-        reg = _fetch_post(scheme, host, port, "/api/mesh/node/add", payload,
-                          headers={"X-Auth": tok} if tok else None)
-        if not (reg and reg.get("ok")):
-            payload.pop("auto_name", None)
-            payload["token"] = tok
-            reg = _fetch_post(scheme, host, port, "/api/mesh/register", payload)
-        if reg and reg.get("ok"):
-            break
-        if attempt < 2:
-            time.sleep(attempt + 1)
-    if not (reg and reg.get("ok")):
-        config.log("mesh: авто-вступление в меш головного %s:%s не удалось" % (
-            host, port))
-        return
-    with _LOCK:
-        present = any(n.get("host") == host and n.get("port") == port
-                      for n in _NODES)
-    if not present:
-        node, err = add("Головной", "RU", host, port, role="hub",
-                          policy_port=int(port))
-        if err:
-            config.log("mesh: авто-добавление головного не удалось: %s" % err)
-            return
-    node_info = reg.get("node") or {}
-    cur = (config.get("server_name") or "").strip()
-    if node_info.get("name") and cur in ("", "Home", "-"):
-        config.set("server_name", node_info["name"])
-    secret = reg.get("secret")
-    if secret:
-        config.set("mesh_own_secret", secret)
-    config.log("mesh: авто-вступление в меш головного %s:%s OK (id=%s, "
-               "name='%s', role=%s)" % (
-        host, port, node_info.get("id") or reg.get("id") or "?",
-        node_info.get("name") or config.get("server_name"), role))
+    """Совместимость со старым вызовом из run.py: автоматического вступления нет."""
+    return None
 
 
 def join_via_invite(url, name=None, region="RU", timeout=5.0):
@@ -1531,399 +1212,30 @@ def join_via_invite(url, name=None, region="RU", timeout=5.0):
 
 
 
-# --- политика головного сервера (видимость меш/магазина у клиентов) ---
-MESH_POLICY_MS = 15 * 1000  # интервал опроса узлом политики мастера
 
+# --- локальная политика (совместимость с панелью) ---
 
 def policy():
-    """Локальная политика клиента. master=True только у головного."""
+    """Только локальные флаги: меш доступен всегда."""
     return {
         "ok": True,
-        "master": False,
-        "show_mesh": bool(config.get("show_mesh", False)),
-        "show_subs": bool(config.get("show_subs", False)),
+        "show_mesh": bool(config.get("show_mesh", True)),
     }
 
 
-def _policy_port(node):
-    # A-945: дефолт - публичный порт политики мастера :8891. Раньше здесь был
-    # config.UI_PORT (8890), то есть ЛАН-панель мастера, которая узлу по ТЗ не
-    # нужна и с улицы недоступна.
-    value = node.get("policy_port") or getattr(config, "MESH_POLICY_PORT", 8891)
-    return value if _valid_port(value) else None
-
-
-def _fetch_policy(host, port, timeout=3.0):
-    """Читает политику далёкого сервера. Возвращает dict или None."""
-    if not _valid_peer_host(host) or not _valid_port(port):
-        return None
-    target = "[%s]" % host if ":" in host else host
-    body = b""
-    for opener in _openers():
-        try:
-            from urllib.request import Request
-            request = Request("http://%s:%d/api/mesh/policy" % (target, port),
-                              headers={"X-Aurora-Request": "1"})
-            with opener.open(request, timeout=timeout) as response:
-                body = response.read(MAX_POLICY_BYTES + 1)
-        except Exception:
-            continue
-        break
-    else:
-        return None
-    if len(body) > MAX_POLICY_BYTES:
-        return None
-    try:
-        value = json.loads(body.decode("utf-8"))
-    except (ValueError, UnicodeDecodeError):
-        return None
-    return value if isinstance(value, dict) else None
-
-
-def _catalog_signature(catalog, buy_url, master_id, key=None):
-    """Подпись каталога мастера: цены и описания защищены тем же ключом, что и политика."""
-    secret = key or _policy_key()
-    if not secret or not isinstance(catalog, dict):
-        return ""
-    body = _signed_bytes({"catalog": catalog, "buy_url": buy_url,
-                          "master_id": master_id}, _CATALOG_FIELDS)
-    return _hmac_hex(secret, body)
-
-
-def _catalog_valid(value):
-    """Каталог мастера: тарифы, прайс витрины и ссылка оплаты.
-    Проверка идёт отдельно от политики, поэтому подписи флагов не ломаются."""
-    if not isinstance(value, dict):
-        return None
-    catalog = value.get("catalog")
-    if not isinstance(catalog, dict):
-        return None
-    master_id = _policy_master_id()
-    if not master_id or value.get("master_id") != master_id:
-        return None
-    buy_url = value.get("buy_url")
-    if not isinstance(buy_url, str) or not buy_url.strip() or len(buy_url) > 200:
-        return None
-    if not _catalog_trusted(value, catalog, buy_url, master_id):
-        return None
-    plans = catalog.get("plans")
-    extras = catalog.get("extras")
-    if not isinstance(plans, dict) or not plans or len(plans) > 32:
-        return None
-    if not isinstance(extras, dict) or not extras or len(extras) > 32:
-        return None
-    return {"plans": plans, "extras": extras, "buy_url": buy_url.strip()}
-
-
-def _catalog_trusted(value, catalog, buy_url, master_id):
-    """Цены и описания подписаны ключом мастера. Как и политика: если ed-подпись
-    есть, проверяем только её - снятие подписи не должно быть обходом проверки.
-    HMAC оставлен для старого мастера."""
-    if value.get("catalog_ed25519"):
-        return _ed_catalog_ok(value)
-    key = _policy_key()
-    if not key:
-        return False
-    signature = value.get("catalog_signature")
-    if not _is_hex(signature, 64):
-        return False
-    return hmac.compare_digest(signature,
-                               _catalog_signature(catalog, buy_url, master_id, key))
-
-
-def _policy_targets():
-    """A-289: узлы-hub из своего списка плюс запасной AURORA_MESH_POLICY_ADDR
-    (host:port панели головного). Без запасного свежий узел, у которого ещё
-    нет записи hub, вообще не знает адреса головного и молча ждёт флагов."""
-    targets = []
-    try:
-        # A-945: all_nodes() всегда подставляет hub() = САМ УЗЕЛ (config.VM_HOST),
-        # а _policy_port() по умолчанию берёт MESH_POLICY_PORT (8891) - публичный
-        # порт политики МАСТЕРА. На клиенте это адрес самого себя, где 8891 никто
-        # не слушает: каждые 15 секунд "mesh: политика (http <self>:8891)
-        # отброшена: не объект" (на ba38-ai-server это дало 27+ тыс. строк за 2
-        # недели). Хаб как источник политики нужен только сборке-мастеру.
-        nodes = []
-        with _LOCK:
-            nodes.extend(_NODES)
-        if _is_master_build():
-            nodes.insert(0, hub())
-        for node in nodes:
-            if node.get("id") != "hub" and node.get("role") != "hub":
-                continue
-            port = _policy_port(node)
-            if port and node.get("host"):
-                targets.append((str(node.get("host")), port))
-    except Exception:
-        pass
-    value = str(os.environ.get("AURORA_MESH_POLICY_ADDR", "") or "").strip()
-    if not value:
-        try:
-            value = str(config.get("mesh_policy_addr", "") or "").strip()
-        except Exception:
-            value = ""
-    # A-945: публичный адрес мастера - всегда в целях, иначе свежий узел без
-    # записи hub вообще не знает, у кого спросить политику, и молчит.
-    try:
-        pinned = str(getattr(config, "MASTER_POLICY_URL", "") or "").strip()
-    except Exception:
-        pinned = ""
-    if pinned:
-        host, _, port_text = pinned.rpartition(":")
-        host = host.split("://", 1)[-1].strip()
-        port = int(port_text) if port_text.strip().isdigit() else 0
-        if host and _valid_peer_host(host) and _valid_port(port):
-            entry = (host, port)
-            if entry not in targets:
-                targets.append(entry)
-    if value and "://" not in value:
-        host, _, port_text = value.partition(":")
-        host = host.strip()
-        if host and _valid_peer_host(host):
-            port = int(port_text) if port_text.strip().isdigit() else 0
-            if not _valid_port(port):
-                port = _policy_port({})
-            if port:
-                targets.append((host, port))
-    return targets
-
-
 def apply_policy_raw(raw, source=""):
-    """A-291: единая точка применения политики мастера (HTTP или туннель).
-    A-755: после успешной проверки подпись кладётся в кэш на диск (30 суток),
-    поэтому сеть переживает мёртвого мастера, и ведётся время последней встречи
-    с мастером для честной плашки в панели.
-
-    Сначала строгая проверка подписи и master_id (_policy_valid), потом флаги
-    show_mesh/show_subs, потом каталог. Всё fail-closed: невалидная политика
-    не трогает настройки. source - только для честного лога.
-    """
-    where = source or "http"
-    if not isinstance(raw, dict):
-        config.log("mesh: политика (%s) отброшена: не объект" % where)
-        return False
-    core = _policy_valid(raw)
-    if not core:
-        config.log("mesh: политика (%s) отброшена: подпись не прошла проверку" % where)
-        return False
-    changed = False
-    for key in ("show_mesh", "show_subs"):
-        if core[key] != config.get(key):
-            config.set(key, bool(core[key]))
-            changed = True
-    global _POLICY_SEEN_AT
-    with _POLICY_CACHE_LOCK:
-        _POLICY_SEEN_AT = time.time()
-    _policy_cache_store(raw)
-    if changed:
-        config.log("mesh: применена политика мастера (%s)" % where)
-    catalog = _catalog_valid(raw)
-    if catalog:
-        mark = "%s|%s|%s" % (
-            sorted(catalog["plans"].keys()),
-            sorted(catalog["extras"].keys()), catalog["buy_url"])
-        if mark != _CATALOG_MARK:
-            globals()["_CATALOG_MARK"] = mark
-            if config.save_catalog(catalog["plans"], catalog["extras"],
-                                   catalog.get("buy_url")):
-                config.log("mesh: каталог мастера принят (тарифов %d, позиций %d)" % (
-                    len(catalog["plans"]), len(catalog["extras"])))
-    ents = raw.get("mesh_entitlements")
-    clean = sorted(set(ents)) if _ed_entitlements_ok(raw) else []
-    if clean != _POLICY_ENTITLEMENTS:
-        _POLICY_ENTITLEMENTS[:] = clean
-        config.log("mesh: mesh-entitlements verified (%d nodes)" % len(clean))
-    return True
-
-
-POLICY_CACHE_FILE = os.path.join(config.DATA_DIR, "mesh_policy_cache.json")
-POLICY_AUTONOMY_DAYS = 30
-_POLICY_AUTONOMY_S = POLICY_AUTONOMY_DAYS * 86400
-_POLICY_CACHE_LOCK = threading.RLock()
-_POLICY_SEEN_AT = 0.0
-
-
-def _policy_cache_schema(value):
-    """Кэш: ровно проверенная подпись плюс время её получения."""
-    if not isinstance(value, dict):
-        return None
-    received = value.get("received_at")
-    if isinstance(received, bool) or not isinstance(received, (int, float)):
-        return None
-    if not 0 < float(received) <= time.time() + 60:
-        return None
-    policy = value.get("policy")
-    if not isinstance(policy, dict):
-        return None
-    return {"received_at": float(received), "policy": policy}
-
-
-def _policy_cache_load():
-    """Читает кэш с диска. Молчание тут допустимо только вместе с честным логом
-    вызывающего: файл может отсутствовать (первый запуск) — это не ошибка."""
-    try:
-        raw = json.load(open(POLICY_CACHE_FILE, "r", encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-    return _policy_cache_schema(raw)
-
-
-def _policy_cache_store(policy):
-    """Сохраняет ПРОВЕРЕННУЮ подпись. Ошибка записи не должна ломать применение:
-    флаги уже применены, кэш — это про выживание при мёртвом мастере."""
-    with _POLICY_CACHE_LOCK:
-        payload = {"received_at": time.time(), "policy": policy}
-        tmp = POLICY_CACHE_FILE + ".tmp"
-        try:
-            with open(tmp, "w", encoding="utf-8") as f:
-                json.dump(payload, f, ensure_ascii=True)
-            os.replace(tmp, POLICY_CACHE_FILE)
-            return True
-        except OSError as exc:
-            config.log("mesh: кэш подписи не записан: %s" % exc)
-            try:
-                os.unlink(tmp)
-            except OSError:
-                pass
-            return False
+    """Совместимость: внешних политик больше нет."""
+    return False
 
 
 def policy_autonomy():
-    """Честная сводка для панели: сколько живём на кэше и когда видели мастера.
-
-    A-756: возраст берётся как max(время в памяти, время файла кэша). Иначе
-    после перезапуска узла память пуста, _POLICY_SEEN_AT = 0, и панель писала
-    «мастер не отвечает» с нуля — хотя кэш на диске свежий и сеть жива.
-
-    Возвращает {"cached", "age_s", "autonomy_s", "master_seen_at"} — панель
-    показывает «работаю на кэше, мастер не отвечает с 14:32», а не врёт.
-    """
-    now = time.time()
-    with _POLICY_CACHE_LOCK:
-        seen = float(_POLICY_SEEN_AT or 0.0)
-    cached = _policy_cache_load()
-    file_seen = float(cached["received_at"]) if cached else 0.0
-    if file_seen > seen:
-        seen = file_seen
-    return {"cached": bool(cached),
-            "age_s": int(max(0.0, now - seen)) if seen else -1,
-            "autonomy_s": _POLICY_AUTONOMY_S,
-            "master_seen_at": int(seen) if seen else 0}
-
-
-def apply_cached_policy():
-    """Поднимает флаги из кэша, когда мастер недоступен.
-
-    Кэш переживает 30 суток и при этом НЕ пересекается со свежестью: подпись
-    всё равно проверяется тем же _policy_valid(), то есть подделать кэш на
-    диске нельзя — HMAC тот же ключ.
-    """
-    cached = _policy_cache_load()
-    if not cached:
-        return False
-    age = time.time() - cached["received_at"]
-    if age > _POLICY_AUTONOMY_S:
-        config.log("mesh: кэш подписи старше %d суток (%d с) — игнорирую"
-                   % (POLICY_AUTONOMY_DAYS, int(age)))
-        return False
-    # Повторная проверка подписи обязательна: файл на диске могли подменить.
-    # _policy_valid откажет и по протухшему expires_at (это правильно: значит
-    # мастер был жив недавно, но кэш мы всё равно храним), поэтому для
-    # автономного режима проверяем подпись и master_id напрямую, а срок берём
-    # свой — 30 суток с момента получения.
-    policy = cached["policy"]
-    master_id = _policy_master_id()
-    if not master_id or policy.get("master_id") != master_id:
-        config.log("mesh: кэш подписи от чужого мастера — игнорирую")
-        return False
-    if not _policy_trusted(policy):
-        config.log("mesh: подпись в кэше не сходится — игнорирую")
-        return False
-    changed = False
-    for flag in ("show_mesh", "show_subs"):
-        value = policy.get(flag)
-        if not isinstance(value, bool):
-            config.log("mesh: в кэше флаг %s не bool — игнорирую кэш" % flag)
-            return False
-        if value != config.get(flag):
-            config.set(flag, value)
-            changed = True
-    if changed:
-        config.log("mesh: работаю на кэше подписи мастера (ей %d суток)"
-                   % max(1, int(age // 86400)))
-    return True
-
-
-_POLICY_OFFLINE = False
-
-
-def _policy_autonomy_toggle(offline):
-    """A-756: переход между «живая политика» и «работаю на кэше», лог только на
-    СМЕНУ состояния.
-
-    Цикл живёт MESH_POLICY_MS (15 с) — четыре раза в минуту. Без троттлинга это
-    240 одинаковых строк в час, и настоящие события снова вытесняются из журнала
-    (та же грабля, что уже закрыта для игрового контура, ROADMAP §2.4).
-
-    offline=True  — мастер не дал применимой политики: поднимаем флаги из кэша.
-    offline=False — мастер ответил и политика принята: возвращаемся к живому режиму.
-
-    Кэш применяется ТОЛЬКО когда мастер не дал применимой политики. Если мастер
-    жив, но подпись не сошлась — это не «сеть жива», а «неизвестно что скачено»:
-    неизвестное указание мы не исполняем и держим последнее подтверждённое
-    состояние, а сам факт виден в логе apply_policy_raw.
-    """
-    global _POLICY_OFFLINE
-    if bool(offline) == bool(_POLICY_OFFLINE):
-        return _POLICY_OFFLINE
-    _POLICY_OFFLINE = bool(offline)
-    if _POLICY_OFFLINE:
-        got = apply_cached_policy()
-        info = policy_autonomy()
-        if got:
-            config.log("mesh: мастер не дал применимой политики — работаю на кэше "
-                       "подписи (ей %d с, автономия %d суток)"
-                       % (info["age_s"], POLICY_AUTONOMY_DAYS))
-        else:
-            config.log("mesh: мастер не дал применимой политики, применимого кэша "
-                       "нет — флаги оставлены как есть")
-    else:
-        config.log("mesh: политика мастера получена, вышел из автономии")
-    return _POLICY_OFFLINE
-
-
-def _policy_loop():
-    """Фоновый опрос мастера: узел применяет подписанные show_mesh/show_subs.
-
-    A-756: при недоступном мастере поднимаем флаги из кэша — сеть живёт, когда
-    мастер мёртв (пункт 3 ФУНДАМЕНТА).
-    """
-    while True:
-        got = False
-        try:
-            for host, port in _policy_targets():
-                if apply_policy_raw(_fetch_policy(host, port),
-                                    "http %s:%d" % (host, port)):
-                    got = True
-                    break
-        except Exception:
-            got = False
-        try:
-            _policy_autonomy_toggle(not got)
-        except Exception as exc:
-            config.log("mesh: переход в автономию не удался: %s: %s"
-                       % (type(exc).__name__, exc))
-        time.sleep(MESH_POLICY_MS / 1000.0)
+    """Совместимость: автономия не нужна, всё локально."""
+    return {"cached": False, "age_s": -1, "autonomy_s": 0, "seen_at": 0}
 
 
 def start_policy_loop():
-    global _POLICY_STARTED
-    with _LOCK:
-        if _POLICY_STARTED:
-            return False
-        _POLICY_STARTED = True
-    threading.Thread(target=_policy_loop, daemon=True).start()
-    return True
+    """Фоновый опрос внешней политики не запускается."""
+    return None
 
 
 load()

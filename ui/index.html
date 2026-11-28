@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Aurora — прокси · меш · магазин</title>
+  <title>Aurora — прокси · меш</title>
   <link rel="icon" href="/favicon.ico">
   <link rel="stylesheet" href="/style.css">
 </head>
@@ -42,13 +42,6 @@
         <button data-t="mesh-routes"><span class="ic">🧭</span><span class="lb" data-i18n="nav.mesh-routes">Маршруты</span></button>
       </div>
 
-      <div class="ngroup" id="g-shop">
-        <div class="ngroup-title" data-short="🛒">🛒 <span data-i18n="nav.shop">Магазин</span></div>
-        <button data-t="shop-plans"><span class="ic">💎</span><span class="lb" data-i18n="nav.shop-plans">Тарифы VPN</span></button>
-        <button data-t="shop-features"><span class="ic">🧩</span><span class="lb" data-i18n="nav.shop-features">Дополнительные возможности Aurora</span><span class="tag" id="tag-feat">2</span></button>
-        <button data-t="shop-billing"><span class="ic">💳</span><span class="lb" data-i18n="nav.shop-billing">Платежи</span></button>
-      </div>
-
       <div class="ngroup">
         <div class="ngroup-title" data-short="🔄">🔄 <span data-i18n="nav.group.upd">Обновления</span></div>
         <button data-t="update"><span class="ic">⬆️</span><span class="lb" data-i18n="nav.update">Обновление</span><span class="tag hot" id="tag-upd">NEW</span></button>
@@ -81,7 +74,6 @@
       <div class="tb-pills">
         <span class="pill off hide-sm" id="pill-vpn"><span class="dot"></span><span id="pill-vpn-t">VPN</span></span>
         <span class="pill on hide-sm" id="pill-mesh"><span class="dot"></span>mesh</span>
-        <span class="pill gold" id="pill-plan">💎 basic</span>
         <span class="pill mono hide-sm" id="pill-ip">—</span>
       </div>
       <select id="lang-sel" class="lang-sel" data-act="lang" title="Язык / Language">
@@ -96,7 +88,6 @@
         <option value="ar">العربية</option>
         <option value="hi">हिन्दी</option>
       </select>
-      <button id="btn-policy" class="icon-btn" title="Политика сервиса" data-act="policy-open">🛡️</button>
       <button id="theme-btn" class="icon-btn" title="Сменить тему">🌙</button>
     </header>
 
@@ -127,7 +118,6 @@
           <div class="stat"><div class="k">📶 <span data-i18n="dash.conns">Соединения</span></div><div class="v" id="conns">0</div></div>
           <div class="stat"><div class="k">📦 <span data-i18n="dash.traffic">Трафик ↓ / ↑</span></div><div class="v mono" id="traffic" style="font-size:13px">0 / 0</div></div>
           <div class="stat" id="meshm"><div class="k">🕸️ <span data-i18n="dash.mesh-nodes">Меш-узлов</span></div><div class="v" id="mesh-count">0</div></div>
-          <div class="stat gold" id="planm"><div class="k">💎 <span data-i18n="dash.plan">Тариф</span></div><div class="v" id="plan-name">–</div></div>
         </div>
 
         <!-- === Виджет: обновление === -->
@@ -165,19 +155,6 @@
             <div class="widget-foot">
               <button class="btn small" data-act="nav" data-tab="mesh-topo">🌌 <span data-i18n="nav.mesh-topo">Топология</span></button>
               <button class="btn small" data-act="nav" data-tab="mesh-routes">🧭 <span data-i18n="nav.mesh-routes">Маршруты</span></button>
-            </div>
-          </div>
-
-          <!-- Тариф -->
-          <div class="widget" id="dash-plan-widget">
-            <div class="widget-head">
-              <span class="ic">💎</span>
-              <b data-i18n="dash.plan">Тариф</b>
-              <span class="badge gold" id="plan-st">basic</span>
-            </div>
-            <div class="widget-body" id="w-plan-body">—</div>
-            <div class="widget-foot">
-              <button class="btn small" data-act="nav" data-tab="shop-features">🧩 <span data-i18n="nav.shop-features">Дополнительные возможности Aurora</span></button>
             </div>
           </div>
 
@@ -462,15 +439,6 @@
           </div>
         </div>
 
-        <div class="card" id="mesh-policy-card">
-          <h2><span class="ic">🎛</span><span data-i18n="mj.pol">Политика хаба</span></h2>
-          <p class="hint" data-i18n="mj.pol-hint">Головной сервер управляет тем, какие вкладки видны у клиентов меша. Клиенты, подключённые по invite этого сервера, автоматически применяют политику (обновление каждые 15&nbsp;сек).</p>
-          <div class="widget-body" style="display:flex;flex-direction:column;gap:8px;font-size:13px">
-            <label class="chk"><input type="checkbox" id="m-master" data-act="mesh-policy-save"> <span data-i18n="mj.master">Cервер — головной, управляет видимостью у клиентов</span></label>
-            <label class="chk"><input type="checkbox" id="m-show-mesh" data-act="mesh-policy-save"> <span data-i18n="mj.show-mesh">Показывать клиентам вкладку «Меш-сеть»</span></label>
-            <label class="chk"><input type="checkbox" id="m-show-subs" data-act="mesh-policy-save"> <span data-i18n="mj.show-subs">Показывать клиентам вкладку «Магазин»</span></label>
-          </div>
-        </div>
       </section>
 
       <!-- ==================================================
@@ -546,7 +514,7 @@
       <section class="tab" id="t-mesh-routes">
         <div class="card">
           <h2><span class="ic">🧭</span><span data-i18n="nav.mesh-routes">Маршруты</span></h2>
-          <p class="hint" data-i18n="routes.master"></p>
+          <p class="hint" data-i18n="routes.local"></p>
           <p class="hint" data-i18n="mrt.hint">Правила, какой трафик через какой узел выходит в интернет. Порядок — сверху вниз.</p>
           <div class="tbl-wrap">
             <table>
@@ -558,90 +526,6 @@
       </section>
 
 <!-- ==================================================
-           МАГАЗИН · ТАРИФЫ
-           A-945: витрина строится из catalog.plans, который приходит в
-           подписанной политике мастера. Цифры в коде не зашиты - мастер
-           меняет цены, меняется витрина, обновлять сборку не нужно.
-           ================================================== -->
-      <section class="tab" id="t-shop-plans">
-        <div class="card">
-          <h2><span class="ic">💎</span><span data-i18n="sp.head">Тарифы</span></h2>
-          <p class="hint" data-i18n="sp.hint"></p>
-          <div id="plans-loading"></div>
-          <div class="plans" id="plans-grid"></div>
-        </div>
-        <div class="card pad-0">
-          <div class="tbl-wrap">
-            <table>
-              <thead><tr><th data-i18n="th.func"></th><th data-i18n="th.val"></th></tr></thead>
-              <tbody id="cmp-rows"></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-<!-- ==================================================
-           МАГАЗИН · ФУНКЦИИ
-           ================================================== -->
-      <section class="tab" id="t-shop-features">
-        <div class="card">
-          <h2><span class="ic">🐾</span><span data-i18n="sf.model">Как это устроено</span></h2>
-          <p class="hint" data-i18n="sf.model-hint">Локальный прокси, своя Aurora, участие в общей
-            меш-сети и до 5 mesh-клиентов для игр — бесплатно, без квот и счётчиков. Покупаются
-            только дополнительные возможности, и Aurora должна быть зарегистрирована в общей сети:
-            это видно до оплаты. VPN-доступ не продаётся.</p>
-        </div>
-
-        <div class="card pad-0">
-          <div style="padding:14px 18px 12px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-            <h2 style="margin:0"><span class="ic">🧩</span><span data-i18n="nav.shop-features">Дополнительные возможности Aurora</span></h2>
-            <span class="spacer" style="flex:1"></span>
-            <span class="badge gold" data-i18n="sf.instant">+ оплата в Telegram-боте, активация мгновенно</span>
-          </div>
-                <div class="ext-card" id="ext-card">
-        <div class="f-ic" id="ext-badge">&#128038;</div>
-        <div class="f-body">
-          <div class="f-name" data-i18n="ext.head">PRO-&#1092;&#1091;&#1085;&#1082;&#1094;&#1080;&#1080; Aurora</div>
-          <div class="f-desc" id="ext-text" data-i18n="ext.locked">&#1055;&#1088;&#1086;&#1074;&#1077;&#1088;&#1103;&#1077;&#1084; &#1082;&#1072;&#1082; &#1079;&#1072;&#1082;&#1088;&#1099;&#1072;&#1077;&#1090;&#1089;&#1103;...&#1103;</div>
-          <button class="btn small gold" style="margin-top:8px" id="ext-buy" data-act="ext-buy" data-i18n="ext.buy">&#1054;&#1087;&#1083;&#1072;&#1090;&#1080;&#1090;&#1100; &#1074; Telegram</button>
-        </div>
-      </div>
-      <div class="feature-list" id="feat-list"></div>
-        </div>
-      </section>
-
-      <!-- ==================================================
-           МАГАЗИН · ПЛАТЕЖИ
-           ================================================== -->
-      <section class="tab" id="t-shop-billing">
-        <div class="card">
-          <h2><span class="ic">💳</span><span data-i18n="sb.head">Оплата и продление</span></h2>
-          <p class="hint" data-i18n="sb.hint">Активный план, срок действия и история платежей. Продление — в один клик.</p>
-          <div class="metrics" style="margin:0 0 12px">
-            <div class="stat"><div class="k">💎 <span data-i18n="sb.plan">Текущий план</span></div><div class="v" id="bill-plan">–</div></div>
-            <div class="stat"><div class="k">📅 <span data-i18n="sb.until">Активен до</span></div><div class="v mono" id="bill-until">–</div></div>
-            <div class="stat"><div class="k">📦 <span data-i18n="plans.traffic">Трафик</span></div><div class="v mono" id="bill-traffic">–</div></div>
-            <div class="stat"><div class="k"><span data-i18n="sb.active">Активных</span></div><div class="v" id="bill-active">–</div></div>
-            <div class="stat"><div class="k"><span data-i18n="sb.income">Доход за месяц</span></div><div class="v" id="bill-income">–</div></div>
-            <div class="stat"><div class="k"><span data-i18n="sb.traffic-month">Трафик за месяц</span></div><div class="v mono" id="bill-traffic-month">–</div></div>
-          </div>
-          <div class="actions" style="margin-top:0">
-            <button class="btn gold" data-act="plan-buy">💳 <span data-i18n="sb.buy">Оплатить в Telegram</span></button>
-          </div>
-          <h3 style="font-size:13px;font-weight:800;margin:14px 0 8px"><span data-i18n="myk.head">Мои ключи</span><span class="count mono" id="mykeys-count">0</span></h3>
-          <p class="hint" data-i18n="myk.hint">Устройство = купленный ключ 🐾 Тариф, срок и трафик — по каждому ключу.</p>
-          <div class="feature-list" id="mykeys-list"></div>
-          <h3 style="font-size:13px;font-weight:800;margin:14px 0 8px"><span data-i18n="sb.hist">История платежей</span></h3>
-          <div class="tbl-wrap">
-            <table>
-              <thead><tr><th data-i18n="th.date">Дата</th><th data-i18n="th.desc">Описание</th><th data-i18n="th.sum">Сумма</th><th data-i18n="th.status">Статус</th></tr></thead>
-              <tbody id="bill-rows"></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <!-- ==================================================
            ОБНОВЛЕНИЕ
            ================================================== -->
       <section class="tab" id="t-update">
@@ -734,7 +618,6 @@
           <div style="font-size:11px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:var(--muted-2);margin:16px 0 8px" data-i18n="set.vis">Видимость вкладок</div>
           <div class="widget-body" style="display:flex;flex-direction:column;gap:8px;font-size:13px">
             <div><span class="ic">🕸️</span> <span data-i18n="set.show-mesh">Включить меш-сеть</span>: <b class="chip" id="set-st-mesh">–</b></div>
-            <div><span class="ic">🛒</span> <span data-i18n="set.show-subs">Включить магазин (подписки и тарифы)</span>: <b class="chip" id="set-st-subs">–</b></div>
           </div>
           <div style="font-size:11px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:var(--muted-2);margin:16px 0 8px" data-i18n="set.mesh">Меш</div>
           <div class="cmd-row">
@@ -973,33 +856,13 @@
 
 <div id="toast"></div>
 
-<!-- ============================================================
-     ПОЛИТИКА СЕРВИСА (оверлей обязательного принятия)
-     ============================================================ -->
-<div id="policy-screen" style="display:none">
-  <div class="policy-mask">
-    <div class="policy-card">
-      <div class="policy-head">
-        <span class="ic">🛡️</span>
-        <b data-i18n="pol.head">Политика сервиса</b>
-        <span class="badge mono" id="policy-rev">rev 0</span>
-      </div>
-      <div class="policy-body" id="policy-text"></div>
-      <div class="policy-foot">
-        <button class="btn ghost" data-act="policy-open" data-force="1">🔍 <span data-i18n="pol.readOnly">Просмотр</span></button>
-        <button class="btn primary" id="policy-accept-btn" data-act="policy-accept">✅ <span data-i18n="pol.accept">Принимаю</span></button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <div id="setup-screen" style="display:none">
   <div class="setup-mask">
     <div class="setup-card">
       <div class="setup-head">
         <span class="ic">⚙️</span>
         <b>Первый запуск Aurora</b>
-        <span class="badge mono" id="setup-progress">1/8</span>
+        <span class="badge mono" id="setup-progress">1/7</span>
       </div>
       <div class="setup-body">
         <section class="setup-step" data-setup-step="0">
@@ -1008,12 +871,6 @@
           <label class="setup-field"><span>Язык</span><select id="setup-lang"><option value="ru">Русский</option><option value="en">English</option><option value="es">Español</option><option value="de">Deutsch</option><option value="fr">Français</option><option value="tr">Türkçe</option><option value="pt">Português</option><option value="zh">中文</option><option value="ar">العربية</option><option value="hi">हिन्दी</option></select></label>
           <label class="setup-field"><span>Тема</span><select id="setup-theme"><option value="dark">Тёмная</option><option value="light">Светлая</option></select></label>
         </section>
-          <div class="setup-policy">
-            <div class="setup-policy-title">Условия использования</div>
-            <div id="setup-policy-text" class="setup-policy-text"></div>
-            <label class="check setup-policy-accept"><input type="checkbox" id="setup-policy-ok"> Принимаю условия использования</label>
-          </div>
-
         <section class="setup-step" data-setup-step="1" style="display:none">
           <h3>Имя сервера</h3>
           <p class="hint">Как Aurora будет называться в панели и mesh-конфигурации.</p>
@@ -1034,7 +891,7 @@
         </section>
         <section class="setup-step" data-setup-step="4" style="display:none">
           <h3>Доступ и защита</h3>
-          <p class="hint">Параметры применяются к этой public-сборке; master-настройки здесь не меняются.</p>
+          <p class="hint">Параметры применяются к этой public-сборке; меш работает локально.</p>
           <label class="setup-check"><input id="setup-lan" type="checkbox" checked><span>Разрешить доступ из LAN</span></label>
           <label class="setup-check"><input id="setup-scanners" type="checkbox" checked><span>Блокировать шаблоны сканеров</span></label>
           <label class="setup-check"><input id="setup-rate" type="checkbox" checked><span>Ограничить частоту запросов</span></label>
@@ -1054,12 +911,6 @@
           </fieldset>
         </section>
 <section class="setup-step" data-setup-step="6" style="display:none">
-          <h3>Mesh-приглашение</h3>
-          <p class="hint">Необязательно. Вставьте invite головного сервера, если он уже выдан.</p>
-          <label class="setup-field"><span>Invite</span><input id="setup-mesh" type="text" autocomplete="off" placeholder="aurora://invite?..."></label>
-          <p class="hint">VLESS и TG-WS настраиваются автоматически. Порты можно изменить на этом шаге. Секреты мастера в этот мастер не вводятся.</p>
-        </section>
-<section class="setup-step" data-setup-step="7" style="display:none">
           <h3>Резервный канал (WARP)</h3>
           <p class="hint">Cloudflare WARP — резерв на случай пустого пула ключей. В части сетей работает только MASQUE, поэтому выберите транспорт и проверьте его.</p>
           <label class="setup-check"><input id="setup-warp-off" type="radio" name="setup-warp" value="off" checked><span>Не использовать</span></label>

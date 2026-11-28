@@ -15,7 +15,6 @@ import pool
 import recovery
 import rusegment
 import security
-import subs
 import telemetry
 import tgws
 import updater
@@ -61,20 +60,15 @@ def _boot():
             config.log("boot: хранилище AURORA2 (%s)" % ", ".join(sorted(migrated)))
     except Exception as e:
         config.log("boot: миграция хранилища пропущена: %s" % e)
-    # v1.8.0: уникальное имя сервера + авто-вступление в меш головного (фон)
+    # Уникальное имя сервера; меш работает локально, без головного сервера.
     mesh.ensure_unique_name()
-    threading.Thread(target=mesh.auto_join, daemon=True).start()
     pool.load()
-    subs.load()  # подписки — до сборки конфига (клиенты vless-in)
-    mesh.start_policy_loop()
-    subs.start_background()
-    extgate.start_background()  # A-111: лицензия PRO (прокси не падает при сети)
     # A-151: релей-туннель меш-сети. По умолчанию выключен (config.mesh_tunnel),
     # роль - из env AURORA_MESH_ROLE. Ошибки не роняют запуск: туннель - это канал,
     # а не условие жизни прокси.
     if config.get("mesh_tunnel", False):
         try:
-            if meshtunnel.start(os.environ.get("AURORA_MESH_ROLE", "")):
+            if meshtunnel.start():
                 config.log("mesh: relay-туннель запущен")
                 _start_game_tun()
         except Exception as e:

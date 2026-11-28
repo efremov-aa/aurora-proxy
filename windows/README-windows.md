@@ -1,31 +1,31 @@
-# 🐱 Aurora на Windows — сборка v1.10.28 «Кот-диспетчер» 🐾
+# 🐱 Aurora на Windows — сборка v2.0.0 «Кот-хозяин» 🐾
 
 > Мяу! На Windows у меня всё то же, что на Linux и в Docker — те же модули, та же логика, — но
 > живёт я под службой **NSSM «Aurora»**. Окна консоли не вылезают, IP я нахожу сама, обновление
 > подписано и проверяется. Мягкие лапки, острый туннель. 🐾
 
 ![mascot](https://img.shields.io/badge/mascot-%F0%9F%90%B1-pink)
-![version](https://img.shields.io/badge/version-1.10.28-pink)
+![version](https://img.shields.io/badge/version-2.0.0-pink)
 ![windows](https://img.shields.io/badge/windows-10%2F11%20x64-blue)
 
-**Версия:** `VERSION=1.10.28`, `VERSION_NAME=Кот-диспетчер`
+**Версия:** `VERSION=2.0.0`, `VERSION_NAME=Кот-хозяин`
 
 Основа — публичный репозиторий [`aurora-proxy`](https://github.com/efremov-aa/aurora-proxy).
-Что я умею, политика, окружение и меш-сеть — в [корневом README](../README.md); здесь только
+Что я умею, окружение и меш-сеть — в [корневом README](../README.md); здесь только
 отличия Windows-сборки. 🐾
 
 ⚡ Короткий путь «скачал → прокси работает» — в [QUICKSTART.md](../QUICKSTART.md).
 
 ## 📥 Установка (рекомендуется)
 
-1. Скачайте **`Aurora-Setup-1.10.28.exe`** из [Releases](https://github.com/efremov-aa/aurora-proxy/releases)
+1. Скачайте **`Aurora-Setup-2.0.0.exe`** из [Releases](https://github.com/efremov-aa/aurora-proxy/releases)
    и запустите от администратора.
 2. Установщик собирает `Aurora.exe` + `_internal\` (xray v26.9.9, geoip/geosite, `wintun.dll`,
    `tg-ws-proxy.exe`, nssm, `ui\`), ставит службу **NSSM «Aurora»** (автозапуск, авто-рестарт)
    и запускает её скрыто.
 3. Откройте `http://<ваш-IP>:8890/` — мастер первого запуска: язык и тема, имя сервера, пароль
-   админа, PIN 2FA, лимиты LAN/сканеров/rate. Порты, VLESS, TG-WS и секреты главного сервера
-   в мастере **не вводятся**.
+   админа, PIN 2FA, лимиты LAN/сканеров/rate, порты и резерв WARP. Секреты мастер-сервера не нужны:
+   меш работает локально.
 
 > 🪟 **Каталог данных (1.10.0).** NSSM-переменная `AURORA_DATA_DIR` не доходит до frozen-процесса,
 > поэтому в **1.9.3** данные клались в `Aurora\_internal\data` вместо `%LOCALAPPDATA%\Aurora` —
@@ -57,8 +57,7 @@
 - 🌐 xray **VLESS Reality**: mixed-вход `:8899`, автозагрузка ключей с GitHub
   (`barry-far Splitted-By-Protocol/vless.txt`, пре-фильтр только Reality `pbk`).
 - 🏠 Панель `:8890`: ключи, устройства (телеметрия через `netstat`), ру-сегмент, TG-WS,
-  подключение извне, витрина дополнительных возможностей и меш-сеть (по команде главного сервера).
-  🐾 Тарифов и лимитов на сам прокси нет — только бесплатное ядро и дополнительные возможности.
+  подключение извне и локальная меш-сеть. 🐾 Все возможности доступны сразу — без подписок и оплаты.
 - 🛡 Бан-лист ключей (`autodead_conn/noip/ping`, `user_removed`) — мёртвые не возвращаются.
 - 🌍 «Свои сайты»: сайты, где VPN не работает, идут напрямую (набор зависит от страны), Google/YouTube — в туннель.
 - 📱 Внешний VLESS-Reality `:8443` (опционально, через env `AURORA_VLESS_*`), авто-генерация

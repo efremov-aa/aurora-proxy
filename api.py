@@ -1,5 +1,5 @@
 # Aurora v1.6.0 — HTTP API: /api/* + панель. Чистый ThreadingHTTPServer (без фреймворков).
-# Порт эталона v1.4.0 (mesh/subs/plans/stats/routes/settings/security) на публичную
+# Порт эталона v1.4.0 (mesh/keys/routes/settings/security) на публичную
 # сборку: станция отсутствует, сохранены авто-обновление (update), Bearer-токен
 # (security.check) и admin-ротация API-токена (/api/security/rotate).
 
@@ -32,7 +32,6 @@ import recovery
 import rusegment
 import security
 import source
-import subs
 import warp  # A-WARP-PUB: rezervnyy kanal WARP
 import masque  # A-MASQUE-PUB: rezerv WARP cherez mihomo
 import telemetry
@@ -522,97 +521,6 @@ def _vless_ext():
     return out
 
 
-def _key_handle(uid, key_id):
-    return crypt.opaque_id("%s:%s" % (str(uid or ""), str(key_id or "")), "subkey")
-
-
-def _opaque_uid(uid):
-    return crypt.opaque_id(str(uid or ""), "subuid")
-
-
-def _subs_safe(s, masked=False, include_secrets=False):
-    uid = str(s.get("uid", ""))
-    state = subs.access_state(s)
-    revoked = set(str(x) for x in (s.get("revoked_key_ids") or []))
-    keys = []
-    for k in s.get("keys") or []:
-        if not isinstance(k, dict):
-            continue
-        kid = str(k.get("id", ""))
-        keys.append({
-            "key_handle": _key_handle(uid, kid),
-            "id_masked": (kid[:8] + "\u2026") if kid else "",
-            "revoked": kid in revoked,
-            "created": 0 if masked else k.get("created", 0),
-            "remark": "" if masked else k.get("remark", ""),
-        })
-    dev_limit = 0
-    try:
-        dev_limit = int(s.get("limit_devices", 0) or 0)
-    except (TypeError, ValueError):
-        dev_limit = 0
-    dev_count = len([k for k in keys if not k["revoked"]])
-    return {
-        "uid": uid if include_secrets else ((uid[:8] + "\u2026") if uid else ""),
-        "name": "" if masked else s.get("name", ""),
-        "plan": s.get("plan", ""),
-        "remark": "" if masked else s.get("remark", ""),
-        "token": s.get("token", "") if include_secrets else "",
-        "created": 0 if masked else s.get("created", 0),
-        "expires": s.get("expires", 0),
-        "plan_next": s.get("plan_next"),
-        "expires_next": 0 if masked else s.get("expires_next", 0),
-        "plan_next_starts": 0 if masked else s.get("plan_next_starts", 0),
-        "used_bytes": s.get("used_bytes", 0),
-        "limit_bytes": s.get("limit_bytes", 0),
-        "limit_devices": s.get("limit_devices", 0),
-        "limit_keys": s.get("limit_keys", 0),
-        "enabled": bool(s.get("enabled", True)),
-        "access_ok": bool(state["ok"]),
-        "access_status": int(state["status"]),
-        "access_reason": str(state["reason"]),
-        "access_detail": "" if masked else str(state.get("detail", "")),
-        "access_state": subs.access_status(s),
-        "blocked_until": 0 if masked else s.get("blocked_until", 0),
-        "block_reason": "" if masked else s.get("block_reason", ""),
-        "keys": keys,
-        "devices": dev_count,
-        "devices_limit": dev_limit,
-        "key_count": len(keys),
-        "sub_url": "",
-        "credential_required": False,
-    }
-
-
-def _subs_list(include_secrets=False):
-    masked = bool(config.SUBS_MASK_UUID) or not include_secrets
-    v = config.vless_public()
-    params = ({
-        "host": v.get("host", ""),
-        "port": v.get("port", 8443),
-        "public_key": v.get("public_key", ""),
-        "short_id": v.get("short_id", ""),
-        "sni": v.get("sni", ""),
-        "flow": v.get("flow", ""),
-        "enabled": bool(v.get("enabled")),
-    } if include_secrets else {"enabled": bool(v.get("enabled"))})
-    out = [_subs_safe(s, masked=masked, include_secrets=include_secrets)
-           for s in subs.all()]
-    return {
-        "ok": True,
-        "subs": out,
-        "plans": config.SUBS_PLANS,
-        "default": config.SUBS_PLAN_DEFAULT,
-        # A-106: витрина «Дополнительные возможности Aurora» рисуется из
-        # ответа списка подписок, поэтому extras и buy_url нужны и здесь.
-        "extras": getattr(config, "SUBS_EXTRAS", {}) or {},
-        "buy_url": config.BUY_URL,
-            "extras_source": config.extras_source(),
-        "masked": masked,
-        "vless_params": params,
-    }
-
-
 _CSP = ("default-src 'self'; base-uri 'none'; object-src 'none'; "
         "frame-ancestors 'none'; frame-src 'none'; form-action 'self'; "
         "script-src 'self'; script-src-attr 'none'; "
@@ -622,8 +530,7 @@ _CSP = ("default-src 'self'; base-uri 'none'; object-src 'none'; "
 
 _TLS_ENABLED = False
 
-_TRANSPORT_EXEMPT = ("/api/ext/config", "/sub", "/api/mesh/policy", "/api/mesh/join", "/api/policy",
-                     "/api/policy/accept", "/api/rusegment/regions")
+_TRANSPORT_EXEMPT = ("/api/ext/config", "/api/rusegment/regions")
 
 
 def _tls_env():
@@ -688,100 +595,17 @@ def _security_headers():
     return headers
 
 
-def _sub_publish(self):
-    """GET /sub?token=... — публичная выдача текст-подписки (vless-ссылки).
-    Без origin-проверки: клиентские приложения (v2rayNG и т.п.) грузят её напрямую.
-    Параметр credential принимается для совместимости с головным сервером,
-    устройства в публичной сборке не регистрируются."""
-    qs = urllib.parse.parse_qs(self.path.split("?", 1)[-1])
-    token = (qs.get("token") or [""])[0].strip()
-    if not token:
-        self._send(*_json({"error": "invalid subscription request"}, 400))
-        return
-    if len(token) > 256 or not token.isascii():
-        self._send(*_json({"error": "invalid subscription request"}, 400))
-        return
-    s, _status = subs.by_token_status(token)
-    if not s:
-        self._send(*_json({"error": "subscription not found"}, 404))
-        return
-    state = subs.access_state(s)
-    if not state.get("ok"):
-        self._send(*_json({"error": "subscription access denied",
-                           "reason": str(state.get("reason") or "invalid"),
-                           "status": int(state.get("status") or 403)},
-                          int(state.get("status") or 403)))
-        return
-    try:
-        data = subs.subscription_text(s).encode("utf-8")
-    except (OSError, TypeError, ValueError):
-        self._send(*_json({"error": "subscription state unavailable"}, 503))
-        return
-    if len(data) > 1024 * 1024:
-        self._send(*_json({"error": "subscription response too large"}, 503))
-        return
-    self.send_response(200)
-    self.send_header("Content-Type", "text/plain; charset=utf-8")
-    self.send_header("Content-Length", str(len(data)))
-    self.send_header("Cache-Control", "no-store")
-    for _name, _value in _security_headers():
-        self.send_header(_name, _value)
-    self.send_header(
-        "Content-Disposition",
-        'inline; filename="aurora-sub-%s.txt"' % _opaque_uid(s.get("uid")))
-    self.end_headers()
-    self.wfile.write(data)
-
-
-
 def _ext_config(req):
-    """GET /api/ext/config?token=... — конфиг браузерного расширения (MV3/DNR).
-
-    Публичный маршрут по device-ссылке (как /sub, без origin-проверки): отдаёт
-    адрес прокси, режим, RU-байпас, признак блокировки, план/срок/трафик,
-    ссылку на бота и версию правил. При недоступной подписке — мастер-код
-    с buy_url, чтобы popup показал «купить»."""
-    qs = urllib.parse.parse_qs((getattr(req, "path", "") or "").split("?", 1)[-1])
-    token = (qs.get("token") or [""])[0].strip()
-    if not token or len(token) > 256 or not token.isascii():
-        req._send(*_json({"error": "invalid subscription request",
-                          "buy_url": config.BUY_URL}, 400))
-        return
-    s, _status = subs.by_token_status(token)
-    if not s:
-        req._send(*_json({"error": "subscription not found",
-                          "buy_url": config.BUY_URL}, 404))
-        return
-    state = subs.access_state(s)
-    if not state.get("ok"):
-        status = int(state.get("status") or 403)
-        req._send(*_json({
-            "error": "subscription access denied",
-            "reason": str(state.get("reason") or "invalid"),
-            "status": status,
-            "buy": True,
-            "message": "Подписка недоступна (%s) — продлить в Telegram-боте."
-                       % str(state.get("reason") or "invalid"),
-            "buy_url": config.BUY_URL,
-        }, status))
-        return
-    now = int(time.time())
+    """GET /api/ext/config — конфиг браузерного расширения, открыт без токена."""
     req._send(*_json({
         "ok": True,
-        "proxy": {
-            "host": config.ext_proxy_host(),
-            "port": int(config.XRAY_PORT),
-            "type": "http",
-        },
+        "proxy": {"host": config.ext_proxy_host(),
+                  "port": int(config.XRAY_PORT), "type": "http"},
         "mode": "vpn" if config.get("vpn_mode", True) else "direct",
         "ru_bypass": bool(config.RU_BYPASS),
-        "blocked": (not bool(s.get("enabled", True))
-                    or int(s.get("blocked_until", 0) or 0) > now),
-        "plan": str(s.get("plan", "")),
-        "expires": int(s.get("expires", 0) or 0),
-        "used": int(s.get("used_bytes", 0) or 0),
-        "limit": int(s.get("limit_bytes", 0) or 0),
-        "buy_url": config.BUY_URL,
+        "blocked": False,
+        "plan": "", "expires": 0, "used": 0, "limit": 0,
+        "buy_url": "",
         "rules_version": config.RULES_VERSION,
     }, 200))
 
@@ -912,21 +736,10 @@ def build_state(local=True):
     st["invite_available"] = False
     st["server_name"] = config.get("server_name", "Home")
     st["show_mesh"] = config.get("show_mesh", False)
-    st["show_subs"] = config.get("show_subs", False)
     st["lan_only"] = bool(config.get("lan_only", False))
     st["rate_limit"] = bool(config.get("rate_limit", True))
     st["block_scanners"] = bool(config.get("block_scanners", False))
-    st["mesh_master"] = False
-    st["setup_complete"] = bool(config.get("setup_complete", False))
     st["setup_token_required"] = bool(config.SETUP_TOKEN)
-    # A-111: лицензия PRO-функций приходит с головного сервера; адрес мастера
-    # наружу не отдаём (внутренний IP), остальное нужно панели и гейту.
-    ext = extgate.state()
-    # A-164: панель спрашивает пакеты расширения (в клиентской сборке пусто).
-    ext["packages"] = _ext_packages()
-    if not local:
-        ext["master"] = ""
-    st["ext"] = ext    # A-WARP-PUB-4: status rezerva WARP v /api/state
     try:
         st["warp"] = warp.status()
     except Exception:
@@ -950,6 +763,10 @@ def build_state(local=True):
         st["tgws_enabled"] = tgws.enabled()
     except Exception:
         st["tgws_enabled"] = bool(config.get("tgws_enabled", True))
+    # Состояние расширения: всё открыто, без лицензии/мастера.
+    ext = extgate.state()
+    ext["packages"] = _ext_packages()
+    st["ext"] = ext
     if not local:
         v = dict(st["vless_ext"])
         for sec in ("link", "uuid", "pbk", "sid", "host", "port", "sni", "fp"):
@@ -988,12 +805,6 @@ def build_state(local=True):
             "is_active": k.get("tag") == vless_now,
         })
     # --- политика сервиса и региональный сегмент ---
-    st["policy_text"] = config.POLICY_TEXT
-    st["policy_rev"] = config.POLICY_REV
-    st["buy_bot"] = config.BUY_BOT
-    st["buy_url"] = config.BUY_URL
-    st["policy_required"] = config.policy_required()
-    st["policy_accepted_rev"] = int(config.get("policy_rev_accepted", 0) or 0)
     st["segment_title"] = config.segment_title()
     st["segment_flag"] = config.segment_flag()
     st["segment_regions"] = config.segment_regions()
@@ -1027,15 +838,6 @@ def _redact_log_line(value):
         "<uuid>", text, flags=re.IGNORECASE)
     return re.sub(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", "<ip>", text)
 
-
-# Оплата и подписки — админ-функция ГОЛОВНОГО сервера. В сборке с GitHub
-# головным быть нельзя (mesh_master жёстко False), поэтому клиент не может
-# записать оплату или выдать себе тариф — только купить в боте.
-SUBS_ADMIN_POSTS = frozenset({
-    "/api/subs/purchase", "/api/subs/apply", "/api/subs/create",
-    "/api/subs/update", "/api/subs/delete", "/api/subs/add_key",
-    "/api/subs/remove_key", "/api/plans/save",
-})
 
 class Handler(BaseHTTPRequestHandler):
     server_version = "Aurora/1.0"
@@ -1113,38 +915,11 @@ class Handler(BaseHTTPRequestHandler):
                 return
             self._send(200, "application/javascript; charset=utf-8", qr.encode("utf-8"))
             return
-        # --- публичная выдача подписки: без авторизации и без LAN-ограничений ---
-        if path == "/sub" or path.startswith("/sub?"):
-            _sub_publish(self)
-            return
         if path == "/api/ext/config" or path.startswith("/api/ext/config?"):
             _ext_config(self)
             return
         if path == "/favicon.ico":
             self._send(200, "image/svg+xml; charset=utf-8", _FAVICON_SVG.encode("utf-8"))
-            return
-        # --- публичная политика меша: без авторизации (нужна узлам) ---
-        # A-WARP-PUB-3: status rezerva WARP (uzel klegko znaet, zagruzhen li
-        # konfig i byl li posledniy zamerenyy vyhod)
-        if path == "/api/warp":
-            if not _trusted_read(self):
-                self._send(*_json({"error": "unauthorized"}, 401))
-                return
-            self._send(*_json(warp.status()))
-            return
-        if path == "/api/masque":
-            if not _trusted_read(self):
-                self._send(*_json({"error": "unauthorized"}, 401))
-                return
-            self._send(*_json(masque.status()))
-            return
-        if path == "/api/mesh/policy":
-            self._send(*_json(mesh.policy()))
-            return
-        # --- публичная политика сервиса: всегда доступна (первая страница) ---
-        if path == "/api/policy":
-            self._send(*_json({"ok": True, "text": config.POLICY_TEXT,
-                               "rev": config.POLICY_REV}))
             return
         # --- публичная справка по региональному сегменту ---
         if path == "/api/rusegment/regions":
@@ -1177,17 +952,7 @@ class Handler(BaseHTTPRequestHandler):
                                     "/api/autobackup", "/api/export/client"):
             self._send(*_json({"error": "management authentication required"}, 403))
             return
-        # гейт видимости: меш-разделы и подписки закрыты, пока головной сервер
-        # не поставит show_mesh/show_subs (правятся только через mesh._policy_loop)
-        if path in ("/api/mesh", "/api/nodes", "/api/routes") and not config.get("show_mesh", False):
-            # A-277: own-subnet view for a local root of its own mesh
-            if not _local_mesh_root():
-                self._send(*_json({"ok": False, "error": "mesh: закрыто до команды мастера"}, 403))
-                return
-        if path in ("/api/subs/list", "/api/subs/plans", "/api/plans", "/api/stats") \
-                and not config.get("show_subs", False):
-            self._send(*_json({"ok": False, "error": "subs: закрыто до команды мастера"}, 403))
-            return
+        # Меш и все остальные разделы доступны локально, без команды мастера.
         if path == "/api/state":
             self._send(*_json(_project_state(build_state(local=trusted), trusted)))
             return
@@ -1229,9 +994,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(*_json({"ok": False, "error": str(e)[:200]}, 400))
             return
         if path == "/api/ext/download":
-            # A-161: архив браузерного расширения - по подписке (триал или PRO).
-            # Прокси при этом не падает: без подписки отдаём честный экран
-            # с buy_url, его дальше рисует панель.
+            # Архив браузерного расширения доступен без подписки.
             _target = ""
             _qs = self.path.split("?", 1)[1] if "?" in self.path else ""
             for _pair in _qs.split("&"):
@@ -1240,10 +1003,6 @@ class Handler(BaseHTTPRequestHandler):
                         _target = urllib.parse.unquote(_pair[7:]).strip().lower()
                     except Exception:
                         _target = ""
-            _denied = extgate.require("extension")
-            if _denied is not None:
-                self._send(*_json(_denied, 403))
-                return
             _name = (getattr(config, "EXT_PACKAGES", {}) or {}).get(_target, "")
             if not _name:
                 self._send(*_json({"ok": False, "error": "ext: неизвестная сборка расширения"}, 400))
@@ -1290,24 +1049,7 @@ class Handler(BaseHTTPRequestHandler):
                                "current": config.VERSION,
                                "chronicle": getattr(config, "VERSION_CHRONICLE", {}) or {}}))
             return
-        if path == "/api/subs/list":
-            self._send(*_json(_subs_list(include_secrets=trusted)))
-            return
-        if path == "/api/subs/plans":
-            self._send(*_json({"ok": True, "plans": config.SUBS_PLANS,
-                               "default": config.SUBS_PLAN_DEFAULT,
-                               "extras": config.SUBS_EXTRAS,
-                               "buy_url": config.BUY_URL}))
-            return
-        if path == "/api/plans":
-            self._send(*_json({"ok": True, "plans": config.SUBS_PLANS,
-                               "default": config.SUBS_PLAN_DEFAULT,
-                               "extras": config.SUBS_EXTRAS,
-                               "buy_url": config.BUY_URL}))
-            return
-        if path == "/api/stats":
-            self._send(*_json(_stats(include_secrets=trusted)))
-            return
+
         if path == "/api/mesh":
             # A-101: показываем честную живость узла (пинг порта прокси,
             # при неудаче - порта панели), иначе все узлы выглядят мертвыми.
@@ -1364,7 +1106,7 @@ class Handler(BaseHTTPRequestHandler):
                 "addon_effects_legend": _lic.get("addon_effects_legend") or {},
                 "unknown": _lic.get("addon_unknown") or [],
                 "effects": effects.status(),
-                "routes": effects.custom_routes(),
+                "routes": effects.routes(),
                 "route_actions": list(effects.ROUTE_ACTIONS),
                 "cap": pool._cap(),
                 "mesh_entitlements": _lic.get("mesh_entitlements") or [],
@@ -1391,12 +1133,6 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?", 1)[0]
         if not _origin_ok(self):
             self._send(*_json({"error": "cross-origin blocked"}, 403))
-            return
-        # приём политики — публично (до входа).
-        # A-945: /api/mesh/register из сборки УБРАН - это маршрут мастера, он
-        # оставлен на master. Узел регистрируется публично на :8445.
-        if path == "/api/policy/accept":
-            self._policy_accept_raw()
             return
         if path == "/api/setup/complete":
             setup_data, body_error = _read_json_body(self)
@@ -1433,34 +1169,10 @@ class Handler(BaseHTTPRequestHandler):
             self._send(*_json({"ok": False, "error": body_error}, 400))
             return
 
-        # гейт политики: до принятия политики запрещены все POST, кроме accept
-        if config.policy_required() and path != "/api/policy/accept":
-            self._send(*_json({"error": "policy required"}, 403))
-            return
-
         if path == "/api/backup/import":
             self._backup_import(data or {})
             return
 
-        # гейт видимости: POST-изменения меша/подписок закрыты, пока мастер
-        # не разрешил (show_mesh/show_subs), /api/mesh/policy — public выше
-        if path.startswith("/api/mesh/") and not config.get("show_mesh", False):
-            # A-274: own-subnet invite for a local root of its own mesh
-            if not _mesh_post_allowed(path):
-                        self._send(*_json({"ok": False, "error": "mesh: закрыто до команды мастера"}, 403))
-                        return
-        if (path.startswith("/api/subs/") or path in ("/api/plans/save",)) \
-                and not config.get("show_subs", False):
-            self._send(*_json({"ok": False, "error": "subs: закрыто до команды мастера"}, 403))
-            return
-
-        # Оплата и подписки — только головной сервер (см. SUBS_ADMIN_POSTS).
-        if path in SUBS_ADMIN_POSTS and not config.get("mesh_master", False):
-            self._send(*_json({"ok": False, "error": "subs: оплату и "
-                                                    "подписки ведёт "
-                                                    "головной "
-                                                    "сервер"}, 403))
-            return
 
         handler = {
             "/api/vpn_mode": self._vpn_mode,
@@ -1520,15 +1232,6 @@ class Handler(BaseHTTPRequestHandler):
             "/api/security/access": self._security_access,
             "/api/update/check": self._update_check,
             "/api/update/apply": self._update_apply,
-            "/api/subs/create": self._subs_create,
-            "/api/subs/update": self._subs_update,
-            "/api/subs/delete": self._subs_delete,
-            "/api/subs/add_key": self._subs_add_key,
-            "/api/subs/remove_key": self._subs_remove_key,
-            "/api/subs/apply": self._subs_apply,
-            "/api/subs/purchase": self._subs_purchase,
-            "/api/subs/device/instructions": self._subs_device_instructions,
-            "/api/plans/save": self._plans_save,
             "/api/settings/save": self._settings_save,
             "/api/setup/complete": self._setup_complete,
             "/api/settings/reset": self._settings_reset,
@@ -1544,9 +1247,7 @@ class Handler(BaseHTTPRequestHandler):
             # не место (иначе сборка сама принимала бы узлы по master-токену).
             "/api/mesh/node/remove": self._mesh_node_remove,
             "/api/mesh/join": self._mesh_join,
-            # A-945: свои правила маршрутизации (купленная позиция whitelist).
-            # Проверка в /api/addons: без покупки правила хранятся, но xray их
-            # не применяет - включать можно только купленное.
+            # Свои правила маршрутизации сохраняются и применяются всегда.
             "/api/routes/custom/save": self._routes_custom_save_raw,
         }.get(path)
         if handler:
@@ -2060,26 +1761,7 @@ class Handler(BaseHTTPRequestHandler):
         started = rusegment.check_all()
         self._send(*_json({"ok": True, "started": started}))
 
-    def _policy_accept_raw(self):
-        """Публичный приём политики (без origin/auth). Читает тело вручную."""
-        ip = self.client_address[0]
-        if not _public_allowed("policy_accept", ip, max_hits=10, window=60):
-            self._send(*_json({"ok": False, "error": "too many requests"}, 429))
-            return
-        data, body_error = _read_json_body(self)
-        if body_error:
-            self._send(*_json({"ok": False, "error": body_error}, 400))
-            return
-        rev = data.get("rev")
-        if type(rev) is not int or rev != config.POLICY_REV:
-            self._send(*_json({"ok": False, "error": "invalid policy revision"}, 400))
-            return
-        config.set("policy_rev_accepted", rev)
-        config.save_settings()
-        _public_succeeded("policy_accept", ip)
-        self._send(*_json({"ok": True, "rev": rev}))
 
-    def _rusegment_region(self, data):
         regions = data.get("regions") or []
         if isinstance(regions, list):
             regions = [str(r).strip() for r in regions if str(r).strip() in config.REGIONS]
@@ -2228,10 +1910,6 @@ class Handler(BaseHTTPRequestHandler):
         if not isinstance(pin, str) or not re.fullmatch(r"[0-9]{6}", pin):
             _setup_reject(self, "invalid pin", 400)
             return
-        policy_rev = data.get("policy_rev")
-        if type(policy_rev) is not int or policy_rev != config.POLICY_REV:
-            _setup_reject(self, "policy revision required", 400)
-            return
         ports = {}
         for port_key in ("ui_port", "xray_port", "xray_api_port", "tgws_port"):
             port_value = data.get(port_key)
@@ -2243,18 +1921,7 @@ class Handler(BaseHTTPRequestHandler):
             _setup_reject(self, "invalid ports", 400)
             return
         restart_required = any(ports[key] != getattr(config, key.upper()) for key in ports)
-        invite = data.get("mesh_invite")
-        if invite is not None and not isinstance(invite, str):
-            _setup_reject(self, "invalid mesh invite", 400)
-            return
-        invite = (invite or "").strip()[:2048]
         mesh_joined = False
-        if invite:
-            joined, join_err = mesh.join_via_invite(invite, name=name.strip())
-            if joined:
-                mesh_joined = True
-            else:
-                config.log("api: setup mesh invite skipped: %s" % (join_err or "unknown"))
         transport = data.get("warp_transport")
         if transport not in (None, "", "off", "wireguard", "masque"):
             _setup_reject(self, "invalid warp transport", 400)
@@ -2265,8 +1932,6 @@ class Handler(BaseHTTPRequestHandler):
             "ui_token": password,
             "twofa": True,
             "ui_pin": pin,
-            "policy_rev_accepted": policy_rev,
-            "setup_complete": True,
             "warp_transport": transport,
         }
         values.update(ports)
@@ -2290,6 +1955,47 @@ class Handler(BaseHTTPRequestHandler):
         self._send(*_json({"ok": True, "mesh_joined": mesh_joined,
                            "restart_required": restart_required,
                            "settings": _settings()["settings"]}))
+
+    def _rusegment_region(self, data):
+        regions = data.get("regions") or []
+        if isinstance(regions, list):
+            regions = [str(r).strip() for r in regions if str(r).strip() in config.REGIONS]
+        else:
+            regions = []
+        if not regions:
+            regions = ["ru"]
+        title = str(data.get("title") or "").strip()[:80]
+        custom = str(data.get("custom") or "").strip()[:4000]
+        config.set("segment_regions", regions)
+        config.set("segment_title", title)
+        config.set("segment_custom", custom)
+        config.save_settings()
+        threading.Thread(target=rusegment.check_all, daemon=True).start()
+        self._send(*_json({"ok": True, "title": config.segment_title(),
+                           "flag": config.segment_flag()}))
+
+
+    def _settings_save(self, data):
+        values = {}
+        for key in ("server_name", "auto_refresh", "mesh_id"):
+            if key not in data:
+                continue
+            value = data[key]
+            if key == "auto_refresh":
+                if type(value) is not bool:
+                    self._send(*_json({"ok": False, "error": "auto_refresh must be boolean"}, 400))
+                    return
+                values[key] = value
+            else:
+                if not isinstance(value, str):
+                    self._send(*_json({"ok": False, "error": "%s must be a string" % key}, 400))
+                    return
+                values[key] = value.strip()
+        if not config.set_many(values):
+            self._send(*_json({"ok": False, "error": "settings save failed"}, 500))
+            return
+        self._send(*_json({"ok": True, "settings": _settings()["settings"]}))
+
 
     def _security_password(self, data):
         value = data.get("password", "")
@@ -2411,245 +2117,8 @@ class Handler(BaseHTTPRequestHandler):
             threading.Timer(0.8, os._exit, args=(0,)).start()
         self._send(*_json(r))
 
-    def _subs_apply_clients_bg(self):
-        threading.Thread(target=lambda: core.apply_sub_clients(),
-                         daemon=True).start()
 
-    def _subs_create(self, data):
-        name = str(data.get("name", "") or "").strip()
-        plan = str(data.get("plan", "") or config.SUBS_PLAN_DEFAULT).strip()
-        remark = str(data.get("remark", "") or "").strip()
-        try:
-            s = subs.create(name=name or None, plan=plan, remark=remark)
-        except (TypeError, ValueError) as exc:
-            self._send(*_json({"ok": False, "error": str(exc)}, 400))
-            return
-        except OSError:
-            self._send(*_json({"ok": False, "error": "subscription write failed"}, 500))
-            return
-        self._subs_apply_clients_bg()
-        self._send(*_json({"ok": True, "sub": _subs_safe(s)}))
-
-    def _subs_update(self, data):
-        uid = str(data.get("uid", "") or "").strip()
-        if not uid:
-            self._send(*_json({"ok": False, "error": "no uid"}, 400))
-            return
-        upd = {}
-        for f in ("name", "remark", "plan", "enabled", "expires",
-                  "limit_bytes", "limit_devices", "limit_keys"):
-            if f in data:
-                upd[f] = data[f]
-        if not upd:
-            self._send(*_json({"ok": False, "error": "no fields"}, 400))
-            return
-        s = subs.find(uid)
-        if not s:
-            self._send(*_json({"ok": False, "error": "subscription not found"}, 400))
-            return
-        try:
-            subs.update(uid, **upd)
-        except (TypeError, ValueError) as exc:
-            self._send(*_json({"ok": False, "error": str(exc)}, 400))
-            return
-        self._subs_apply_clients_bg()
-        self._send(*_json({"ok": True, "sub": _subs_safe(subs.find(uid) or {})}))
-
-    def _subs_delete(self, data):
-        uid = str(data.get("uid", "") or "").strip()
-        if not uid or not subs.delete(uid):
-            self._send(*_json({"ok": False, "error": "subscription not found"}, 400))
-            return
-        self._subs_apply_clients_bg()
-        self._send(*_json({"ok": True, "deleted": uid}))
-
-    def _subs_add_key(self, data):
-        uid = str(data.get("uid", "") or "").strip()
-        remark = str(data.get("remark", "") or "").strip()
-        device_id = str(data.get("device_id", "") or "").strip()[:64]
-        s = subs.find(uid)
-        if not s:
-            self._send(*_json({"ok": False, "error": "subscription not found"}, 400))
-            return
-        try:
-            key, sub = subs.add_key(uid, remark=remark, device_id=device_id)
-        except PermissionError as exc:
-            self._send(*_json({"ok": False, "error": str(exc)}, 403))
-            return
-        except (TypeError, ValueError) as exc:
-            self._send(*_json({"ok": False, "error": str(exc)}, 400))
-            return
-        if not sub:
-            self._send(*_json({"ok": False, "error": "subscription not found"}, 400))
-            return
-        if not key:
-            self._send(*_json({"ok": False, "error": "key limit reached"}, 409))
-            return
-        self._subs_apply_clients_bg()
-        self._send(*_json({"ok": True, "key": {"key_handle": _key_handle(uid, key.get("id", ""))},
-                           "sub": _subs_safe(sub)}))
-
-    def _subs_remove_key(self, data):
-        uid = str(data.get("uid", "") or "").strip()
-        kid = str(data.get("key_id", "") or data.get("key_handle", "") or "").strip()
-        if not uid or not subs.remove_key(uid, kid):
-            self._send(*_json({"ok": False, "error": "key not found"}, 400))
-            return
-        self._subs_apply_clients_bg()
-        self._send(*_json({"ok": True, "removed": kid or True}))
-
-    def _subs_device_instructions(self, data):
-        """A-110: инструкция подключения ключа (устройство = купленный ключ).
-
-        Клиент знает только маскированный uid/key_handle, поэтому ищем подписку
-        по handle, а если он не пришёл - берём единственную с ключами.
-        """
-        key_handle = str(data.get("key_handle", "") or data.get("key_id", "") or "").strip()
-        uid = str(data.get("uid", "") or "").strip()
-        platform = str(data.get("platform", "") or "").strip()
-        rows = [s for s in subs.all() if isinstance(s, dict)]
-        target = None
-        for s in rows:
-            if uid and str(s.get("uid", "")) == uid:
-                target = s
-                break
-            if key_handle:
-                for k in s.get("keys") or []:
-                    if not isinstance(k, dict):
-                        continue
-                    if _key_handle(s.get("uid", ""), k.get("id", "")) == key_handle:
-                        target = s
-                        break
-            if target is not None:
-                break
-        if target is None and not uid and not key_handle:
-            for s in rows:
-                if s.get("keys"):
-                    target = s
-                    break
-        if target is None:
-            self._send(*_json({"ok": False, "error": "subscription not found"}, 404))
-            return
-        info = subs.device_instructions(target, platform=platform,
-                                        key_id=str(data.get("key_id", "") or "").strip())
-        info["buy_url"] = config.BUY_URL
-        self._send(*_json(info))
-
-    def _subs_apply(self, data):
-        ok, msg = core.apply_sub_clients()
-        self._send(*_json({"ok": bool(ok), "pending": not ok, "msg": msg},
-                          200 if ok else 503))
-
-    def _subs_purchase(self, data):
-        """Внесение оплаты: создание/продление подписки."""
-        plan = str(data.get("plan", "") or "").strip()
-        if plan and plan not in config.SUBS_PLANS:
-            self._send(*_json({"ok": False, "error": "тариф %s не найден" % plan}, 400))
-            return
-        try:
-            sub, status, msg, payment = subs.purchase_with_receipt(
-                uid=str(data.get("uid", "") or "").strip() or None,
-                name=str(data.get("name", "") or "").strip() or None,
-                plan=plan,
-                remark=str(data.get("remark", "") or "").strip(),
-                amount=data.get("amount") if "amount" in data else None,
-                idempotency_key=str(data.get("idempotency_key", "") or "").strip() or None)
-        except (TypeError, ValueError) as exc:
-            self._send(*_json({"ok": False, "error": str(exc)}, 400))
-            return
-        if status == "error":
-            self._send(*_json({"ok": False, "error": msg}, 400))
-            return
-        if status == "conflict":
-            self._send(*_json({"ok": False, "error": msg, "status": status}, 409))
-            return
-        if status == "created":
-            self._subs_apply_clients_bg()
-        self._send(*_json({"ok": True, "sub": _subs_safe(sub or {}),
-                           "status": status, "msg": msg, "payment": payment}))
-
-    def _plans_save(self, data):
-        plans = data.get("plans")
-        if not isinstance(plans, dict) or not plans:
-            self._send(*_json({"ok": False, "error": "no plans"}, 400))
-            return
-        need = ("name", "price", "bytes", "days", "devices", "keys")
-        in_use = {}
-        for row in subs.all():
-            for pid in (row.get("plan"), row.get("plan_next")):
-                if pid:
-                    in_use.setdefault(str(pid), row)
-        blocked = []
-        for pid, value in plans.items():
-            if not isinstance(value, dict):
-                continue
-            pid = str(pid or "").strip()
-            if pid not in in_use or pid not in config.SUBS_PLANS:
-                continue
-            current = config.SUBS_PLANS[pid]
-            for field in ("bytes", "days", "devices", "keys"):
-                if field in value:
-                    try:
-                        want = int(value[field] or 0)
-                    except (TypeError, ValueError):
-                        continue
-                    if want != int(current.get(field, 0) or 0):
-                        blocked.append(pid)
-                        break
-        if blocked:
-            self._send(*_json({"ok": False,
-                               "error": "используемый тариф нельзя изменить: %s"
-                                        % ", ".join(sorted(set(blocked)))}, 409))
-            return
-        changed = 0
-        for k, v in plans.items():
-            if not isinstance(v, dict):
-                continue
-            k = str(k or "").strip()
-            # новые тарифы: id = латиница/цифры/_- до 40 симв.
-            valid_slug = bool(k) and len(k) <= 40 and k.isascii() and k.islower() and \
-                all(c in "abcdefghijklmnopqrstuvwxyz0123456789_-" for c in k)
-            if not valid_slug:
-                continue
-            if k in config.SUBS_PLANS:
-                cur = dict(config.SUBS_PLANS[k])
-            else:
-                # новый план: без названия не создаём
-                if not str(v.get("name") or "").strip():
-                    continue
-                cur = {"name": "", "price": 0, "bytes": 0,
-                       "days": 30, "devices": 1, "keys": 1,
-                       "features": [], "features_no": []}
-            for f in need:
-                if f in v:
-                    if f == "name":
-                        cur[f] = str(v[f]).strip()[:40] or cur[f]
-                    else:
-                        try:
-                            value = int(v[f] or 0)
-                            if value < 0 or (f in ("devices", "keys") and value < 1):
-                                raise ValueError
-                            cur[f] = value
-                        except (TypeError, ValueError):
-                            return self._send(*_json({"ok": False,
-                                                      "error": "поле %s имеет недопустимое значение" % f}, 400))
-            # описание тарифа: списки включённых/невключённых возможностей
-            for f in ("features", "features_no"):
-                if f in v and isinstance(v[f], list):
-                    cur[f] = [str(x).strip()[:80] for x in v[f]
-                              if isinstance(x, str) and x.strip()]
-            config.SUBS_PLANS[k] = cur
-            config.log("api: тариф %s обновлён" % k)
-            changed += 1
-        if not changed:
-            self._send(*_json({"ok": False, "error": "пустое обновление"}, 400))
-            return
-        config.save_plans()
-        config.log("api: сохранены тарифы (%d)" % changed)
-        self._send(*_json({"ok": True, "plans": config.SUBS_PLANS}))
-
-    def _settings_save(self, data):
-        values = {"mesh_master": False}
+        values = {}
         for key in ("server_name", "auto_refresh", "mesh_id"):
             if key not in data:
                 continue
@@ -2744,44 +2213,24 @@ class Handler(BaseHTTPRequestHandler):
                 return
             self._send(*_json({"ok": True, "node": node}))
             return
-        ok, err = mesh.join_via_invite(invite, name or None, region or "RU")
-        if not ok:
-            self._send(*_json({"ok": False, "error": err or "join failed"}, 400))
-            return
-        self._send(*_json({"ok": True}))
+        self._send(*_json({"ok": False,
+                           "error": "нужен invite своей сети (proof)"}, 400))
 
     def _routes_custom_save_raw(self, data):
-        """A-945: сохранить свои правила маршрутизации и применить их на xray.
-
-        Правила пишутся всегда, но применяются только при купленной whitelist:
-        включать можно лишь то, что куплено."""
+        """Свои правила маршрутизации сохраняются и применяются всегда."""
         rows = data.get("routes")
-        if not isinstance(rows, list):
-            self._send(*_json({"ok": False, "error": "routes must be a list"}, 400))
-            return
-        if len(rows) > 400:
-            self._send(*_json({"ok": False, "error": "too many routes"}, 400))
+        if not isinstance(rows, list) or len(rows) > 400:
+            self._send(*_json({"ok": False, "error": "routes must be a list (<=400)"}, 400))
             return
         if not effects.set_custom_routes(rows):
             self._send(*_json({"ok": False, "error": "save failed"}, 500))
             return
-        lic = extgate.state() or {}
-        active = set()
-        effects_map = lic.get("addon_effects") or {}
-        for name in lic.get("addons") or []:
-            for code in effects_map.get(name) or []:
-                active.add(code)
-        applied = "custom_routes" in active
-        if applied:
-            try:
-                core.sync()
-            except Exception as e:
-                config.log("routes: custom rules saved, xray sync failed: %s" % e)
-        config.log("routes: свои правила сохранены (%d), применены: %s"
-                   % (len(effects.custom_routes()), applied))
-        self._send(*_json({"ok": True, "routes": effects.custom_routes(),
-                           "applied": applied}))
-
+        try:
+            core.sync()
+        except Exception as e:
+            config.log("routes: saved, xray sync failed: %s" % e)
+        self._send(*_json({"ok": True, "routes": effects.routes(),
+                           "applied": True}))
 
     def _mesh_node_remove(self, data):
         nid = str(data.get("id") or "").strip()
@@ -2861,79 +2310,46 @@ def _versions_list():
     return out
 
 
-def _stats(include_secrets=True):
-    now = int(time.time())
-    week_ago = now - 7 * 86400
-    subs_all = subs.all()
-    snapshot = subs.billing_snapshot(now)
-    month = str(snapshot.get("month") or subs._billing_month(now))
-    by_plan = {}
 
-    def row_for(plan_id):
-        plan_id = str(plan_id or config.SUBS_PLAN_DEFAULT)
-        row = by_plan.get(plan_id)
-        if row is None:
-            plan = config.SUBS_PLANS.get(plan_id) or {}
-            row = {
-                "plan": plan_id,
-                "name": plan.get("name", plan_id),
-                "price": int(plan.get("price", 0) or 0),
-                "count": 0,
-                "active_count": 0,
-                "income": 0,
-            }
-            by_plan[plan_id] = row
-        return row
+    """A-101: живость узла для панели.
 
-    for s in subs_all:
-        row = row_for(s.get("plan", config.SUBS_PLAN_DEFAULT))
-        row["count"] += 1
-        if subs.access_status(s, now) == "ok":
-            row["active_count"] += 1
-
-    income_month = 0
-    for payment in snapshot.get("month_payments", []) or []:
-        if payment.get("kind") != "payment" or payment.get("state") != "paid":
-            continue
+    Пингуем порт прокси, а если он не отвечает - порт панели узла
+    (в узлах часто указан именно порт панели, а не прокси).
+    Возвращает копию узла с полями ok/ping_ms/status/ping_port/reason.
+    """
+    if not isinstance(node, dict):
+        return {"id": "", "name": "-", "region": "", "role": "node",
+                "ok": False, "ping_ms": 0, "status": "off", "ping_port": 0,
+                "reason": "bad-node"}
+    host = str(node.get("host") or "").strip()
+    ports = []
+    for key in ("port", "policy_port"):
         try:
-            amount = int(payment.get("amount", 0) or 0)
+            port = int(node.get(key) or 0)
         except (TypeError, ValueError):
-            amount = 0
-        if amount < 0:
-            continue
-        income_month += amount
-        row = row_for(payment.get("plan", config.SUBS_PLAN_DEFAULT))
-        row["income"] += amount
+            port = 0
+        if 1 <= port <= 65535 and port not in ports:
+            ports.append(port)
+    ok = False
+    ms = 0
+    used = 0
+    for port in ports:
+        try:
+            ok, ms = mesh.ping(host, port, timeout)
+        except Exception:
+            ok, ms = False, 0
+        if ok:
+            used = port
+            break
+    out = dict(node)
+    out["ok"] = bool(ok)
+    out["ping_ms"] = int(ms) if ok else 0
+    out["status"] = ("online" if ms <= 500 else "warn") if ok else "off"
+    out["ping_port"] = used
+    if not ok:
+        out["reason"] = "timeout" if ports else "no-port"
+    return out
 
-    total = len(subs_all)
-    active = sum(1 for s in subs_all if subs.access_status(s, now) == "ok")
-    rows = []
-    for row in by_plan.values():
-        rows.append({
-            "plan": row["plan"],
-            "name": row["name"],
-            "price": row["price"],
-            "count": row["count"],
-            "active_count": row["active_count"],
-            "share": round(row["count"] * 100.0 / total, 1) if total else 0,
-            "active_share": round(row["active_count"] * 100.0 / active, 1) if active else 0,
-            "income": row["income"],
-        })
-    rows.sort(key=lambda r: (-r["active_count"], -r["count"], r["plan"]))
-    return {
-        "ok": True,
-        "stats_version": 2,
-        "month": month,
-        "period": {"month": month, "timezone": "UTC"},
-        "total": total,
-        "active": active,
-        "new_week": sum(1 for s in subs_all if s.get("created", 0) >= week_ago),
-        "traffic_month": int(snapshot.get("traffic_month", 0) or 0),
-        "income_month": income_month,
-        "rows": rows,
-        "payments": (snapshot.get("payments", []) or [])
-        if include_secrets else [],
-    }
 
 
 def _node_alive(node, timeout=2.0):
@@ -2975,7 +2391,6 @@ def _node_alive(node, timeout=2.0):
     if not ok:
         out["reason"] = "timeout" if ports else "no-port"
     return out
-
 
 
 def _tunnel_module():
@@ -3185,11 +2600,9 @@ def _settings():
             "auto_refresh": config.get("auto_refresh", True),
             "mesh_id": config.get("mesh_id", ""),
             "show_mesh": config.get("show_mesh", False),
-            "show_subs": config.get("show_subs", False),
             "lan_only": bool(config.get("lan_only", False)),
             "rate_limit": bool(config.get("rate_limit", True)),
             "block_scanners": bool(config.get("block_scanners", False)),
-            "mesh_master": False,
             "setup_complete": bool(config.get("setup_complete", False)),
         },
     }
@@ -3231,8 +2644,6 @@ def serve(port=None):
     security.init()
     _migrate_storage()
     port = port or config.UI_PORT
-    mesh.start_policy_loop()
-    subs.start_background()
     _load_ui_token()
     # bind 0.0.0.0 (панель доступна из LAN); защита: Origin-проверка для POST,
     # Bearer (security.check) + опциональный токен (settings.ui_token),

@@ -6,7 +6,6 @@ import mesh  # A-855: mesh-piry
 import meshtunnel  # A-855: mesh-piry
 import atexit
 import hashlib
-import ipaddress
 import json
 import os
 import re
@@ -16,14 +15,15 @@ import subprocess
 import tempfile
 import threading
 import time
-import urllib.parse
 import urllib.request
 from contextlib import contextmanager
 
 import config
 import crypt
 import pool
-import subs
+import warp  # A-WARP-PUB: rezervnyy kanal WARP
+import mesh  # A-855: mesh-piry
+import meshtunnel  # A-855: mesh-piry
 
 XRAY_CONFIG_LOCK = threading.RLock()  # RLock: read-modify-write оборачивается этим локом целиком
 EGRESS_LOCK = threading.Lock()
@@ -133,24 +133,59 @@ def _xray_bin():
     return None
 
 
-def _master_source_ip():
-    raw = str(config.get("master_addr", "") or "").strip()
-    if not raw:
+# --- A-145: локальный relay-туннель меш-сети ---
+def _mesh_outbound():
+    """A-145: исходящий relay-туннель (SOCKS5 меш-релея на loopback).
+
+    Выключено по умолчанию: пока mesh_tunnel выключен, конфиг xray
+    не меняется ни на байт."""
+    if not config.get("mesh_tunnel", False):
         return None
-    if "://" not in raw:
-        raw = "//" + raw
     try:
-        host = urllib.parse.urlparse(raw).hostname
-        return str(ipaddress.ip_address(host)) if host else None
-    except ValueError:
+        import meshtunnel
+    except Exception:
         return None
+    try:
+        if not meshtunnel.enabled():
+            return None
+        port = int(meshtunnel.MESH_PORT) + 1
+    except Exception:
+        return None
+    if port <= 0 or port > 65535:
+        return None
+    return {"tag": "mesh", "protocol": "socks",
+            "settings": {"servers": [{"address": "127.0.0.1", "port": port}]}}
 
 
-# --- A-145: исходящий relay-туннель меш-сети (по подписке клиента) ---
+def _vless_emails(cfg):
+    """A-145: email-адреса клиентов VLESS (якорь для маршрутизации)."""
+    out = []
+    for inbound in (cfg.get("inbounds") or []):
+        if not isinstance(inbound, dict) or inbound.get("tag") != "vless-in":
+            continue
+        clients = ((inbound.get("settings") or {}).get("clients") or [])
+        for client in clients:
+            if not isinstance(client, dict):
+                continue
+            email = str(client.get("email") or "").strip()
+            if email and email not in out:
+                out.append(email)
+    return out[:64]
+
+
+def _mesh_rule_position(rules):
+    """Позиция для mesh-правила: после block/direct-правил, но до inboundTag
+    (RU-байпас и http-правило идут в туннель)."""
+    for idx, rule in enumerate(rules):
+        if isinstance(rule, dict) and rule.get("inboundTag"):
+            return idx
+    return len(rules)
+
+
 def _masque_outbounds():
     """A-MASQUE-ROUTE: zhivoy vyhod cherez lokalnyy mihomo (MASQUE).
 
-    Chistyy WireGuard WARP na nekotoryh masterakh ne otvechaet: ipify i
+    Chistyy WireGuard WARP na nekotoryh uzlah ne otvechaet: ipify i
     instagram cherez xray visnut, togda kak mihomo na mixed-port 18808
     normalno otdayot 104.28.x.x. Podmenyaem outbound-y s tegami warp/
     warp-noise na freedom cherez lokalnyy SOCKS mihomo. Catch-all pravila
@@ -538,7 +573,7 @@ MESH_LIVE_TTL = 60.0
 
 
 def _custom_routes():
-    """A-945: свои правила маршрутизации (купленная позиция whitelist).
+    """Свои правила маршрутизации применяются всегда, без проверок и подписок.
 
     Человек описал свой маршрут - он идёт первым, до штатных правил. Семантику
     не выдумываем: у каждого правила действие выбирает сам человек
@@ -636,7 +671,7 @@ def build_xray_config(final_tag):
     # geoip:private -> direct (destination у этих пакетов сам 127.0.0.1),
     # xray уходит в direct и дозванивается сам в свой же порт -> бесконечная
     # петля соединений -> утечка fd "too many open files" и смерть прокси.
-    # Воспроизведено на мастере: 8 -> 63962 fd за ~9 c от ОДНОГО коннекта.
+    # Воспроизведено на узле: 8 -> 63962 fd за ~9 c от ОДНОГО коннекта.
     rules.insert(0, {"type": "field", "inboundTag": ["api-in"],
                      "outboundTag": "api-in", "ruleTag": "aurora-xray-api"})
 
@@ -655,22 +690,13 @@ def build_xray_config(final_tag):
         "routing": {"domainStrategy": "IPIfNonMatch", "rules": _custom_routes() + rules},
     }
     # Внешний VLESS-Reality inbound для подключения к прокси ИЗВНЕ.
-    # При замке master_only сервер не раскрывает наружу входящий VLESS:
-    # просочиться в этот сервер извне нельзя, работает только локальный http-in.
+    # Клиент в конфиге один — owner-UUID (владелец сервера).
     vln = config.vless_public()
-    master_locked = config.get("master_only", False)
-    if vln.get("enabled") and vln.get("uuid") and not master_locked:
-        # мастер-uuid (владелец сервера) + все активные подписочные клиенты
+    if vln.get("enabled") and vln.get("uuid"):
         clients = [{
             "id": vln["uuid"],
             "flow": vln.get("flow", "xtls-rprx-vision"),
         }]
-        for cuuid in subs.build_client_list():
-            clients.append({
-                "id": cuuid,
-                "email": cuuid,
-                "flow": vln.get("flow", "xtls-rprx-vision"),
-            })
         cfg["inbounds"].insert(1, {
             "tag": "vless-in",
             "listen": "0.0.0.0",
@@ -693,7 +719,7 @@ def build_xray_config(final_tag):
                 },
             },
         })
-        # A-145: подписочные клиенты -> relay-туннель меш-сети (по email)
+    # A-145: owner-VLESS -> локальный relay-туннель меш-сети (по email)
     mesh_ob = _mesh_outbound()
     if mesh_ob:
         mesh_emails = _vless_emails(cfg)
@@ -702,28 +728,7 @@ def build_xray_config(final_tag):
             rules.insert(_mesh_rule_position(rules),
                          {"type": "field", "inboundTag": ["vless-in"],
                           "email": mesh_emails, "outboundTag": "mesh"})
-    # A-293: туннель головного - через его внешний VLESS Reality (8443).
-    # Правило вставляется ПЕРЕД catch-all, домашний/обычный трафик не трогаем.
-    if _master_mesh_outbound():
-        cfg["outbounds"].append(_master_mesh_outbound())
-        rules.insert(_mesh_rule_position(rules), _master_mesh_rule())
     http_rule["inboundTag"] = ["http-in", "vless-in"]
-    if master_locked:
-        master_ip = _master_source_ip()
-        if master_ip:
-            rules.insert(0, {
-                "type": "field",
-                "sourceIP": [master_ip],
-                "inboundTag": ["http-in"],
-                "outboundTag": tag,
-            })
-            rules.insert(1, {
-                "type": "field",
-                "inboundTag": ["http-in"],
-                "outboundTag": "block",
-            })
-        else:
-            cfg["inbounds"][0]["listen"] = "127.0.0.1"
     # A-855: локальный socks-inbound на каждого mesh-пира с известным
     # профилем (A-164/A-168). Без этого путь «дозвониться до пира через
     # его локальный xray» не собирался, и core._mesh_peers() был пуст.
@@ -732,98 +737,12 @@ def build_xray_config(final_tag):
     return cfg
 
 
-# A-293: соединение с туннелем головного (mesh) идёт через его ВНЕШНИЙ
-# VLESS Reality :8443 - тот порт и так открыт наружу, а 51821 закрыт роутером.
-# Настройки берём ТОЛЬКО из env AURORA_MESH_MASTER_VLESS (JSON) - без env
-# поведение узла не меняется ничего, секреты в репозиторий не попадают.
-_MASTER_MESH_TAG = "master-mesh"
-_MASTER_MESH_DEFAULT_PORT = 51821
-
-
-def _master_mesh_spec():
-    """A-293: параметры внешнего VLESS головного из env (пусто = выключено)."""
-    raw = (os.environ.get("AURORA_MESH_MASTER_VLESS", "") or "").strip()
-    if not raw:
-        return None
-    try:
-        import json
-        data = json.loads(raw)
-    except Exception:
-        return None
-    if not isinstance(data, dict):
-        return None
-    for field in ("id", "pbk", "sid", "sni", "host"):
-        if not str(data.get(field) or "").strip():
-            return None
-    try:
-        port = int(data.get("port") or 8443)
-    except (TypeError, ValueError):
-        return None
-    if not 0 < port < 65536:
-        return None
-    data["port"] = port
-    return data
-
-
-def _master_mesh_port():
-    """A-293: локальный порт, который клиент шлёт мастеру (по умолчанию 51821)."""
-    raw = (os.environ.get("AURORA_MESH_MASTER_PORT", "") or "").strip()
-    if raw:
-        try:
-            port = int(raw)
-        except (TypeError, ValueError):
-            port = 0
-        if 0 < port < 65536:
-            return port
-    return _MASTER_MESH_DEFAULT_PORT
-
-
-def _master_mesh_outbound():
-    """A-293: outbound к внешнему VLESS Reality головного (fail-closed)."""
-    spec = _master_mesh_spec()
-    if not spec:
-        return None
-    return {
-        "tag": _MASTER_MESH_TAG,
-        "protocol": "vless",
-        "settings": {"vnext": [{
-            "address": spec["host"],
-            "port": spec["port"],
-            "users": [{"id": spec["id"], "encryption": "none",
-                       "flow": str(spec.get("flow") or "xtls-rprx-vision")}],
-        }]},
-        "streamSettings": {
-            "network": "tcp",
-            "security": "reality",
-            "realitySettings": {
-                "serverName": spec["sni"],
-                "fingerprint": "chrome",
-                "publicKey": spec["pbk"],
-                "shortId": spec["sid"],
-            },
-        },
-    }
-
-
-def _master_mesh_rule():
-    """A-293: трафик на порт туннеля головного уводим в его внешний VLESS."""
-    return {"type": "field", "inboundTag": ["http-in"],
-            "port": str(_master_mesh_port()),
-            "outboundTag": _MASTER_MESH_TAG,
-            "ruleTag": "aurora-master-mesh"}
-
-
 def _authoritative_config(cfg, target):
     import copy
     allowed = {k.get("tag", "") for k in pool.get_keys() if k.get("tag")}
     # A-146: релей-туннель меш-сети не считаем «чужим» outbound: иначе
     # автосинхронизация вычистит и outbound, и правило маршрутизации.
     allowed.add("mesh")
-    # A-293: outbound к внешнему VLESS головного - тоже не «чужой», иначе
-    # автосинхронизация вычистит и outbound, и правило маршрутизации.
-    master_mesh_ob = _master_mesh_outbound()
-    if master_mesh_ob:
-        allowed.add(master_mesh_ob["tag"])
     # A-146: возвращаем outbound mesh, если правила по нему остались
     mesh_ob = _mesh_outbound()
     if mesh_ob and not any(isinstance(o, dict) and o.get("tag") == "mesh"
@@ -903,8 +822,7 @@ def _authoritative_config(cfg, target):
         if rule.get("type") != "field":
             return False
         if rule.get("ruleTag"):
-            # A-295: aurora-master-mesh тоже матчит http-in,
-            # но это служебное правило, а не catch-all.
+            # Служебные правила меша тоже матчат http-in, но не являются catch-all.
             return False
         tags = rule.get("inboundTag")
         if not isinstance(tags, list):
@@ -1422,9 +1340,8 @@ def _is_service_rule(rule):
 def _is_final_http_rule(rule):
     """A-295: финальное VPN-правило - это http-in БЕЗ ruleTag.
 
-    A-293 добавил служебное правило aurora-master-mesh с inboundTag
-    ["http-in"], и обычный поиск "первого правила с http-in" возвращал
-    'master-mesh': собственный выход узла уезжал в служебный outbound.
+    Служебные правила меша с inboundTag ["http-in"] раньше могли подменить
+    собой первый http-in и увести собственный выход узла в служебный outbound.
     Служебные правила (ruleTag) из выбора финального тега исключаются.
     """
     if not isinstance(rule, dict) or _is_service_rule(rule):
@@ -1473,53 +1390,6 @@ def _set_direct_impl():
                         comm={"state": "idle", "msg": ""})
     config.log("core: final=direct (прямой режим)")
     return True
-
-
-def apply_sub_clients():
-    """Перезаписывает clients inbound vless-in в существующем xray.json
-    (мастер + все активные подписочные uuid) и рестартует xray.
-    ТОЛЬКО правка clients — routing/outbounds не трогаются (безопасно вживую).
-    Возвращает (ok: bool, msg: str)."""
-    vln = config.vless_public()
-    if not (vln.get("enabled") and vln.get("uuid")):
-        return False, "внешний inbound не настроен"
-    flow = vln.get("flow", "xtls-rprx-vision")
-    clients = [{"id": vln["uuid"], "flow": flow}]
-    try:
-        for cuuid in subs.build_client_list():
-            clients.append({"id": cuuid, "email": cuuid, "flow": flow})
-    except Exception as e:
-        config.log("core: subscription clients failed: %s" % e)
-        return False, "clients unavailable"
-    with _cross_process_lock():
-        with XRAY_CONFIG_LOCK:
-            previous = _read_config()
-            if not previous:
-                return False, "нет конфига"
-            cfg, _target = _authoritative_config(previous, get_vless_now())
-            target = None
-            for inbound in cfg.get("inbounds", []) or []:
-                if inbound.get("tag") == "vless-in":
-                    target = inbound
-                    break
-            if target is None:
-                return False, "vless-in не найден в xray.json"
-            if target.setdefault("settings", {}).get("clients") == clients:
-                return True, "clients %d" % len(clients)
-            target["settings"]["clients"] = clients
-            level = cfg.setdefault("policy", {}).setdefault("levels", {}).setdefault("0", {})
-            level["statsUserUplink"] = True
-            level["statsUserDownlink"] = True
-            if not _xray_config_valid(cfg):
-                return False, "config preflight failed"
-            if not _write_config(cfg):
-                return False, "write fail"
-            expected = _config_fingerprint(cfg)
-        if not _restart_xray():
-            _restore_config_cas(expected, previous)
-            return False, "restart fail"
-    config.log("core: vless-in clients обновлены (%d всего)" % len(clients))
-    return True, "clients %d" % len(clients)
 
 
 def set_active_tag(tag):

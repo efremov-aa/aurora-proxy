@@ -29,7 +29,7 @@ _RAW = "https://raw.githubusercontent.com/"
 # файлы, которые обновляются из windows-сборки релиза
 _MODULES = [
     "config.py", "pool.py", "source.py", "core.py", "telemetry.py", "tgws.py", "recovery.py", 
-    "rusegment.py", "api.py", "ui.py", "run.py", "updater.py", "security.py", "subs.py", 
+    "rusegment.py", "api.py", "ui.py", "run.py", "updater.py", "security.py", 
     "mesh.py", "crypt.py", "release_sign.py", "extgate.py", "warp.py", "meshtunnel.py", 
     "meshtun.py", "meshsignal.py", "effects.py", "masque.py",
     # A-1040 «Кот-смотритель»: обслуживание канала и данных

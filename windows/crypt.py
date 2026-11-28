@@ -1,6 +1,6 @@
 # Aurora v1.9.0 «Кот-правозащитник» — шифрование данных на диске.
 # Только stdlib: ChaCha20-Poly1305 (RFC 8439), формат AURORA2.
-# Защита от чтения файлов данных (subs.json, keys.json) вне панели.
+# Защита от чтения файлов данных (keys.json, settings.json) вне панели.
 # Формат файла: AURORA2 + nonce(12) + ciphertext + tag(16, Poly1305).
 # Легаси-чтение: AURORA1 (HMAC-SHA256) и открытый JSON; миграция в AURORA2.
 import hashlib

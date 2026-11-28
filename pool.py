@@ -405,18 +405,8 @@ def _save_dead():
 
 # --- public API ---
 def _cap():
-    """Потолок ключей. A-945: он больше не константа - купленная позиция
-    nolimit снимает его на ходу, поэтому спрашиваем effects, а не config.
-    0 = без ограничения."""
-    try:
-        import effects
-        return effects.key_cap()
-    except Exception:
-        pass
-    try:
-        return int(config.MAX_USER_KEYS)
-    except Exception:
-        return 0
+    """Потолок ключей снят в публичной сборке: 0 = без ограничения."""
+    return 0
 
 
 def get_keys():

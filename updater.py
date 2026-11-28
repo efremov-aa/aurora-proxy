@@ -27,7 +27,7 @@ _RAW = "https://raw.githubusercontent.com/"
 _MODULES = [
     "config.py", "pool.py", "source.py", "core.py", "telemetry.py", "tgws.py", "recovery.py", 
     "rusegment.py", "api.py", "ui.py", "run.py", "security.py", "updater.py", "mesh.py", 
-    "subs.py", "crypt.py", "release_sign.py", "extgate.py", "warp.py", "meshtunnel.py", 
+    "crypt.py", "release_sign.py", "extgate.py", "warp.py", "meshtunnel.py", 
     "meshtun.py", "meshsignal.py", "effects.py", "masque.py",
     # A-1040 «Кот-смотритель»: обслуживание канала и данных
     "diag.py", "autocheck.py", "backup.py",

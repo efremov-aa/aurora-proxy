@@ -30,8 +30,7 @@ BACKUP_SETTINGS = (
     "server_name", "auto_refresh", "lan_only", "block_scanners", "rate_limit",
     "segment_title", "segment_regions", "segment_custom",
     "warp_mode", "masque_enabled", "tgws_enabled", "vless_enabled",
-    "game_tun", "game_scenario", "mesh_id", "master_addr", "master_token",
-    "auto_join",
+    "game_tun", "game_scenario", "mesh_id",
 )
 
 

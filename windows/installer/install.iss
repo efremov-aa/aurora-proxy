@@ -1,15 +1,15 @@
 ﻿; Aurora Proxy - Inno Setup 7 installer for the Windows bundle
 ; SrcDir is passed on the command line:
-;   ISCC.exe /DSrcDir=C:\path\to\dist\Aurora /DAuroraVersion=1.10.28 /DAuroraVersionName=Кот-диспетчер install.iss
+;   ISCC.exe /DSrcDir=C:\path\to\dist\Aurora /DAuroraVersion=2.0.0 /DAuroraVersionName=Кот-хозяин install.iss
 
 #ifndef SrcDir
   #define SrcDir "..\..\..\Temp\opencode\aurora_build\dist\Aurora"
 #endif
 #ifndef AuroraVersion
-  #define AuroraVersion "1.10.28"
+  #define AuroraVersion "2.0.0"
 #endif
 #ifndef AuroraVersionName
-  #define AuroraVersionName "Кот-диспетчер"
+  #define AuroraVersionName "Кот-хозяин"
 #endif
 
 [Setup]
